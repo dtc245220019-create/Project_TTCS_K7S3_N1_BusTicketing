@@ -5,14 +5,18 @@ import CountdownTimer from '../components/CountdownTimer';
 function BusListPage() {
   const navigate = useNavigate();
 
-  // Giả lập danh sách nhiều chuyến xe trả về từ Backend
+  // Danh sách chuyến xe mẫu
   const busTrips = [
     {
       id: 1,
       operator: 'Phương Trang Limousine',
       busType: 'Giường nằm VIP 22 chỗ',
-      departureTime: '08:00 AM',
-      arrivalTime: '18:00 PM',
+      tag: 'BÁN CHẠY NHẤT',
+      departureTime: '08:00',
+      arrivalTime: '16:00',
+      duration: '8 tiếng',
+      from: 'TP. Hồ Chí Minh',
+      to: 'Đà Lạt',
       price: 350000,
       availableSeatsCount: 10,
     },
@@ -20,23 +24,30 @@ function BusListPage() {
       id: 2,
       operator: 'Nhà xe Thành Bưởi',
       busType: 'Xe giường nằm 36 chỗ',
-      departureTime: '13:30 PM',
-      arrivalTime: '23:30 PM',
+      tag: 'GIÁ TỐT',
+      departureTime: '13:30',
+      arrivalTime: '21:30',
+      duration: '8 tiếng',
+      from: 'TP. Hồ Chí Minh',
+      to: 'Đà Lạt',
       price: 280000,
       availableSeatsCount: 15,
     },
     {
       id: 3,
       operator: 'An Anh Express',
-      busType: 'Limousine Chuyên Cơ Mặt Đất 9 chỗ',
-      departureTime: '22:00 PM',
-      arrivalTime: '08:00 AM (+1 ngày)',
+      busType: 'Limousine Chuyên Cơ 9 chỗ',
+      tag: 'ĐÓN TẬN NƠI',
+      departureTime: '22:00',
+      arrivalTime: '06:00',
+      duration: '8 tiếng (+1 ngày)',
+      from: 'TP. Hồ Chí Minh',
+      to: 'Đà Lạt',
       price: 400000,
       availableSeatsCount: 5,
     },
   ];
 
-  // Sơ đồ ghế mẫu
   const seatsData = [
     { id: 'A1', status: 'available' }, { id: 'A2', status: 'available' },
     { id: 'A3', status: 'booked' },    { id: 'A4', status: 'available' },
@@ -44,17 +55,15 @@ function BusListPage() {
     { id: 'A7', status: 'booked' },    { id: 'A8', status: 'available' },
   ];
 
-  // Lưu chuyến xe đang được mở sơ đồ ghế
   const [activeBusId, setActiveBusId] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
 
-  // Bật / Tắt sơ đồ ghế của từng chuyến xe
   const toggleBusSeats = (busId) => {
     if (activeBusId === busId) {
-      setActiveBusId(null); // Bấm lại lần nữa thì đóng
+      setActiveBusId(null);
     } else {
-      setActiveBusId(busId); // Mở sơ đồ chọn ghế cho xe này
-      setSelectedSeats([]); // Reset lại danh sách ghế đang chọn
+      setActiveBusId(busId);
+      setSelectedSeats([]);
     }
   };
 
@@ -76,77 +85,145 @@ function BusListPage() {
   };
 
   return (
-    <div className="bus-list-container">
-      <h2>🚌 Các chuyến xe từ Hồ Chí Minh ➔ Đà Lạt</h2>
-      <p className="sub-title">Khởi hành: Hôm nay, 25/09/2026</p>
+    <div className="bus-page-wrapper">
+      {/* Tiêu đề trang */}
+      <div className="page-header-info">
+        <h2>Xe từ TP. Hồ Chí Minh đi Đà Lạt</h2>
+        <p>Khởi hành: Hôm nay, 25/09/2026 — Tìm thấy {busTrips.length} chuyến xe</p>
+      </div>
 
-      {/* Hiển thị danh sách từng chuyến xe */}
-      {busTrips.map((bus) => (
-        <div key={bus.id} className="bus-card" style={{ marginBottom: '20px' }}>
-          <div className="bus-info-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h3 style={{ color: '#00b0ff', margin: '0 0 5px 0' }}>{bus.operator}</h3>
-              <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>{bus.busType}</p>
-              <p style={{ margin: '8px 0 0 0' }}>
-                ⏰ Giờ chạy: <strong>{bus.departureTime}</strong> ➔ Đến: <strong>{bus.arrivalTime}</strong>
-              </p>
-            </div>
+      {/* Bố cục 2 Cột */}
+      <div className="bus-layout-grid">
+        
+        {/* CỘT 1: BỘ LỌC BÊN TRÁI */}
+        <aside className="filter-sidebar">
+          <div className="filter-title">Bộ lọc tìm kiếm</div>
 
-            <div style={{ textAlign: 'right' }}>
-              <p style={{ fontSize: '20px', color: '#d9534f', fontWeight: 'bold', margin: '0 0 8px 0' }}>
-                {bus.price.toLocaleString()} VNĐ
-              </p>
-              <button 
-                className="continue-btn"
-                onClick={() => toggleBusSeats(bus.id)}
-                style={{ backgroundColor: activeBusId === bus.id ? '#ff9800' : '#00b0ff' }}
-              >
-                {activeBusId === bus.id ? 'Đóng chọn ghế' : 'Chọn chuyến'}
-              </button>
-            </div>
+          <div className="filter-group">
+            <label className="group-label">Giờ đi</label>
+            <label className="filter-option">
+              <input type="checkbox" /> Sáng (06:00 - 12:00)
+            </label>
+            <label className="filter-option">
+              <input type="checkbox" /> Chiều (12:00 - 18:00)
+            </label>
+            <label className="filter-option">
+              <input type="checkbox" /> Tối (18:00 - 24:00)
+            </label>
           </div>
 
-          {/* Sơ đồ chọn ghế chỉ hiện ra khi bấm nút "Chọn chuyến" ở xe tương ứng */}
-          {activeBusId === bus.id && (
-            <div className="seat-selection" style={{ marginTop: '20px', borderTop: '1px dashed #ccc', paddingTop: '15px' }}>
-              <CountdownTimer initialMinutes={10} />
-              <h4>Sơ đồ chọn chỗ ngồi ({bus.operator})</h4>
+          <div className="filter-group">
+            <label className="group-label">Loại xe</label>
+            <label className="filter-option">
+              <input type="checkbox" /> Limousine VIP
+            </label>
+            <label className="filter-option">
+              <input type="checkbox" /> Giường nằm tiêu chuẩn
+            </label>
+          </div>
 
-              <div className="seat-legend">
-                <span><i className="seat-demo available"></i> Trống</span>
-                <span><i className="seat-demo selected"></i> Đang chọn</span>
-                <span><i className="seat-demo booked"></i> Đã bán</span>
+          <div className="filter-group">
+            <label className="group-label">Nhà xe</label>
+            <label className="filter-option">
+              <input type="checkbox" /> Phương Trang
+            </label>
+            <label className="filter-option">
+              <input type="checkbox" /> Thành Bưởi
+            </label>
+            <label className="filter-option">
+              <input type="checkbox" /> An Anh Express
+            </label>
+          </div>
+        </aside>
+
+        {/* CỘT 2: DANH SÁCH CHUYẾN XE BÊN PHẢI */}
+        <main className="trip-list-container">
+          {busTrips.map((bus) => (
+            <div key={bus.id} className="trip-card">
+              
+              {/* Header Thẻ Xe */}
+              <div className="trip-card-header">
+                <div>
+                  <h3 className="operator-name">{bus.operator}</h3>
+                  <span className="bus-type-badge">{bus.busType}</span>
+                  {bus.tag && <span className="trip-tag">{bus.tag}</span>}
+                </div>
+
+                <div className="trip-price-section">
+                  <div className="trip-price">{bus.price.toLocaleString()} VNĐ</div>
+                  <button 
+                    className={`select-seat-btn ${activeBusId === bus.id ? 'active' : ''}`}
+                    onClick={() => toggleBusSeats(bus.id)}
+                  >
+                    {activeBusId === bus.id ? 'Đóng chọn ghế' : 'Chọn chuyến'}
+                  </button>
+                </div>
               </div>
 
-              <div className="seat-grid">
-                {seatsData.map((seat) => {
-                  let seatClass = 'seat-btn';
-                  if (seat.status === 'booked') seatClass += ' booked';
-                  else if (selectedSeats.includes(seat.id)) seatClass += ' selected';
+              {/* Trục thời gian (Timeline) */}
+              <div className="trip-timeline">
+                <div className="time-box">
+                  <div className="time">{bus.departureTime}</div>
+                  <div className="place">{bus.from}</div>
+                </div>
 
-                  return (
-                    <button
-                      key={seat.id}
-                      className={seatClass}
-                      onClick={() => toggleSeat(seat.id, seat.status)}
-                    >
-                      {seat.id}
+                <div className="timeline-line">
+                  <span className="duration-tag">{bus.duration}</span>
+                </div>
+
+                <div className="time-box" style={{ textAlign: 'right' }}>
+                  <div className="time">{bus.arrivalTime}</div>
+                  <div className="place">{bus.to}</div>
+                </div>
+              </div>
+
+              {/* Sơ đồ chọn ghế mở ra khi click */}
+              {activeBusId === bus.id && (
+                <div className="seat-picker-container">
+                  <CountdownTimer initialMinutes={10} />
+                  <h4 style={{ margin: '10px 0 5px 0', fontSize: '14px', color: 'var(--primary)' }}>
+                    Chọn chỗ ngồi — {bus.operator}
+                  </h4>
+
+                  <div className="seat-legend">
+                    <span><i className="seat-demo available"></i> Trống</span>
+                    <span><i className="seat-demo selected"></i> Đang chọn</span>
+                    <span><i className="seat-demo booked"></i> Đã bán</span>
+                  </div>
+
+                  <div className="seat-grid">
+                    {seatsData.map((seat) => {
+                      let seatClass = 'seat-btn';
+                      if (seat.status === 'booked') seatClass += ' booked';
+                      else if (selectedSeats.includes(seat.id)) seatClass += ' selected';
+
+                      return (
+                        <button
+                          key={seat.id}
+                          className={seatClass}
+                          onClick={() => toggleSeat(seat.id, seat.status)}
+                        >
+                          {seat.id}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="booking-summary">
+                    <p>Chỗ đã chọn: <strong>{selectedSeats.length > 0 ? selectedSeats.join(', ') : 'Chưa chọn'}</strong></p>
+                    <p>Tổng tiền: <strong style={{ color: 'var(--accent)', fontSize: '16px' }}>{(selectedSeats.length * bus.price).toLocaleString()} VNĐ</strong></p>
+                    <button className="continue-btn" onClick={handleContinuePayment}>
+                      Tiếp tục thanh toán ➔
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                </div>
+              )}
 
-              <div className="booking-summary">
-                <p>Ghế đã chọn: <strong>{selectedSeats.length > 0 ? selectedSeats.join(', ') : 'Chưa chọn'}</strong></p>
-                <p>Tổng tiền: <strong className="total-text">{(selectedSeats.length * bus.price).toLocaleString()} VNĐ</strong></p>
-                <button className="continue-btn" onClick={handleContinuePayment}>
-                  Tiếp tục thanh toán ➔
-                </button>
-              </div>
             </div>
-          )}
-        </div>
-      ))}
+          ))}
+        </main>
+
+      </div>
     </div>
   );
 }
