@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // 1. Bổ sung import công cụ chuyển trang
 
 function SearchForm() {
   const [diemDi, setDiemDi] = useState('Hồ Chí Minh');
   const [diemDen, setDiemDen] = useState('Đà Lạt');
+  const navigate = useNavigate(); // 2. Bổ sung khai báo navigate
 
   const handleSearch = () => {
-    alert(`Bạn đang tìm xe từ: ${diemDi} đến: ${diemDen}`);
+    // Chuyển hướng sang trang danh sách chuyến xe & chọn ghế
+    navigate('/buses');
   };
 
   return (

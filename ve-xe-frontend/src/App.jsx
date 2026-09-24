@@ -1,8 +1,11 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
 import PaymentPage from './pages/PaymentPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import BusListPage from './pages/BusListPage'; // 1. Import trang danh sách xe
 import './App.css';
 
 function App() {
@@ -11,13 +14,12 @@ function App() {
       <div className="app-wrapper">
         <Header />
 
-        {/* Cấu hình các tuyến đường (Route) */}
         <Routes>
-          {/* Trang chủ: http://localhost:5173/ */}
           <Route path="/" element={<HomePage />} />
-
-          {/* Trang thanh toán: http://localhost:5173/payment */}
+          <Route path="/buses" element={<BusListPage />} /> {/* 2. Đường dẫn xem danh sách xe & chọn ghế */}
           <Route path="/payment" element={<PaymentPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
         </Routes>
 
         <Footer />
