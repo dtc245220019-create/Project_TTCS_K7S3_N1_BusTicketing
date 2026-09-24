@@ -40,3 +40,93 @@ body { background-color: #ffffff; color: #333; }
 .footer-col h4 { font-size: 12px; color: #88c1f0; margin-bottom: 15px; }
 .footer-col p { font-size: 14px; color: #d0e4f5; line-height: 1.6; }
 .footer-col h2 { font-size: 24px; }
+
+/* Styling cho Đồng hồ đếm ngược (US03) */
+.countdown-box {
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  color: #856404;
+  padding: 12px 20px;
+  text-align: center;
+  font-size: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.timer-text {
+  color: #d9534f;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.timer-expired {
+  color: #721c24;
+  font-weight: bold;
+}
+
+/* Styling cho UI Thanh toán (US06) */
+.payment-container {
+  background: white;
+  max-width: 600px;
+  margin: 30px auto;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.payment-container h2 {
+  color: #003a6c;
+  margin-bottom: 20px;
+}
+
+.order-summary {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  line-height: 1.8;
+  border-left: 4px solid #00b0ff;
+}
+
+.total-price {
+  color: #d9534f;
+  font-size: 18px;
+  margin-top: 5px;
+}
+
+.payment-methods {
+  margin-bottom: 20px;
+}
+
+.payment-methods h3 {
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+.method-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-top: 10px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.pay-btn {
+  width: 100%;
+  background-color: #28a745;
+  color: white;
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.pay-btn:hover {
+  background-color: #218838;
+}

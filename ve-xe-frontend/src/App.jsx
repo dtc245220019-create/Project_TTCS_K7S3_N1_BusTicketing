@@ -1,32 +1,28 @@
+import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Header from './components/Header';
-import SearchForm from './components/SearchForm';
 import Footer from './components/Footer';
+import HomePage from './pages/HomePage';
+import PaymentPage from './pages/PaymentPage';
 import './App.css';
 
 function App() {
   return (
-    <div className="app-wrapper">
-      {/* Gọi các mảnh ghép vào */}
-      <Header />
-      <SearchForm />
+    <Router>
+      <div className="app-wrapper">
+        <Header />
 
-      <section className="features">
-        <div className="feature-item">
-          <h4>Đặt vé tức thì</h4>
-          <p>Xác nhận nhanh qua email</p>
-        </div>
-        <div className="feature-item">
-          <h4>Thanh toán an toàn</h4>
-          <p>Nhiều phương thức linh hoạt</p>
-        </div>
-        <div className="feature-item">
-          <h4>Hỗ trợ 24/7</h4>
-          <p>Luôn sẵn sàng đồng hành</p>
-        </div>
-      </section>
+        {/* Cấu hình các tuyến đường (Route) */}
+        <Routes>
+          {/* Trang chủ: http://localhost:5173/ */}
+          <Route path="/" element={<HomePage />} />
 
-      <Footer />
-    </div>
+          {/* Trang thanh toán: http://localhost:5173/payment */}
+          <Route path="/payment" element={<PaymentPage />} />
+        </Routes>
+
+        <Footer />
+      </div>
+    </Router>
   );
 }
 
