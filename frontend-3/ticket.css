@@ -1,0 +1,216 @@
+/* ==========================================
+   TICKET PAGE - Frontend 3
+   ========================================== */
+
+.ticket-list {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.ticket-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    position: relative;
+    transition: box-shadow 0.2s;
+}
+
+.ticket-card:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+}
+
+/* Phần bên trái — thông tin vé */
+.ticket-info {
+    padding: 28px 32px;
+    position: relative;
+}
+
+.ticket-info::after {
+    content: "";
+    position: absolute;
+    top: 20px;
+    right: -12px;
+    bottom: 20px;
+    width: 24px;
+    background-image: radial-gradient(circle, #f0f4f8 6px, transparent 7px);
+    background-size: 24px 30px;
+    background-repeat: repeat-y;
+    background-position: center;
+}
+
+.ticket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed #cbd5e1;
+}
+
+.ticket-route {
+    font-size: 22px;
+    font-weight: bold;
+    color: #1e40af;
+    margin-bottom: 4px;
+}
+
+.ticket-code {
+    font-size: 12px;
+    color: #64748b;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+}
+
+.ticket-status {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ticket-status.confirmed {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.ticket-status.pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.ticket-status.cancelled {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.ticket-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 24px;
+    margin-bottom: 20px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.info-value {
+    font-size: 15px;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.info-value.price {
+    color: #16a34a;
+    font-size: 18px;
+}
+
+.ticket-actions {
+    display: flex;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px dashed #cbd5e1;
+}
+
+.btn-ticket {
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-download {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+}
+
+.btn-download:hover {
+    background: #dbeafe;
+}
+
+.btn-cancel {
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.btn-cancel:hover {
+    background: #fee2e2;
+}
+
+.btn-cancel:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Phần bên phải — QR code */
+.ticket-qr {
+    background: #f8fafc;
+    padding: 28px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-left: 1px solid #e2e8f0;
+}
+
+.qr-box {
+    background: white;
+    padding: 12px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 12px;
+}
+
+.qr-box canvas,
+.qr-box img {
+    display: block;
+    width: 200px;
+    height: 200px;
+}
+
+.qr-hint {
+    font-size: 11px;
+    color: #64748b;
+    text-align: center;
+    line-height: 1.5;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .ticket-card {
+        grid-template-columns: 1fr;
+    }
+    .ticket-info::after {
+        display: none;
+    }
+    .ticket-qr {
+        border-left: none;
+        border-top: 1px dashed #cbd5e1;
+    }
+    .ticket-info-grid {
+        grid-template-columns: 1fr;
+    }
+}

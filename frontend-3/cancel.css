@@ -1,0 +1,239 @@
+/* ==========================================
+   CANCEL PAGE - Frontend 3 (US05)
+   ========================================== */
+
+.search-ticket-box {
+    background: white;
+    padding: 28px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 30px;
+}
+
+.search-ticket-form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 16px;
+    align-items: end;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    font-size: 13px;
+    color: #475569;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.form-group input {
+    padding: 12px 14px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+    transition: border-color 0.2s;
+    text-transform: uppercase;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #1e40af;
+    box-shadow: 0 0 0 3px rgba(30,64,175,0.1);
+}
+
+.btn-primary {
+    padding: 12px 24px;
+    background: #1e40af;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+    height: 46px;
+}
+
+.btn-primary:hover {
+    background: #1e3a8a;
+}
+
+.btn-primary:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+.error-message {
+    color: #dc2626;
+    font-size: 14px;
+    margin-top: 12px;
+    min-height: 20px;
+}
+
+/* KẾT QUẢ */
+.ticket-result {
+    background: white;
+    padding: 28px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 30px;
+}
+
+.ticket-result h3 {
+    color: #1e40af;
+    font-size: 20px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #eff6ff;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 24px;
+    margin-bottom: 24px;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.detail-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.detail-value {
+    font-size: 15px;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.detail-value.price {
+    color: #16a34a;
+    font-size: 17px;
+}
+
+.detail-value.status-active {
+    color: #16a34a;
+}
+
+.detail-value.status-cancelled {
+    color: #dc2626;
+}
+
+/* CẢNH BÁO */
+.warning-box {
+    background: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    border-radius: 6px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+}
+
+.warning-box p {
+    font-size: 13px;
+    color: #78350f;
+    line-height: 1.6;
+    margin-bottom: 4px;
+}
+
+.warning-box p:last-child {
+    margin-bottom: 0;
+}
+
+/* NÚT HÀNH ĐỘNG */
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    padding-top: 20px;
+    border-top: 1px dashed #cbd5e1;
+}
+
+.btn-cancel-confirm {
+    flex: 1;
+    padding: 14px;
+    background: #dc2626;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-cancel-confirm:hover {
+    background: #b91c1c;
+}
+
+.btn-cancel-confirm:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    padding: 14px 24px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #e2e8f0;
+}
+
+/* THÀNH CÔNG */
+.success-box {
+    background: white;
+    padding: 60px 30px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    text-align: center;
+}
+
+.success-icon {
+    font-size: 60px;
+    margin-bottom: 16px;
+}
+
+.success-box h3 {
+    color: #16a34a;
+    font-size: 22px;
+    margin-bottom: 8px;
+}
+
+.success-box p {
+    color: #64748b;
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .search-ticket-form {
+        grid-template-columns: 1fr;
+    }
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+    .action-buttons {
+        flex-direction: column;
+    }
+}

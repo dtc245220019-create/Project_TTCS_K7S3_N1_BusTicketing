@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soát vé QR - Smart Bus Ticket</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="scan.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">🚌 Smart Bus Ticket</h1>
+            <nav class="nav">
+                <a href="ticket.html">Vé của tôi</a>
+                <a href="cancel.html">Hủy vé</a>
+                <a href="#">Đăng xuất</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <h2 class="page-title">Soát vé QR</h2>
+        <p class="page-subtitle">Đưa mã QR trên vé vào khung hình để kiểm tra</p>
+
+        <!-- KHU VỰC CAMERA -->
+        <section class="scan-section">
+            <div class="camera-wrapper">
+                <div id="qr-reader" class="qr-reader"></div>
+                <div id="camera-placeholder" class="camera-placeholder">
+                    <div class="placeholder-icon">📷</div>
+                    <p>Nhấn nút bên dưới để bật camera</p>
+                </div>
+            </div>
+
+            <div class="scan-controls">
+                <button class="btn-camera" id="btn-start-camera">
+                    📷 Bật Camera
+                </button>
+                <button class="btn-camera stop" id="btn-stop-camera" style="display: none;">
+                    ⏹ Tắt Camera
+                </button>
+            </div>
+        </section>
+
+        <!-- NHẬP MÃ THỦ CÔNG -->
+        <section class="manual-section">
+            <h3>Hoặc nhập mã vé thủ công</h3>
+            <form id="manual-form" class="manual-form">
+                <input
+                    type="text"
+                    id="manual-code"
+                    placeholder="VD: TKT-2026-0001-XYZ"
+                    autocomplete="off"
+                >
+                <button type="submit" class="btn-manual">Kiểm tra</button>
+            </form>
+        </section>
+
+        <!-- KẾT QUẢ QUÉT -->
+        <section id="scan-result" class="scan-result" style="display: none;">
+            <!-- JS render kết quả vào đây -->
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2026 Smart Bus Ticket System - Đồ án TTCS K7S3 N1</p>
+        </div>
+    </footer>
+
+    <!-- Thư viện quét QR -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="scan.js"></script>
+</body>
+</html>

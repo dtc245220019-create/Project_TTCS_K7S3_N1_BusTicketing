@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vé điện tử - Smart Bus Ticket</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="ticket.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">🚌 Smart Bus Ticket</h1>
+            <nav class="nav">
+                <a href="#">Trang chủ</a>
+                <a href="#">Vé của tôi</a>
+                <a href="#">Đăng xuất</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <h2 class="page-title">Vé điện tử của bạn</h2>
+        <p class="page-subtitle">Đưa mã QR này cho nhân viên soát vé khi lên xe</p>
+
+        <!-- DANH SÁCH VÉ -->
+        <div id="ticket-list" class="ticket-list">
+            <!-- JS sẽ render vé vào đây -->
+        </div>
+
+        <!-- NẾU CHƯA CÓ VÉ -->
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <div class="empty-icon">🎫</div>
+            <h3>Bạn chưa có vé nào</h3>
+            <p>Hãy tìm chuyến và đặt vé để nhận vé điện tử tại đây.</p>
+            <a href="../frontend-1/index.html" class="btn-primary">Tìm chuyến xe</a>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2026 Smart Bus Ticket System - Đồ án TTCS K7S3 N1</p>
+        </div>
+    </footer>
+
+    <!-- Thư viện sinh QR code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="ticket.js"></script>
+</body>
+</html>

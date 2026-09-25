@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hủy vé - Smart Bus Ticket</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="cancel.css">
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">🚌 Smart Bus Ticket</h1>
+            <nav class="nav">
+                <a href="ticket.html">Vé của tôi</a>
+                <a href="#">Trang chủ</a>
+                <a href="#">Đăng xuất</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <h2 class="page-title">Hủy vé</h2>
+        <p class="page-subtitle">Nhập mã vé để tra cứu và hủy</p>
+
+        <!-- FORM NHẬP MÃ VÉ -->
+        <section class="search-ticket-box">
+            <form id="search-ticket-form" class="search-ticket-form">
+                <div class="form-group">
+                    <label for="ticket-code">Mã vé</label>
+                    <input
+                        type="text"
+                        id="ticket-code"
+                        placeholder="VD: TKT-2026-0001-XYZ"
+                        required
+                        autocomplete="off"
+                    >
+                </div>
+                <button type="submit" class="btn-primary" id="btn-search">
+                    🔍 Tra cứu
+                </button>
+            </form>
+            <p id="search-error" class="error-message"></p>
+        </section>
+
+        <!-- KẾT QUẢ TRA CỨU -->
+        <section id="ticket-result" class="ticket-result" style="display: none;">
+            <h3>Thông tin vé</h3>
+
+            <div class="ticket-detail">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <span class="detail-label">Mã vé</span>
+                        <span class="detail-value" id="r-code">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Trạng thái</span>
+                        <span class="detail-value" id="r-status">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Tuyến</span>
+                        <span class="detail-value" id="r-route">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Khởi hành</span>
+                        <span class="detail-value" id="r-departure">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Ghế</span>
+                        <span class="detail-value" id="r-seats">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Tổng tiền</span>
+                        <span class="detail-value price" id="r-price">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CẢNH BÁO -->
+            <div class="warning-box">
+                <p>⚠️ <strong>Lưu ý:</strong> Sau khi hủy, vé không thể khôi phục.</p>
+                <p>Tiền hoàn sẽ được xử lý trong vòng 3-5 ngày làm việc (tùy chính sách).</p>
+            </div>
+
+            <!-- NÚT HỦY -->
+            <div class="action-buttons">
+                <button class="btn-cancel-confirm" id="btn-cancel-confirm">
+                    🚫 Xác nhận hủy vé
+                </button>
+                <button class="btn-secondary" id="btn-reset">
+                    ← Tra cứu vé khác
+                </button>
+            </div>
+        </section>
+
+        <!-- THÔNG BÁO THÀNH CÔNG -->
+        <section id="success-box" class="success-box" style="display: none;">
+            <div class="success-icon">✅</div>
+            <h3>Hủy vé thành công!</h3>
+            <p id="success-message">Vé của bạn đã được hủy.</p>
+            <a href="ticket.html" class="btn-primary">Xem danh sách vé</a>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <p>© 2026 Smart Bus Ticket System - Đồ án TTCS K7S3 N1</p>
+        </div>
+    </footer>
+
+    <script src="cancel.js"></script>
+</body>
+</html>
