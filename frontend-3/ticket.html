@@ -13,16 +13,24 @@
         <div class="container">
             <h1 class="logo">🚌 Smart Bus Ticket</h1>
             <nav class="nav">
-                <a href="#">Trang chủ</a>
-                <a href="#">Vé của tôi</a>
-                <a href="#">Đăng xuất</a>
-            </nav>
+    <a href="../frontend-1/index.html">Trang chủ</a>
+    <a href="ticket.html" class="active">Vé của tôi</a>
+    <a href="#">Đăng xuất</a>
+</nav>
         </div>
     </header>
 
     <main class="container">
         <h2 class="page-title">Vé điện tử của bạn</h2>
         <p class="page-subtitle">Đưa mã QR này cho nhân viên soát vé khi lên xe</p>
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+    <a href="cancel.html" class="btn-primary" style="text-decoration:none; padding:10px 20px;">
+        🚫 Hủy vé
+    </a>
+    <a href="scan.html" class="btn-primary" style="text-decoration:none; padding:10px 20px; background:#16a34a;">
+        📷 Soát vé QR
+    </a>
+</div>
 
         <!-- DANH SÁCH VÉ -->
         <div id="ticket-list" class="ticket-list">

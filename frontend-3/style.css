@@ -53,6 +53,13 @@ body {
 .nav a:hover {
     opacity: 0.8;
 }
+.nav a.active {
+    background: white;
+    color: #1e40af;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 700;
+}
 
 /* MAIN */
 main {
@@ -121,4 +128,11 @@ main {
 
 .btn-primary:hover {
     background: #1e3a8a;
+}
+.nav a.active {
+    background: white;
+    color: #1e40af;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-weight: 700;
 }

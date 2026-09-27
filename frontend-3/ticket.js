@@ -104,11 +104,6 @@ function renderTickets(tickets) {
                     <button class="btn-ticket btn-download" onclick="downloadTicket(${t.ticket_id})">
                         📥 Tải vé
                     </button>
-                    <button class="btn-ticket btn-cancel"
-                            onclick="cancelTicket(${t.ticket_id})"
-                            ${t.status === "CANCELLED" ? "disabled" : ""}>
-                        ${t.status === "CANCELLED" ? "✕ Đã hủy" : "🚫 Hủy vé"}
-                    </button>
                 </div>
             </div>
 
@@ -159,26 +154,6 @@ function downloadTicket(ticketId) {
     // Sau này sẽ gọi API: GET /api/v1/tickets/{id}/download
     // Hiện tại: chỉ thông báo
     alert(`📥 Đang tải vé ${ticket.ticket_code}...\n(Sẽ tải file PDF/PNG ở phiên bản hoàn chỉnh)`);
-}
-
-// ---------- HỦY VÉ ----------
-function cancelTicket(ticketId) {
-    const ticket = MOCK_TICKETS.find((t) => t.ticket_id === ticketId);
-    if (!ticket) return;
-
-    const confirmed = confirm(
-        `Bạn có chắc muốn hủy vé ${ticket.ticket_code}?\n\n` +
-        `Lưu ý: Vé đã hủy không thể khôi phục.`
-    );
-
-    if (!confirmed) return;
-
-    // Sau này sẽ gọi API: POST /api/v1/tickets/{id}/cancel
-    // Hiện tại: cập nhật mock data và render lại
-    ticket.status = "CANCELLED";
-    renderTickets(MOCK_TICKETS);
-
-    alert("✅ Đã hủy vé thành công.");
 }
 
 // ---------- KHỞI CHẠY ----------
