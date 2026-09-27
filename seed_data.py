@@ -1,58 +1,25 @@
-from datetime import datetime, timedelta
-from database import SessionLocal, Route, Trip, BusStop, Seat, engine, Base
+import sqlite3
 
-def seed_database():
-    Base.metadata.create_all(engine)
-    db = SessionLocal()
-    try:
-        # 1. Thêm Tuyến đường
-        route_hn_tn = db.query(Route).filter_by(name="Hà Nội - Thái Nguyên").first()
-        if not route_hn_tn:
-            route_hn_tn = Route(
-                name="Hà Nội - Thái Nguyên",
-                departure_city="Hà Nội",
-                arrival_city="Thái Nguyên",
-                distance_km=75.0
-            )
-            db.add(route_hn_tn)
-            db.commit()
-            db.refresh(route_hn_tn)
+from database import get_connection, initialize_database
 
-        # 2. Thêm Chuyến xe mẫu cho ngày 2026-09-30
-        target_date = datetime.strptime("2026-09-30", "%Y-%m-%d").date()
-        
-        trip = db.query(Trip).filter_by(route_id=route_hn_tn.id).first()
-        if not trip:
-            trip = Trip(
-                route_id=route_hn_tn.id,
-                bus_number="29B-12345",
-                total_seats=20,
-                available_seats=20,
-                departure_time=datetime.combine(target_date, datetime.min.time()) + timedelta(hours=8),
-                arrival_time=datetime.combine(target_date, datetime.min.time()) + timedelta(hours=10),
-                price=120000,
-                status="SCHEDULED"
-            )
-            db.add(trip)
-            db.commit()
-            db.refresh(trip)
 
-            # 3. Tạo 20 ghế mẫu (A1 -> A10, B1 -> B10)
-            seats = []
-            for row in ['A', 'B']:
-                for num in range(1, 11):
-                    seats.append(Seat(trip_id=trip.id, seat_number=f"{row}{num}", status="AVAILABLE"))
-            db.add_all(seats)
-            db.commit()
-            print("-> TẠO DỮ LIỆU MẪU VỚI 20 GHẾ TRỐNG THÀNH CÔNG!")
-        else:
-            print("Database đã có chuyến xe!")
+def seed_database(connection: sqlite3.Connection) -> None:
+    connection.executescript("DELETE FROM ticket_inspections; DELETE FROM demo_tickets; DELETE FROM payments; DELETE FROM sqlite_sequence;")
+    connection.execute("""INSERT INTO payments
+        (booking_code, transaction_code, amount, provider, status, provider_transaction_code, paid_at)
+        VALUES ('BOOK-PAID-001', 'TXN-SANDBOX-001', 450000, 'SANDBOX', 'SUCCESS', 'PROVIDER-001', '2026-09-27 10:00:00')""")
+    connection.execute("""INSERT INTO payments
+        (booking_code, transaction_code, amount, provider, status)
+        VALUES ('BOOK-PENDING-001', 'TXN-SANDBOX-002', 500000, 'SANDBOX', 'PENDING')""")
+    connection.executemany(
+        "INSERT INTO demo_tickets (ticket_code, booking_code) VALUES (?, ?)",
+        [("TICKET-001", "BOOK-PAID-001"), ("TICKET-002", "BOOK-PENDING-001")],
+    )
+    connection.commit()
 
-    except Exception as e:
-        db.rollback()
-        print(f"Lỗi: {e}")
-    finally:
-        db.close()
 
 if __name__ == "__main__":
-    seed_database()
+    with get_connection() as connection:
+        initialize_database(connection)
+        seed_database(connection)
+        print(f"Backend 4 seed completed: {connection.execute('SELECT COUNT(*) FROM payments').fetchone()[0]} payments")
