@@ -1,0 +1,244 @@
+/* ==========================================
+   SCAN PAGE - Frontend 3 (US15)
+   ========================================== */
+
+.scan-section {
+    background: white;
+    padding: 28px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+}
+
+.camera-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto 20px;
+    aspect-ratio: 1 / 1;
+    background: #0f172a;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 3px dashed #334155;
+}
+
+.qr-reader {
+    width: 100%;
+    height: 100%;
+}
+
+.qr-reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+    border-radius: 12px;
+}
+
+.camera-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    pointer-events: none;
+}
+
+.placeholder-icon {
+    font-size: 64px;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+
+.camera-placeholder p {
+    font-size: 14px;
+}
+
+.scan-controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.btn-camera {
+    padding: 12px 28px;
+    background: #1e40af;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-camera:hover {
+    background: #1e3a8a;
+}
+
+.btn-camera.stop {
+    background: #dc2626;
+}
+
+.btn-camera.stop:hover {
+    background: #b91c1c;
+}
+
+/* NHẬP TAY */
+.manual-section {
+    background: white;
+    padding: 24px 28px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+}
+
+.manual-section h3 {
+    font-size: 15px;
+    color: #475569;
+    margin-bottom: 14px;
+    font-weight: 600;
+}
+
+.manual-form {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+}
+
+.manual-form input {
+    padding: 12px 14px;
+    border: 2px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 1px;
+    transition: border-color 0.2s;
+    text-transform: uppercase;
+}
+
+.manual-form input:focus {
+    outline: none;
+    border-color: #1e40af;
+    box-shadow: 0 0 0 3px rgba(30,64,175,0.1);
+}
+
+.btn-manual {
+    padding: 12px 24px;
+    background: #16a34a;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-manual:hover {
+    background: #15803d;
+}
+
+/* KẾT QUẢ */
+.scan-result {
+    background: white;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 24px;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0);    }
+}
+
+.result-valid {
+    border-left: 6px solid #16a34a;
+}
+
+.result-invalid {
+    border-left: 6px solid #dc2626;
+}
+
+.result-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed #cbd5e1;
+}
+
+.result-icon {
+    font-size: 48px;
+}
+
+.result-title {
+    flex: 1;
+}
+
+.result-title h3 {
+    font-size: 22px;
+    margin-bottom: 4px;
+}
+
+.result-title p {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.result-valid .result-title h3 {
+    color: #16a34a;
+}
+
+.result-invalid .result-title h3 {
+    color: #dc2626;
+}
+
+.result-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 24px;
+    margin-bottom: 20px;
+}
+
+.result-detail-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.result-label {
+    font-size: 11px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.result-value {
+    font-size: 15px;
+    color: #1e293b;
+    font-weight: 600;
+}
+
+.result-value.price {
+    color: #16a34a;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .manual-form {
+        grid-template-columns: 1fr;
+    }
+    .result-detail-grid {
+        grid-template-columns: 1fr;
+    }
+    .result-header {
+        flex-direction: column;
+        text-align: center;
+    }
+}
