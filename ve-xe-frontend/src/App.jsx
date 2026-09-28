@@ -8,6 +8,7 @@ import UserDashboard from './pages/UserDashboard';
 import TicketVerification from './pages/TicketVerification';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import MapPage from './pages/MapPage';
 import './App.css';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<HomePage />} />
+            <Route path="/map" element={<MapPage />} />
             <Route path="/buses" element={<BusListPage />} />
             <Route path="/payment" element={<PaymentPage />} />
             <Route path="/dashboard" element={<UserDashboard />} />

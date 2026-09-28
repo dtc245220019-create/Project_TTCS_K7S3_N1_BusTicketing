@@ -1,195 +1,91 @@
+"""Main Entry Point for Smart Bus Ticketing System Backend.
+
+Integrates:
+- Unified FastAPI application with all 8 User Stories
+- BackgroundScheduler (Cronjob tự động quét và giải phóng ghế tạm giữ hết hạn)
+- Lifespan management
+- Seed data on startup
+"""
+
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
-from typing import List, Optional
+from datetime import datetime
 
-from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import Depends, FastAPI, HTTPException, status
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
 import uvicorn
+from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi import FastAPI
 
-from database import Seat, SessionLocal, Trip, engine
+from api import app as api_app
+from database import get_connection, initialize_database
+from seed_data import seed_database, seed_rich_demo_data
 
 
-# ==========================================
-# BACKGROUND JOB (CRONJOB TỰ ĐỘNG GIẢI PHÓNG GHẾ HẾT HẠN)
-# ==========================================
-
+# =============================================================================
+# BACKGROUND JOB (CRONJOB TỰ ĐỘNG GIẢI PHÓNG GHẾ HẾT HẠN - US03)
+# =============================================================================
 def release_expired_seats_job():
     """Background Job quét và giải phóng tất cả ghế HELD đã hết hạn trong DB."""
-    db = SessionLocal()
     try:
-        now = datetime.now()
-        expired_seats = (
-            db.query(Seat)
-            .filter(Seat.status == "HELD", Seat.held_until < now)
-            .all()
-        )
+        now_str = datetime.now().isoformat()
+        with get_connection() as connection:
+            expired_seats = connection.execute(
+                "SELECT id, trip_id, seat_number FROM seats WHERE status = 'HELD' AND held_until < ?",
+                (now_str,),
+            ).fetchall()
 
-        if expired_seats:
-            affected_trip_ids = {seat.trip_id for seat in expired_seats}
-
-            for seat in expired_seats:
-                seat.status = "AVAILABLE"
-                seat.held_until = None
-
-            db.commit()
-
-            for trip_id in affected_trip_ids:
-                trip = db.query(Trip).filter(Trip.id == trip_id).first()
-                if trip:
-                    avail_count = (
-                        db.query(Seat)
-                        .filter(Seat.trip_id == trip_id, Seat.status == "AVAILABLE")
-                        .count()
+            if expired_seats:
+                affected_trips = {s["trip_id"] for s in expired_seats}
+                for s in expired_seats:
+                    connection.execute(
+                        "UPDATE seats SET status = 'AVAILABLE', held_until = NULL WHERE id = ?",
+                        (s["id"],),
                     )
-                    trip.available_seats = avail_count
-            
-            db.commit()
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] -> [CRONJOB] Đã tự động nhả {len(expired_seats)} ghế hết hạn giữ!")
+
+                for trip_id in affected_trips:
+                    avail_count = connection.execute(
+                        "SELECT COUNT(*) FROM seats WHERE trip_id = ? AND status = 'AVAILABLE'",
+                        (trip_id,),
+                    ).fetchone()[0]
+                    connection.execute(
+                        "UPDATE trips SET available_seats = ? WHERE id = ?",
+                        (avail_count, trip_id),
+                    )
+
+                connection.commit()
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [CRONJOB] Đã giải phóng {len(expired_seats)} ghế hết hạn giữ!")
     except Exception as e:
-        db.rollback()
         print(f"Lỗi Cronjob giải phóng ghế: {e}")
-    finally:
-        db.close()
 
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(release_expired_seats_job, 'interval', seconds=10)
+scheduler.add_job(release_expired_seats_job, "interval", seconds=10)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Khởi tạo database và dữ liệu mẫu nếu chưa có
+    with get_connection() as connection:
+        initialize_database(connection)
+        user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        if user_count == 0:
+            seed_database(connection)
+            seed_rich_demo_data(connection)
+            print("-> Đã nạp thành công bộ dữ liệu mẫu ban đầu!")
+        else:
+            seed_rich_demo_data(connection)
+
+    # Khởi chạy scheduler
     scheduler.start()
-    print("-> Background Job Cronjob nhả ghế đã khởi chạy thành công!")
+    print("-> Background Scheduler (Cronjob tự động nhả ghế US03) đã khởi chạy thành công!")
     yield
     scheduler.shutdown()
+    print("-> Background Scheduler đã tắt an toàn.")
 
 
-app = FastAPI(title="Bus Seats & Lock API - Backend 2", lifespan=lifespan)
-
-
-# Dependency lấy DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# ==========================================
-# SCHEMAS (PYDANTIC MODELS)
-# ==========================================
-
-class SeatResponse(BaseModel):
-    id: int
-    seat_number: str
-    status: str  # "AVAILABLE", "HELD", "BOOKED"
-    held_until: Optional[datetime] = None
-
-    model_config = {"from_attributes": True}
-
-
-class TripSeatMapResponse(BaseModel):
-    trip_id: int
-    total_seats: int
-    available_seats: int
-    seats: List[SeatResponse]
-
-
-class HoldSeatRequest(BaseModel):
-    seat_ids: List[int]
-
-
-# ==========================================
-# API ENDPOINTS (BE2: US02 & US03)
-# ==========================================
-
-@app.get("/")
-def home():
-    return {"message": "Bus Seats & Lock API (Backend 2)"}
-
-
-# US02: API Lấy sơ đồ ghế
-@app.get(
-    "/api/v1/trips/{trip_id}/seats",
-    response_model=TripSeatMapResponse,
-    summary="Lấy sơ đồ ghế và trạng thái (US02)",
-)
-def get_trip_seat_map(trip_id: int, db: Session = Depends(get_db)):
-    trip = db.query(Trip).filter(Trip.id == trip_id).first()
-    if not trip:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy chuyến xe có ID = {trip_id}",
-        )
-
-    seats = (
-        db.query(Seat)
-        .filter(Seat.trip_id == trip_id)
-        .order_by(Seat.seat_number.asc())
-        .all()
-    )
-
-    return TripSeatMapResponse(
-        trip_id=trip.id,
-        total_seats=trip.total_seats,
-        available_seats=trip.available_seats,
-        seats=[
-            SeatResponse(
-                id=seat.id,
-                seat_number=seat.seat_number,
-                status=seat.status,
-                held_until=seat.held_until,
-            )
-            for seat in seats
-        ],
-    )
-
-
-# US03: API Tạm giữ ghế trong 10 phút (Lock Seat)
-@app.post(
-    "/api/v1/trips/{trip_id}/hold-seats",
-    summary="Tạm giữ vị trí ghế trong 10 phút (US03)",
-)
-def hold_seats(trip_id: int, payload: HoldSeatRequest, db: Session = Depends(get_db)):
-    seats = (
-        db.query(Seat)
-        .filter(Seat.trip_id == trip_id, Seat.id.in_(payload.seat_ids))
-        .all()
-    )
-
-    if len(seats) != len(payload.seat_ids):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Một số vị trí ghế không hợp lệ hoặc không thuộc chuyến xe này.",
-        )
-
-    unavailable_seats = [s.seat_number for s in seats if s.status != "AVAILABLE"]
-    if unavailable_seats:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Các ghế sau vừa có người chọn: {', '.join(unavailable_seats)}. Vui lòng chọn ghế khác.",
-        )
-
-    # Đặt thời gian giữ ghế 10 phút (khi test có thể sửa thành seconds=15)
-    hold_time = datetime.now() + timedelta(minutes=10)
-    for seat in seats:
-        seat.status = "HELD"
-        seat.held_until = hold_time
-
-    trip = db.query(Trip).filter(Trip.id == trip_id).first()
-    if trip:
-        trip.available_seats -= len(seats)
-
-    db.commit()
-
-    return {
-        "message": "Tạm giữ ghế thành công!",
-        "held_until": hold_time,
-        "seat_ids": payload.seat_ids
-    }
+# Gán lifespan cho app
+api_app.router.lifespan_context = lifespan
+app = api_app
 
 
 if __name__ == "__main__":
