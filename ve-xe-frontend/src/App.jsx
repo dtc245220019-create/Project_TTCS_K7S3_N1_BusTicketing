@@ -2,9 +2,12 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
+import BusListPage from './pages/BusListPage';
 import PaymentPage from './pages/PaymentPage';
 import UserDashboard from './pages/UserDashboard';
 import TicketVerification from './pages/TicketVerification';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import './App.css';
 
 function App() {
@@ -13,20 +16,17 @@ function App() {
       <div className="app-wrapper">
         <Header />
 
-        {/* Cấu hình các tuyến đường (Route) */}
-        <Routes>
-          {/* Trang chủ: http://localhost:5173/ */}
-          <Route path="/" element={<HomePage />} />
-
-          {/* Trang thanh toán: http://localhost:5173/payment */}
-          <Route path="/payment" element={<PaymentPage />} />
-
-          {/* Trang Quản Lý Vé (FE4): http://localhost:5173/dashboard */}
-          <Route path="/dashboard" element={<UserDashboard />} />
-
-          {/* Trang Soát Vé (FE4): http://localhost:5173/verify-ticket */}
-          <Route path="/verify-ticket" element={<TicketVerification />} />
-        </Routes>
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/buses" element={<BusListPage />} />
+            <Route path="/payment" element={<PaymentPage />} />
+            <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/verify-ticket" element={<TicketVerification />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+          </Routes>
+        </main>
 
         <Footer />
       </div>
