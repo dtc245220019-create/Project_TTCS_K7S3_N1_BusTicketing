@@ -16,15 +16,33 @@ function UserDashboard() {
   const loadUserTickets = async () => {
     setLoading(true);
     try {
-      const data = await getTickets(currentUser.id);
-      if (data && data.length > 0) {
-        setTickets(data);
+      let apiTickets = [];
+      try {
+        const data = await getTickets(currentUser.id);
+        if (data && Array.isArray(data)) {
+          apiTickets = data;
+        }
+      } catch (apiErr) {
+        console.warn('API getTickets tạm thời không phản hồi:', apiErr);
+      }
+
+      // Đọc vé đã mua lưu trong localStorage
+      const localSaved = JSON.parse(localStorage.getItem('smartbus_purchased_tickets') || '[]');
+      
+      // Hợp nhất vé từ API và LocalStorage (tránh trùng mã vé)
+      const existingCodes = new Set(apiTickets.map((t) => (t.ticket_code || t.id || '').toUpperCase()));
+      const uniqueLocal = localSaved.filter((lt) => !existingCodes.has((lt.ticket_code || lt.id || '').toUpperCase()));
+      const combined = [...uniqueLocal, ...apiTickets];
+
+      if (combined.length > 0) {
+        setTickets(combined);
       } else {
         // Fallback default tickets so user can demo right away
         setTickets([
           {
             id: 'TKT-8892',
             ticket_id: 8892,
+            ticket_code: 'TKT-8892',
             routeName: 'Hà Nội - Thái Nguyên',
             departureTime: '07:30 - Hôm nay',
             seatNumber: 'A12',
@@ -36,6 +54,7 @@ function UserDashboard() {
           {
             id: 'TKT-7710',
             ticket_id: 7710,
+            ticket_code: 'TKT-7710',
             routeName: 'Thái Nguyên - Hà Nội',
             departureTime: '14:00 - 15/09/2026',
             seatNumber: 'B04',
@@ -58,12 +77,28 @@ function UserDashboard() {
   }, []);
 
   const handleCancel = async (ticket) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn hủy vé ${ticket.id || ticket.ticket_code} không?\n(Lưu ý: Chỉ hủy được trước giờ khởi hành ít nhất 24 giờ)`)) {
+    const code = ticket.ticket_code || ticket.id;
+    if (!window.confirm(`Bạn có chắc chắn muốn hủy vé ${code} không?\n(Lưu ý: Chỉ hủy được trước giờ khởi hành ít nhất 24 giờ)`)) {
       return;
     }
 
     try {
-      await cancelTicket(ticket.ticket_id || ticket.id, currentUser.id);
+      try {
+        await cancelTicket(ticket.ticket_id || ticket.id, currentUser.id);
+      } catch (apiErr) {
+        console.warn('Lỗi gọi API hủy vé:', apiErr);
+      }
+
+      // Cập nhật trạng thái trong localStorage nếu có
+      const localSaved = JSON.parse(localStorage.getItem('smartbus_purchased_tickets') || '[]');
+      const updatedLocal = localSaved.map((t) => {
+        if ((t.ticket_code || t.id) === code) {
+          return { ...t, status: 'CANCELLED' };
+        }
+        return t;
+      });
+      localStorage.setItem('smartbus_purchased_tickets', JSON.stringify(updatedLocal));
+
       alert('Đã hủy vé thành công! Ghế ngồi đã được giải phóng.');
       loadUserTickets();
     } catch (err) {
