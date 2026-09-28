@@ -42,16 +42,22 @@ def seed_database(connection: sqlite3.Connection) -> None:
         (id, trip_code, origin, destination, departure_at, arrival_at, base_price, status, available_seats)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
-            (1, "TRIP-001", "Ha Noi", "Da Nang", "2026-10-01 08:00", "2026-10-01 20:00", 450000, "SCHEDULED", 5),
-            (2, "TRIP-002", "Da Nang", "Ho Chi Minh", "2026-10-02 09:00", "2026-10-02 21:00", 500000, "SCHEDULED", 5),
+            (1, "TRIP-001", "Ha Noi", "Da Nang", "2026-10-01 08:00", "2026-10-01 20:00", 450000, "SCHEDULED", 35),
+            (2, "TRIP-002", "Da Nang", "Ho Chi Minh", "2026-10-02 09:00", "2026-10-02 21:00", 500000, "SCHEDULED", 35),
         ],
     )
     trips = connection.execute("SELECT id FROM trips ORDER BY id").fetchall()
     for trip in trips:
-        connection.executemany(
-            "INSERT INTO seats (trip_id, seat_number, seat_type, status) VALUES (?, ?, ?, 'AVAILABLE')",
-            [(trip["id"], f"A{i:02d}", "STANDARD") for i in range(1, 6)],
-        )
+        for i in range(1, 19):
+            connection.execute(
+                "INSERT INTO seats (trip_id, seat_number, deck_or_row, seat_type, status) VALUES (?, ?, 'TangDuoi', 'STANDARD', 'AVAILABLE')",
+                (trip["id"], f"A{i:02d}"),
+            )
+        for i in range(1, 19):
+            connection.execute(
+                "INSERT INTO seats (trip_id, seat_number, deck_or_row, seat_type, status) VALUES (?, ?, 'TangTren', 'STANDARD', 'AVAILABLE')",
+                (trip["id"], f"B{i:02d}"),
+            )
 
     connection.execute(
         """INSERT INTO bookings
@@ -65,7 +71,7 @@ def seed_database(connection: sqlite3.Connection) -> None:
     )
     connection.executemany(
         "INSERT INTO booking_items (id, booking_id, seat_id, passenger_name, passenger_id_number) VALUES (?, ?, ?, ?, ?)",
-        [(1, 1, 1, "Nguyen Van A", "001234567890"), (2, 2, 6, "Nguyen Van A", "001234567890")],
+        [(1, 1, 1, "Nguyen Van A", "001234567890"), (2, 2, 37, "Nguyen Van A", "001234567890")],
     )
     connection.execute(
         """INSERT INTO payments
@@ -208,6 +214,27 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
                 "INSERT OR IGNORE INTO seats (trip_id, seat_number, deck_or_row, status) VALUES (?, ?, 'TangTren', 'AVAILABLE')",
                 (trip_id, s),
             )
+
+    # Đảm bảo TẤT CẢ các chuyến xe trong cơ sở dữ liệu đều có đầy đủ ghế Tầng A (TangDuoi) và Tầng B (TangTren)
+    all_trips = connection.execute("SELECT id FROM trips").fetchall()
+    for tr in all_trips:
+        tid = tr["id"]
+        for i in range(1, 19):
+            connection.execute(
+                "INSERT OR IGNORE INTO seats (trip_id, seat_number, deck_or_row, status) VALUES (?, ?, 'TangDuoi', 'AVAILABLE')",
+                (tid, f"A{i:02d}"),
+            )
+            connection.execute(
+                "INSERT OR IGNORE INTO seats (trip_id, seat_number, deck_or_row, status) VALUES (?, ?, 'TangTren', 'AVAILABLE')",
+                (tid, f"B{i:02d}"),
+            )
+        # Cập nhật số ghế trống thực tế cho chuyến xe
+        avail_count = connection.execute(
+            "SELECT COUNT(*) FROM seats WHERE trip_id = ? AND status = 'AVAILABLE'", (tid,)
+        ).fetchone()[0]
+        connection.execute(
+            "UPDATE trips SET available_seats = ? WHERE id = ?", (avail_count, tid)
+        )
 
     # 7. Demo Bookings, Payments & Tickets
     connection.execute(
