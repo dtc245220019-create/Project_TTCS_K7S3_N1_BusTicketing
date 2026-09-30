@@ -4,6 +4,7 @@ import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
 import BusListPage from './pages/BusListPage';
 import PaymentPage from './pages/PaymentPage';
+import PaymentResultPage from './pages/PaymentResultPage';
 import UserDashboard from './pages/UserDashboard';
 import TicketVerification from './pages/TicketVerification';
 import LoginPage from './pages/LoginPage';
@@ -23,6 +24,7 @@ function App() {
             <Route path="/map" element={<MapPage />} />
             <Route path="/buses" element={<BusListPage />} />
             <Route path="/payment" element={<PaymentPage />} />
+            <Route path="/payment/result" element={<PaymentResultPage />} />
             <Route path="/dashboard" element={<UserDashboard />} />
             <Route path="/verify-ticket" element={<TicketVerification />} />
             <Route path="/login" element={<LoginPage />} />
