@@ -387,3 +387,27 @@
     width: 100%;
   }
 }
+
+/* Print Styles for E-Ticket US06 */
+@media print {
+  .navbar,
+  .footer,
+  .countdown-box,
+  .payment-success-card > div:first-child,
+  .payment-success-card > div:nth-child(2),
+  .payment-success-card > div:nth-child(3),
+  .payment-success-card > div:last-child {
+    display: none !important;
+  }
+  body, .app-wrapper, .main-content {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  #printable-ticket {
+    max-width: 100% !important;
+    border: 2px solid #000 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+}

@@ -13,7 +13,7 @@ class DatabaseSeedTests(unittest.TestCase):
             for table, expected in {
                 "users": 3,
                 "trips": 2,
-                "seats": 10,
+                "seats": 72,
                 "bookings": 2,
                 "booking_items": 2,
                 "payments": 2,

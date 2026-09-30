@@ -7,7 +7,13 @@ Integrates:
 - Seed data on startup
 """
 
-from __future__ import annotations
+import sys
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -53,9 +59,9 @@ def release_expired_seats_job():
                     )
 
                 connection.commit()
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] [CRONJOB] Đã giải phóng {len(expired_seats)} ghế hết hạn giữ!")
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [CRONJOB] Da giai phong {len(expired_seats)} ghe het han giu!")
     except Exception as e:
-        print(f"Lỗi Cronjob giải phóng ghế: {e}")
+        print(f"Loi Cronjob giai phong ghe: {e}")
 
 
 scheduler = BackgroundScheduler()
@@ -71,16 +77,16 @@ async def lifespan(app: FastAPI):
         if user_count == 0:
             seed_database(connection)
             seed_rich_demo_data(connection)
-            print("-> Đã nạp thành công bộ dữ liệu mẫu ban đầu!")
+            print("-> Da nap thanh cong bo du lieu mau ban dau!")
         else:
             seed_rich_demo_data(connection)
 
     # Khởi chạy scheduler
     scheduler.start()
-    print("-> Background Scheduler (Cronjob tự động nhả ghế US03) đã khởi chạy thành công!")
+    print("-> Background Scheduler (Cronjob tu dong nha ghe US03) da khoi chay thanh cong!")
     yield
     scheduler.shutdown()
-    print("-> Background Scheduler đã tắt an toàn.")
+    print("-> Background Scheduler da tat an toan.")
 
 
 # Gán lifespan cho app
