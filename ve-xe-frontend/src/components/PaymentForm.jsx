@@ -2,11 +2,20 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createOrder, getCurrentUser } from '../api';
 
+const AVAILABLE_VOUCHERS = {
+  CHAO20: { type: 'percentage', value: 20 },
+  BUS50: { type: 'fixed', value: 50000 },
+};
+
 function PaymentForm({ bookingData }) {
   const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState('MOMO');
   const [processing, setProcessing] = useState(false);
   const [orderResult, setOrderResult] = useState(null);
+  const [activeTicketIndex, setActiveTicketIndex] = useState(0);
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [voucherMessage, setVoucherMessage] = useState('');
 
   const currentUser = getCurrentUser() || bookingData.user || {
     id: 1,
@@ -22,7 +31,27 @@ function PaymentForm({ bookingData }) {
   // Ưu đãi giảm 20% cho HSSV / Người cao tuổi
   const hasDiscount = currentUser.discount_type === 'HSSV' || currentUser.discount_type === 'NguoiCaoTuoi';
   const discountAmount = hasDiscount ? Math.round(basePrice * 0.2) : 0;
-  const finalPrice = basePrice - discountAmount;
+  const priceAfterUserDiscount = basePrice - discountAmount;
+  const voucherDiscountAmount = appliedVoucher
+    ? appliedVoucher.type === 'percentage'
+      ? Math.round(priceAfterUserDiscount * appliedVoucher.value / 100)
+      : Math.min(appliedVoucher.value, priceAfterUserDiscount)
+    : 0;
+  const finalPrice = Math.max(0, priceAfterUserDiscount - voucherDiscountAmount);
+
+  const handleApplyVoucher = () => {
+    const code = voucherCode.trim().toUpperCase();
+    const voucher = AVAILABLE_VOUCHERS[code];
+
+    if (!code || !voucher) {
+      setAppliedVoucher(null);
+      setVoucherMessage(code ? 'Mã giảm giá không hợp lệ.' : 'Vui lòng nhập mã giảm giá.');
+      return;
+    }
+
+    setAppliedVoucher({ ...voucher, code });
+    setVoucherMessage(`Đã áp dụng mã ${code}.`);
+  };
 
   const handlePayment = async () => {
     setProcessing(true);
@@ -47,8 +76,10 @@ function PaymentForm({ bookingData }) {
   };
 
   if (orderResult) {
-    const firstTicket = orderResult.tickets[0];
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=ticket:${firstTicket}`;
+    const tickets = orderResult.tickets || [];
+    const currentTicket = tickets[activeTicketIndex] || tickets[0];
+    const currentSeat = bookingData.selectedSeats[activeTicketIndex] || bookingData.selectedSeats[0];
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=ticket:${currentTicket}`;
 
     return (
       <div
@@ -68,6 +99,31 @@ function PaymentForm({ bookingData }) {
         <p style={{ color: '#64748b', margin: '0 0 24px 0', fontSize: '15px' }}>
           Đơn đặt vé của bạn đã được xác nhận. Vé điện tử kèm mã QR thông minh sẵn sàng sử dụng khi lên xe.
         </p>
+
+        {tickets.length > 1 && (
+          <div role="tablist" aria-label="Vé trong đơn hàng" style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
+            {tickets.map((ticket, index) => (
+              <button
+                key={ticket}
+                type="button"
+                role="tab"
+                aria-selected={activeTicketIndex === index}
+                onClick={() => setActiveTicketIndex(index)}
+                style={{
+                  padding: '8px 12px',
+                  border: activeTicketIndex === index ? '1px solid #2563eb' : '1px solid #cbd5e1',
+                  borderRadius: '6px',
+                  backgroundColor: activeTicketIndex === index ? '#eff6ff' : 'white',
+                  color: activeTicketIndex === index ? '#1d4ed8' : '#475569',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                }}
+              >
+                Vé {index + 1} · Ghế {bookingData.selectedSeats[index] || index + 1}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* E-Ticket Card Preview */}
         <div
@@ -100,19 +156,19 @@ function PaymentForm({ bookingData }) {
 
               <div style={{ fontSize: '13px', color: '#64748b', marginTop: '8px' }}>Vị trí ghế:</div>
               <div style={{ fontSize: '18px', fontWeight: '800', color: '#2563eb' }}>
-                {bookingData.selectedSeats.join(', ')}
+                {currentSeat}
               </div>
 
               <div style={{ fontSize: '13px', color: '#64748b', marginTop: '8px' }}>Mã vé:</div>
               <div style={{ fontSize: '15px', fontFamily: 'monospace', fontWeight: 'bold', color: '#475569' }}>
-                {firstTicket}
+                {currentTicket}
               </div>
             </div>
 
             <div style={{ textAlign: 'center' }}>
               <img
                 src={qrUrl}
-                alt="QR Code Vé"
+                alt={`Mã QR vé ${currentTicket}`}
                 style={{ width: '130px', height: '130px', border: '1px solid #cbd5e1', padding: '4px', borderRadius: '8px', backgroundColor: 'white' }}
               />
               <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '4px' }}>Quét khi lên xe</div>
@@ -204,6 +260,43 @@ function PaymentForm({ bookingData }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
                   <span>Ưu đãi {currentUser.discount_type} (-20%):</span>
                   <span>- {discountAmount.toLocaleString('vi-VN')} VNĐ</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0', padding: '12px', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+                <label htmlFor="voucher-code" style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>Mã giảm giá</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    id="voucher-code"
+                    type="text"
+                    value={voucherCode}
+                    onChange={(event) => {
+                      setVoucherCode(event.target.value);
+                      setAppliedVoucher(null);
+                      setVoucherMessage('');
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') handleApplyVoucher();
+                    }}
+                    placeholder="Nhập mã ưu đãi"
+                    aria-describedby="voucher-message"
+                    style={{ minWidth: 0, flex: 1, padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', textTransform: 'uppercase' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyVoucher}
+                    style={{ padding: '0 14px', border: 'none', borderRadius: '6px', backgroundColor: '#1e293b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+                <p id="voucher-message" role="status" aria-live="polite" style={{ minHeight: '16px', margin: 0, color: appliedVoucher ? '#15803d' : '#64748b', fontSize: '12px' }}>
+                  {voucherMessage || 'Mã thử nghiệm: CHAO20 hoặc BUS50.'}
+                </p>
+              </div>
+              {appliedVoucher && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
+                  <span>Voucher {appliedVoucher.code}:</span>
+                  <span>- {voucherDiscountAmount.toLocaleString('vi-VN')} VNĐ</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '18px', fontWeight: 'bold', color: '#dc2626' }}>
