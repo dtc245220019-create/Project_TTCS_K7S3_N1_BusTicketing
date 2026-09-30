@@ -1,6 +1,11 @@
-import { useState, useId } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createOrder, getCurrentUser } from '../api';
+
+const AVAILABLE_VOUCHERS = {
+  CHAO20: { type: 'percentage', value: 20 },
+  BUS50: { type: 'fixed', value: 50000 },
+};
 
 function PaymentForm({ bookingData }) {
   const navigate = useNavigate();
@@ -9,6 +14,9 @@ function PaymentForm({ bookingData }) {
   const [orderResult, setOrderResult] = useState(null);
   const [activeTicketTab, setActiveTicketTab] = useState(0);
   const [copiedField, setCopiedField] = useState('');
+  const [voucherCode, setVoucherCode] = useState('');
+  const [appliedVoucher, setAppliedVoucher] = useState(null);
+  const [voucherMessage, setVoucherMessage] = useState('');
 
   const currentUser = getCurrentUser() || bookingData.user || {
     id: 1,
@@ -24,7 +32,27 @@ function PaymentForm({ bookingData }) {
   // Ưu đãi giảm 20% cho HSSV / Người cao tuổi
   const hasDiscount = currentUser.discount_type === 'HSSV' || currentUser.discount_type === 'NguoiCaoTuoi';
   const discountAmount = hasDiscount ? Math.round(basePrice * 0.2) : 0;
-  const finalPrice = basePrice - discountAmount;
+  const priceAfterUserDiscount = basePrice - discountAmount;
+  const voucherDiscountAmount = appliedVoucher
+    ? appliedVoucher.type === 'percentage'
+      ? Math.round(priceAfterUserDiscount * appliedVoucher.value / 100)
+      : Math.min(appliedVoucher.value, priceAfterUserDiscount)
+    : 0;
+  const finalPrice = Math.max(0, priceAfterUserDiscount - voucherDiscountAmount);
+
+  const handleApplyVoucher = () => {
+    const code = voucherCode.trim().toUpperCase();
+    const voucher = AVAILABLE_VOUCHERS[code];
+
+    if (!code || !voucher) {
+      setAppliedVoucher(null);
+      setVoucherMessage(code ? 'Mã giảm giá không hợp lệ.' : 'Vui lòng nhập mã giảm giá.');
+      return;
+    }
+
+    setAppliedVoucher({ ...voucher, code });
+    setVoucherMessage(`Đã áp dụng mã ${code}.`);
+  };
 
   // Mã giao dịch và chuyển khoản đồng bộ cho phiên đặt chỗ
   const tripCodeClean = (bookingData.trip.trip_code || 'HN-TN').replace(/[^a-zA-Z0-9]/g, '');
@@ -81,7 +109,7 @@ function PaymentForm({ bookingData }) {
       payment_method: paymentMethod,
     };
 
-    let result = null;
+    let result;
 
     try {
       // 1. Thử gọi API Backend trực tiếp
@@ -452,6 +480,43 @@ function PaymentForm({ bookingData }) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
                   <span>Ưu đãi {currentUser.discount_type} (-20%):</span>
                   <span>- {discountAmount.toLocaleString('vi-VN')} VNĐ</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0', padding: '12px', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
+                <label htmlFor="voucher-code" style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>Mã giảm giá</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    id="voucher-code"
+                    type="text"
+                    value={voucherCode}
+                    onChange={(event) => {
+                      setVoucherCode(event.target.value);
+                      setAppliedVoucher(null);
+                      setVoucherMessage('');
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') handleApplyVoucher();
+                    }}
+                    placeholder="Nhập mã ưu đãi"
+                    aria-describedby="voucher-message"
+                    style={{ minWidth: 0, flex: 1, padding: '9px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', textTransform: 'uppercase' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyVoucher}
+                    style={{ padding: '0 14px', border: 'none', borderRadius: '6px', backgroundColor: '#1e293b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Áp dụng
+                  </button>
+                </div>
+                <p id="voucher-message" role="status" aria-live="polite" style={{ minHeight: '16px', margin: 0, color: appliedVoucher ? '#15803d' : '#64748b', fontSize: '12px' }}>
+                  {voucherMessage || 'Mã thử nghiệm: CHAO20 hoặc BUS50.'}
+                </p>
+              </div>
+              {appliedVoucher && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
+                  <span>Voucher {appliedVoucher.code}:</span>
+                  <span>- {voucherDiscountAmount.toLocaleString('vi-VN')} VNĐ</span>
                 </div>
               )}
 
