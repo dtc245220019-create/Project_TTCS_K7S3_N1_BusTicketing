@@ -6,6 +6,7 @@ import BusListPage from './pages/BusListPage';
 import PaymentPage from './pages/PaymentPage';
 import UserDashboard from './pages/UserDashboard';
 import TicketVerification from './pages/TicketVerification';
+import TicketCancellation from './pages/TicketCancellation';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MapPage from './pages/MapPage';
@@ -27,6 +28,7 @@ function App() {
             <Route path="/verify-ticket" element={<TicketVerification />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/cancel-ticket" element={<TicketCancellation />} />
           </Routes>
         </main>
 
