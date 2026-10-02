@@ -1,13 +1,13 @@
 """Main Entry Point for Smart Bus Ticketing System Backend.
 
 Integrates:
-- Unified FastAPI application with all 8 User Stories
+- Unified FastAPI application with all User Stories
 - BackgroundScheduler (Cronjob tự động quét và giải phóng ghế tạm giữ hết hạn)
 - Lifespan management
 - Seed data on startup
 """
-
 import sys
+
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -17,14 +17,45 @@ if sys.platform == "win32":
 
 from contextlib import asynccontextmanager
 from datetime import datetime
-
 import uvicorn
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 
+# Import ứng dụng chính từ api.py
 from api import app as api_app
 from database import get_connection, initialize_database
 from seed_data import seed_database, seed_rich_demo_data
+
+# =============================================================================
+# ĐĂNG KÝ TẤT CẢ CÁC ROUTER/MODULE TRONG DỰ ÁN
+# =============================================================================
+# 1. Module Thông báo (US20)
+try:
+    from notification import router as notification_router
+    api_app.include_router(notification_router)
+except (ImportError, AttributeError):
+    pass
+
+# 2. Module Soát vé / Test API
+try:
+    from test_api import router as test_api_router
+    api_app.include_router(test_api_router)
+except (ImportError, AttributeError):
+    pass
+
+# 3. Module Thay đổi / Hủy vé
+try:
+    from ticket_changes import router as ticket_changes_router
+    api_app.include_router(ticket_changes_router)
+except (ImportError, AttributeError):
+    pass
+
+# 4. Module Test Ticket Changes (nếu có)
+try:
+    from test_ticket_changes import router as test_ticket_changes_router
+    api_app.include_router(test_ticket_changes_router)
+except (ImportError, AttributeError):
+    pass
 
 
 # =============================================================================
@@ -89,10 +120,9 @@ async def lifespan(app: FastAPI):
     print("-> Background Scheduler da tat an toan.")
 
 
-# Gán lifespan cho app
+# Gán lifespan và export app
 api_app.router.lifespan_context = lifespan
 app = api_app
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
