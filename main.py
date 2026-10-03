@@ -1,98 +1,236 @@
-"""Main Entry Point for Smart Bus Ticketing System Backend.
+import json
+import uuid
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 
-Integrates:
-- Unified FastAPI application with all 8 User Stories
-- BackgroundScheduler (Cronjob tự động quét và giải phóng ghế tạm giữ hết hạn)
-- Lifespan management
-- Seed data on startup
-"""
+from .config import (
+    VNPAY_TMN_CODE,
+    VNPAY_HASH_SECRET,
+    VNPAY_PAYMENT_URL,
+    VNPAY_RETURN_URL,
+    ZALOPAY_KEY2,
+)
+from .payment_gateway import (
+    create_vnpay_payment_url,
+    verify_vnpay_signature,
+    verify_zalopay_callback,
+)
 
-import sys
-if sys.platform == "win32":
+app = FastAPI(
+    title="US17 + US18 Payment Integration",
+    version="1.0.0"
+)
+
+# Demo in-memory storage.
+# Khi tích hợp vào project thật, thay bằng database của project.
+PAYMENTS = {}
+
+
+# ==========================================================
+# US17 - TẠO THANH TOÁN
+# ==========================================================
+
+@app.post("/api/v1/payments/vnpay/create")
+async def create_vnpay_payment(body: dict):
+    amount = int(body.get("amount", 0))
+    order_info = body.get("order_info", "Thanh toan ve xe")
+
+    if amount <= 0:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "amount phai > 0"}
+        )
+
+    transaction_code = "VNP" + uuid.uuid4().hex[:12].upper()
+
+    PAYMENTS[transaction_code] = {
+        "transaction_code": transaction_code,
+        "provider": "VNPAY",
+        "amount": amount,
+        "status": "PENDING",
+    }
+
+    payment_url = create_vnpay_payment_url(
+        txn_ref=transaction_code,
+        amount=amount,
+        order_info=order_info,
+        tmn_code=VNPAY_TMN_CODE,
+        hash_secret=VNPAY_HASH_SECRET,
+        payment_url=VNPAY_PAYMENT_URL,
+        return_url=VNPAY_RETURN_URL,
+    )
+
+    return {
+        "success": True,
+        "transaction_code": transaction_code,
+        "status": "PENDING",
+        "payment_url": payment_url,
+    }
+
+
+# ==========================================================
+# US18 - VNPAY IPN / WEBHOOK
+# ==========================================================
+
+@app.get("/api/v1/payments/vnpay/ipn")
+async def vnpay_ipn(request: Request):
+    params = dict(request.query_params)
+
+    if not verify_vnpay_signature(params, VNPAY_HASH_SECRET):
+        return {"RspCode": "97", "Message": "Invalid signature"}
+
+    txn_ref = params.get("vnp_TxnRef")
+    response_code = params.get("vnp_ResponseCode")
+    amount = int(params.get("vnp_Amount", "0")) // 100
+
+    payment = PAYMENTS.get(txn_ref)
+
+    if not payment:
+        return {"RspCode": "01", "Message": "Order not found"}
+
+    if payment["amount"] != amount:
+        return {"RspCode": "04", "Message": "Invalid amount"}
+
+    # Idempotent callback:
+    # callback lặp lại không làm thay đổi sai trạng thái.
+    if payment["status"] == "SUCCESS":
+        return {"RspCode": "00", "Message": "Confirm Success"}
+
+    if response_code == "00":
+        payment["status"] = "SUCCESS"
+    else:
+        payment["status"] = "FAILED"
+
+    return {"RspCode": "00", "Message": "Confirm Success"}
+
+
+# ==========================================================
+# US18 - VNPAY RETURN
+# ==========================================================
+
+@app.get("/api/v1/payments/vnpay/return")
+async def vnpay_return(request: Request):
+    params = dict(request.query_params)
+
+    if not verify_vnpay_signature(params, VNPAY_HASH_SECRET):
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "Invalid signature"}
+        )
+
+    txn_ref = params.get("vnp_TxnRef")
+
+    # Return URL chỉ dùng để đưa người dùng về website.
+    # Không dùng Return URL để tự xác nhận thanh toán.
+    return {
+        "success": True,
+        "transaction_code": txn_ref,
+        "message": "Da xac thuc Return URL. Cho IPN cap nhat trang thai."
+    }
+
+
+# ==========================================================
+# US17 - ZALOPAY CREATE
+# ==========================================================
+
+@app.post("/api/v1/payments/zalopay/create")
+async def create_zalopay_payment(body: dict):
+    amount = int(body.get("amount", 0))
+
+    if amount <= 0:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "message": "amount phai > 0"}
+        )
+
+    transaction_code = "ZLP" + uuid.uuid4().hex[:12].upper()
+
+    PAYMENTS[transaction_code] = {
+        "transaction_code": transaction_code,
+        "provider": "ZALOPAY",
+        "amount": amount,
+        "status": "PENDING",
+    }
+
+    # Phần gọi API tạo order thật của ZaloPay phụ thuộc
+    # credentials + endpoint của merchant.
+    # Endpoint này tạo transaction nội bộ để minh họa US17.
+    return {
+        "success": True,
+        "transaction_code": transaction_code,
+        "status": "PENDING",
+        "message": "Da tao transaction ZaloPay. Gan API create order cua ZaloPay vao day."
+    }
+
+
+# ==========================================================
+# US18 - ZALOPAY CALLBACK
+# ==========================================================
+
+@app.post("/api/v1/payments/zalopay/callback")
+async def zalopay_callback(request: Request):
+    body = await request.json()
+
+    data = body.get("data", "")
+    mac = body.get("mac", "")
+
+    if not verify_zalopay_callback(data, mac, ZALOPAY_KEY2):
+        return {"return_code": -1, "return_message": "Invalid MAC"}
+
     try:
-        sys.stdout.reconfigure(encoding="utf-8")
-        sys.stderr.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
+        payload = json.loads(data)
+    except json.JSONDecodeError:
+        return {"return_code": -1, "return_message": "Invalid data"}
 
-from contextlib import asynccontextmanager
-from datetime import datetime
+    transaction_code = (
+        payload.get("transaction_code")
+        or payload.get("app_trans_id")
+    )
 
-import uvicorn
-from apscheduler.schedulers.background import BackgroundScheduler
-from fastapi import FastAPI
+    payment = PAYMENTS.get(transaction_code)
 
-from api import app as api_app
-from database import get_connection, initialize_database
-from seed_data import seed_database, seed_rich_demo_data
+    if not payment:
+        return {"return_code": 0, "return_message": "Order not found"}
 
+    # Idempotent callback
+    if payment["status"] == "SUCCESS":
+        return {"return_code": 1, "return_message": "Success"}
 
-# =============================================================================
-# BACKGROUND JOB (CRONJOB TỰ ĐỘNG GIẢI PHÓNG GHẾ HẾT HẠN - US03)
-# =============================================================================
-def release_expired_seats_job():
-    """Background Job quét và giải phóng tất cả ghế HELD đã hết hạn trong DB."""
-    try:
-        now_str = datetime.now().isoformat()
-        with get_connection() as connection:
-            expired_seats = connection.execute(
-                "SELECT id, trip_id, seat_number FROM seats WHERE status = 'HELD' AND held_until < ?",
-                (now_str,),
-            ).fetchall()
+    payment["status"] = "SUCCESS"
 
-            if expired_seats:
-                affected_trips = {s["trip_id"] for s in expired_seats}
-                for s in expired_seats:
-                    connection.execute(
-                        "UPDATE seats SET status = 'AVAILABLE', held_until = NULL WHERE id = ?",
-                        (s["id"],),
-                    )
-
-                for trip_id in affected_trips:
-                    avail_count = connection.execute(
-                        "SELECT COUNT(*) FROM seats WHERE trip_id = ? AND status = 'AVAILABLE'",
-                        (trip_id,),
-                    ).fetchone()[0]
-                    connection.execute(
-                        "UPDATE trips SET available_seats = ? WHERE id = ?",
-                        (avail_count, trip_id),
-                    )
-
-                connection.commit()
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] [CRONJOB] Da giai phong {len(expired_seats)} ghe het han giu!")
-    except Exception as e:
-        print(f"Loi Cronjob giai phong ghe: {e}")
+    return {
+        "return_code": 1,
+        "return_message": "Success"
+    }
 
 
-scheduler = BackgroundScheduler()
-scheduler.add_job(release_expired_seats_job, "interval", seconds=10)
+# ==========================================================
+# KIỂM TRA TRẠNG THÁI
+# ==========================================================
+
+@app.get("/api/v1/payments/{transaction_code}")
+async def payment_status(transaction_code: str):
+    payment = PAYMENTS.get(transaction_code)
+
+    if not payment:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "message": "Transaction not found"
+            }
+        )
+
+    return {
+        "success": True,
+        "data": payment
+    }
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Khởi tạo database và dữ liệu mẫu nếu chưa có
-    with get_connection() as connection:
-        initialize_database(connection)
-        user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        if user_count == 0:
-            seed_database(connection)
-            seed_rich_demo_data(connection)
-            print("-> Da nap thanh cong bo du lieu mau ban dau!")
-        else:
-            seed_rich_demo_data(connection)
-
-    # Khởi chạy scheduler
-    scheduler.start()
-    print("-> Background Scheduler (Cronjob tu dong nha ghe US03) da khoi chay thanh cong!")
-    yield
-    scheduler.shutdown()
-    print("-> Background Scheduler da tat an toan.")
-
-
-# Gán lifespan cho app
-api_app.router.lifespan_context = lifespan
-app = api_app
-
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+@app.get("/")
+async def root():
+    return {
+        "project": "US17 + US18",
+        "US17": "Create payment VNPAY + ZaloPay",
+        "US18": "Webhook / Callback VNPAY + ZaloPay"
+    }
