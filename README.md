@@ -1,225 +1,184 @@
 # 🚌 HỆ THỐNG ĐẶT VÉ XE BUÝT THÔNG MINH (SMART BUS TICKETING)
 > **Đồ án Thực tập Cơ sở K7S3 — Nhóm 01**  
 > **Repository:** [Project_TTCS_K7S3_N1_BusTicketing](https://github.com/dtc245220019-create/Project_TTCS_K7S3_N1_BusTicketing.git)  
-> **Trạng thái:** Đã tích hợp hoàn tất (Git Merge All Branches), 100% vượt qua kiểm thử (12/12 Test Cases Passed), sẵn sàng Demo & Ra mắt sản phẩm.
+> **Trạng thái Sprint 2:** Đã tích hợp hoàn tất (Git Merge All Sprint 2 Branches), Hỗ trợ MySQL 8.0+ & SQLite Dual-Engine, 100% vượt qua kiểm thử (33/33 Test Cases Passed), sẵn sàng Demo & Báo cáo.
 
 ---
 
-## 📌 1. Giới Thiệu Dự Án & Kế Hoạch Phát Triển
+## 📌 1. Giới Thiệu Dự Án & Kế Hoạch Sprint 2
 
 Hệ thống **Smart Bus Ticketing** là nền tảng quản trị và bán vé xe buýt / xe khách trực tuyến toàn diện. Dự án áp dụng quy trình Scrum/Agile với tổng lộ trình **4 tuần (24 User Stories)**.
 
-Trong **Tuần đầu tiên (Sprint 1)**, mục tiêu trọng tâm là hoàn thành và bàn giao hệ thống **MVP (Minimum Viable Product)** với **8 User Stories cốt lõi**, cho phép khách hàng tra cứu, chọn ghế trực quan 2 tầng, giữ chỗ tạm thời với đồng hồ đếm ngược, thanh toán trực tuyến Sandbox, nhận vé điện tử mã QR động, tự quản lý/hủy vé và tài xế đối soát vé chống gian lận theo thời gian thực. Ngoài ra, hệ thống đã được nâng cấp tích hợp **Bản đồ tương tác GPS (OpenStreetMap / Leaflet)** hiển thị toàn bộ lộ trình và các trạm dừng (TRAM_DUNG).
+- **Sprint 1 (Tuần 1):** Bàn giao hệ thống **MVP cốt lõi (US01 - US08)**: Tra cứu chuyến, sơ đồ ghế 2 tầng (Dãy A & Dãy B), tạm giữ ghế 10 phút kèm Cronjob BackgroundScheduler tự động nhả ghế, thanh toán trực tuyến Sandbox, xuất vé điện tử kèm mã QR động, soát vé chống gian lận và Bản đồ tương tác OpenStreetMap/Leaflet với tọa độ GPS trạm dừng.
+- **Sprint 2 (Tuần 2):** Nâng cấp hệ thống lên quy mô doanh nghiệp với các chức năng mở rộng:
+  - **US17 & US18:** Tích hợp Cổng thanh toán quốc dân **VNPay** (Chữ ký điện tử HMAC-SHA512) và **ZaloPay** (Mã xác thực HMAC-SHA256), cơ chế Webhook IPN xử lý bất đồng bộ và Return URL điều hướng.
+  - **US20:** Hệ thống thông báo tức thì đa kênh: Gửi Email xác nhận hóa đơn vé xe chuẩn HTML (`smtp.gmail.com`) + SMS Gateway Mock đồng bộ thông tin chuyến đi + Chuông thông báo in-app Notification Bell với unread badge.
+  - **BE4:** Hệ sinh thái Khuyến mãi & Phí dịch vụ: Mã giảm giá (**Vouchers**: `CHAO20`, `BUS50`, `GIAM10K`, `VIP15`) và Phí dịch vụ tiện ích bến bãi, bảo hiểm hành khách.
+  - **US24:** Nghiệp vụ soát vé lên xe (**Boarding Check-in**): Cập nhật trạng thái vé `USED` / `DaSoat`, ghi nhận lịch sử kiểm soát vé và đối soát tài xế.
+  - **US25 & US26:** Màn hình kết quả giao dịch thanh toán chi tiết (**PaymentResultPage**) và Cổng tra cứu, hủy vé & yêu cầu hoàn tiền trực tuyến (**TicketCancellation**).
+  - **Kiến trúc CSDL MySQL quy mô lớn:** Cung cấp lược đồ DDL 18 bảng MySQL 8.0+ ([schema_mysql.sql](schema_mysql.sql)), công cụ di chuyển dữ liệu tự động ([migrate_to_mysql.py](migrate_to_mysql.py)) và kiến trúc **Dual-Engine** thông minh tự động kết nối MySQL hoặc fallback mượt mà về SQLite.
 
 ---
 
-## 👥 2. Phân Chia Vai Trò Nhóm 10 Thành Viên
+## 👥 2. Phân Chia Vai Trò Nhóm 10 Thành Viên (Sprint 2)
 
-| STT | Thành Viên / Luồng | Vai Trò | Nhiệm Vụ Chi Tiết Tuần 1 | Nhánh Phụ Trách |
+| STT | Thành Viên / Luồng | Vai Trò | Nhiệm Vụ Chi Tiết Sprint 2 | Nhánh Nguồn Git |
 |:---:|:---|:---|:---|:---|
-| 1 | **Leader (Gia Bảo)** | Quản lý dự án & Kiến trúc sư | Lập kế hoạch Sprint, điều phối luồng, Gitmerge hợp nhất toàn bộ nhánh nguồn, tối ưu hóa CSDL theo ERD chuẩn, thiết kế tính năng Bản đồ chặng GPS, chuẩn bị tài liệu ra mắt sản phẩm. | `main` |
-| 2 | **Backend 1** | Backend Engineer | Thiết kế lược đồ CSDL, khởi tạo database và phát triển API Tra cứu chuyến xe (**US01**). | `feature/be-auth-search` |
-| 3 | **Backend 2** | Backend Engineer | Xây dựng API Sơ đồ ghế (**US02**), logic khóa giữ ghế 10 phút và Cronjob BackgroundScheduler tự động quét nhả ghế hết hạn (**US03**). | `feature/be-seats-lock` |
-| 4 | **Backend 3** | Backend Engineer | Xây dựng logic sinh mã vé, mã QR động (**US06**), API Hủy vé và Đổi ghế trực tuyến theo quy tắc 24h (**US07**). | `feature/be-qr-cancel` |
-| 5 | **Backend 4** | Backend Engineer | Tích hợp cổng thanh toán Sandbox MoMo / VNPay (**US05**), xử lý callback và API Soát vé xác thực tài xế (**US08**). | `feature/be-payment-verify` |
-| 6 | **Frontend 1** | Frontend Engineer | Xây dựng Layout tổng thể chuẩn doanh nghiệp, thanh điều hướng Header/Footer, Form tìm kiếm chuyến xe thông minh (**US01**). | `feature/fe-layout-search-pay` |
-| 7 | **Frontend 2** | Frontend Engineer | Thiết kế giao diện Đăng ký/Đăng nhập (**US04**), danh sách chuyến xe và sơ đồ chọn ghế 2 tầng kèm Countdown Timer 10:00 (**US02, US03**). | `feature/fe-auth-seats` |
-| 8 | **Frontend 3** | Frontend Engineer | Thiết kế giao diện hiển thị vé điện tử QR, form hủy vé và màn hình quét mã QR soát vé trên di động/web (**US06, US07**). | `feature/fe-qr-scan` |
-| 9 | **Frontend 4** | Frontend Engineer | Xây dựng Trang Dashboard Quản lý vé cá nhân, Lịch sử chuyến đi và Màn hình Soát vé thời gian thực cho tài xế (**US07, US08**). | `feature/fe-user-dashboard` |
-| 10 | **QA - Tester** | Kiểm thử phần mềm | Xây dựng bộ test suite `unittest` tự động, kiểm tra tính toàn vẹn CSDL, kiểm thử luồng thanh toán Sandbox, hủy vé và soát vé. | `test` |
+| 1 | **Leader (Gia Bảo)** | Quản lý dự án & Kiến trúc sư | Gitmerge hợp nhất toàn bộ nhánh nguồn Sprint 2, đồng bộ mô hình CSDL MySQL & SQLite Dual-Engine, chuẩn hóa API thống nhất, kiểm thử toàn diện 33 tests và viết tài liệu hướng dẫn. | `main` |
+| 2 | **Backend 1** | Backend Engineer | Cổng thanh toán ZaloPay & VNPay: Mã hóa chữ ký HMAC-SHA256, HMAC-SHA512, API tạo URL thanh toán (**US17**), Webhook IPN & Return URL (**US18**). | `feature/be1-zalo-vnpay` |
+| 3 | **Backend 2** | Backend Engineer | Hệ thống Thông báo đa kênh (**US20**): Gửi Email SMTP HTML xác nhận đặt vé, SMS Gateway Mock và lưu trữ thông báo in-app. | `feature/be-notification-US20` |
+| 4 | **Backend 3** | Backend Engineer | API Soát vé bằng mã QR (**US08**) và Nghiệp vụ ghi nhận hành khách lên xe (**US24** - Boarding API). | `feature/Api-cap-nhat-trang-thai-ve-khi-len-xe`<br>`feature/Api-soat-ve-bang-qr` |
+| 5 | **Backend 4** | Backend Engineer | Quản lý Mã giảm giá (Vouchers) và Phí dịch vụ (Service Fees): Tính toán chiết khấu, ràng buộc đơn giá tối thiểu và hạn sử dụng. | `feature/be4-voucher-fee` |
+| 6 | **Frontend 1** | Frontend Engineer | Thiết kế Trang Kết quả thanh toán chi tiết (**US26** - `PaymentResultPage.jsx`) hiển thị mã hóa đơn, thông tin vé và nút điều hướng. | `feature/fe-payment-result` |
+| 7 | **Frontend 2** | Frontend Engineer | Xây dựng Giao diện Tra cứu vé, Hủy vé trực tuyến và Chính sách hoàn tiền 100% (**US25** - `TicketCancellation.jsx`). | `feature/fe-ticket-verify-cancel` |
+| 8 | **Frontend 3** | Frontend Engineer | Tích hợp thành phần nhập Voucher khuyến mãi trực tiếp trên Form thanh toán và hiển thị thẻ vé QR động. | `feature/fe2-ticket-qr-voucher` |
+| 9 | **Frontend 4** | Frontend Engineer | Thiết kế Chuông thông báo Notification Bell trên Navbar với số đếm tin chưa đọc và Dropdown xem tin nhắn xác nhận Email/SMS. | `feature/fe-user-dashboard` |
+| 10 | **QA - Tester** | Kiểm thử phần mềm | Xây dựng bộ test suite tự động 33 tests kiểm thử toàn diện Voucher, Fee, VNPay, ZaloPay, Boarding, Hủy vé và CSDL. | `test` |
 
 ---
 
-## 🗄️ 3. Mô Hình Thực Thể Quan Hệ (ERD Chuẩn Hóa)
+## 🗄️ 3. Mô Hình Dữ Liệu MySQL Chuẩn Hóa 18 Bảng (ERD Sprint 2)
 
-Hệ thống được thiết kế bám sát 100% tài liệu đặc tả **"Đề tài Smart_Bus_Ticketing"** với 14 thực thể nghiệp vụ:
+Hệ thống cung cấp file DDL MySQL hoàn chỉnh tại **[schema_mysql.sql](schema_mysql.sql)** chuẩn hóa theo tài liệu ERD *"Đề tài Smart_Bus_Ticketing"*:
 
 ```mermaid
 erDiagram
-    NGUOI_DUNG ||--o{ VE_DIEN_TU : "dat_ve"
-    NGUOI_DUNG ||--o{ VE_THANG : "dang_ky"
-    NGUOI_DUNG ||--o{ PHAN_ANH : "gui"
-    NGUOI_DUNG ||--o{ NHAT_KY_HOAT_DONG : "thuc_hien"
-    NGUOI_DUNG ||--o{ CHUYEN_XE : "dieu_hanh_lai_xe"
-
-    TUYEN_XE ||--|{ CHI_TIET_TUYEN_TRAM : "bao_gom"
-    TRAM_DUNG ||--|{ CHI_TIET_TUYEN_TRAM : "thuoc"
-    TUYEN_XE ||--o{ CHUYEN_XE : "thuoc_tuyen"
-    TUYEN_XE ||--o{ VE_THANG : "ap_dung"
-
-    XE_BUYT ||--|{ GHE_NGOI : "co"
-    XE_BUYT ||--o{ CHUYEN_XE : "phan_cong"
-
-    CHUYEN_XE ||--o{ VE_DIEN_TU : "phat_hanh"
-    CHUYEN_XE ||--o{ BAO_CAO_SU_CO : "phat_sinh"
-    CHUYEN_XE ||--o{ PHAN_ANH : "duoc_danh_gia"
-
-    GHE_NGOI ||--o| VE_DIEN_TU : "duoc_chon"
-    VE_DIEN_TU ||--o| THANH_TOAN : "phat_sinh"
-    VOUCHER ||--o{ VE_DIEN_TU : "giam_gia"
+    users ||--o{ bookings : "places"
+    users ||--o{ tickets : "owns"
+    users ||--o{ notifications : "receives"
+    users ||--o{ monthly_passes : "registers"
+    users ||--o{ ticket_inspections : "inspects"
+    
+    routes ||--|{ route_stop_details : "contains"
+    bus_stops ||--|{ route_stop_details : "locates"
+    routes ||--o{ trips : "schedules"
+    
+    buses ||--|{ seats : "has"
+    buses ||--o{ trips : "assigns"
+    
+    trips ||--|{ seats : "arranges"
+    trips ||--o{ bookings : "booked_in"
+    trips ||--o{ tickets : "issues"
+    
+    bookings ||--|{ booking_items : "contains"
+    bookings ||--o| payments : "paid_by"
+    
+    booking_items ||--o| tickets : "generates"
+    seats ||--o| tickets : "reserved_for"
+    vouchers ||--o{ tickets : "applies_to"
+    
+    tickets ||--o{ ticket_inspections : "inspected_in"
+    tickets ||--o{ notifications : "triggers"
 ```
 
-### Chi tiết các thực thể chính:
-1. **NGUOI_DUNG (`users`):** Lưu trữ thông tin người dùng, mật khẩu mã hóa, vai trò (`Admin`, `QuanLy`, `TaiXe`, `PhuXe`, `HanhKhach`), đối tượng ưu đãi (`HSSV`, `NguoiCaoTuoi`, `Khong`).
-2. **TUYEN_XE (`routes`):** Quản lý tuyến đường (Điểm đầu, Điểm cuối, Giá vé cơ bản, Cự ly km, Trạng thái hoạt động).
-3. **TRAM_DUNG (`bus_stops`):** Trạm dừng trên hành trình kèm tọa độ GPS (`latitude`, `longitude`, `address`, `city`).
-4. **CHI_TIET_TUYEN_TRAM (`route_stop_details`):** Thứ tự các trạm dừng và cự ly chặng trên từng tuyến xe buýt.
-5. **XE_BUYT (`buses`):** Quản lý phương tiện, biển số xe, loại xe (Limousine VIP, Giường nằm), tọa độ GPS hiện tại.
-6. **GHE_NGOI (`seats`):** Quản lý vị trí ghế, tầng/dãy (`TangDuoi`, `TangTren`), trạng thái (`AVAILABLE`, `HELD`, `BOOKED`), thời hạn giữ chỗ (`held_until`).
-7. **CHUYEN_XE (`trips`):** Lịch trình khởi hành, thời gian đến dự kiến, phân công tài xế/phụ xe và số ghế còn trống.
-8. **VE_DIEN_TU (`tickets`):** Quản lý vé, mã vé điện tử (`TKT-...`), chuỗi mã hóa QR (`qr_payload`), giá thực tế, trạng thái vé (`GiuCho`, `DaThanhToan`, `DaSoat`, `DaHuy`).
-9. **THANH_TOAN (`payments`):** Giao dịch thanh toán Sandbox (MoMo, VNPay, ZaloPay, Thẻ ATM), mã giao dịch duy nhất (`TXN-...`).
-10. **VE_THANG (`monthly_passes`):** Đăng ký vé tháng theo tuyến xe.
-11. **VOUCHER (`vouchers`):** Mã khuyến mãi giảm giá, phần trăm giảm, hạn sử dụng.
-12. **BAO_CAO_SU_CO (`incident_reports`):** Báo cáo sự cố từ tài xế trong quá trình vận hành chuyến xe.
-13. **PHAN_ANH (`feedbacks`):** Đánh giá số sao (1-5 sao) và nhận xét của hành khách sau chuyến đi.
-14. **NHAT_KY_HOAT_DONG (`ticket_inspections` / `activity_logs`):** Nhật ký kiểm tra soát vé của tài xế và thao tác hệ thống.
-
-File DDL tạo bảng chuẩn hóa được cung cấp độc lập tại: [schema_smart_bus_ticketing.sql](schema_smart_bus_ticketing.sql).
+### Danh sách 18 Bảng CSDL Chuẩn Hóa:
+1. `users` (Khách hàng, Tài xế, Phụ xe, Quản trị viên, Loại đối tượng ưu đãi HSSV)
+2. `routes` (Tuyến xe buýt liên tỉnh / nội đô)
+3. `bus_stops` (Trạm dừng đón/trả khách kèm tọa độ GPS)
+4. `route_stop_details` (Thứ tự trạm dừng và khoảng cách cự ly theo tuyến)
+5. `buses` (Phương tiện, biển số xe, loại xe, vị trí GPS thời gian thực)
+6. `trips` (Lịch khởi hành, điểm đi, điểm đến, tài xế phân công, số ghế trống)
+7. `seats` (Sơ đồ ghế 2 tầng: Dãy A Tầng Dưới, Dãy B Tầng Trên, trạng thái AVAILABLE/HELD/BOOKED)
+8. `vouchers` (Mã giảm giá, loại chiết khấu %, giảm cố định, đơn giá tối thiểu, ngày hết hạn)
+9. `fees` (Các loại phụ phí dịch vụ: bảo hiểm hành khách, tiện ích bến bãi)
+10. `bookings` (Đơn đặt vé tổng hợp)
+11. `booking_items` (Chi tiết ghế và thông tin từng hành khách)
+12. `payments` (Lịch sử thanh toán: SANDBOX, VNPAY, ZALOPAY, MOMO, BANK)
+13. `tickets` (Vé điện tử, mã vé `TKT-...`, chuỗi QR Payload, trạng thái PAID/USED/CANCELLED)
+14. `demo_tickets` (Khả năng tương thích sandbox và mô phỏng vé demo)
+15. `ticket_inspections` (Nhật ký soát vé và xác nhận hành khách lên xe của tài xế)
+16. `notifications` (Nhật ký gửi thông báo Email xác nhận, SMS Gateway và In-app)
+17. `monthly_passes` (Đăng ký vé tháng theo tuyến)
+18. `incident_reports` & `feedbacks` (Báo cáo sự cố và đánh giá chuyến đi 1-5 sao)
 
 ---
 
-## 🚀 4. Chi Tiết 8 User Stories Tuần 1
+## ⚡ 4. Hướng Dẫn Di Chuyển Lên MySQL (MySQL Migration)
 
-* **US01: Tra cứu & Tìm kiếm Chuyến xe (Search Trips):**  
-  Người dùng nhập điểm đi, điểm đến, ngày đi để nhận danh sách chuyến xe phù hợp kèm thời gian khởi hành, loại xe, biển số, số chỗ còn trống và giá vé.
-* **US02: Sơ đồ ghế trực quan 2 tầng & Chọn chỗ (Seat Map Selection):**  
-  Hiển thị sơ đồ ghế phân tầng (Tầng dưới Dãy A, Tầng trên Dãy B) với màu sắc trực quan (Trống, Đang chọn, Đang giữ chỗ, Đã bán).
-* **US03: Khóa giữ chỗ tạm thời 10 phút & Background Cronjob (Hold Seats & Auto-Release):**  
-  Hệ thống tạm giữ ghế đã chọn trong vòng 10 phút kèm đồng hồ đếm ngược trên giao diện. Background Job (`APScheduler`) chạy ngầm mỗi 10 giây tự động giải phóng ghế nếu khách hàng không hoàn tất thanh toán.
-* **US04: Đăng ký & Đăng nhập phân quyền (Auth & Roles):**  
-  Xác thực người dùng với các vai trò: Hành khách (đặt vé), Tài xế/Phụ xe (soát vé), Quản trị viên (quản lý). Hỗ trợ xét duyệt ưu đãi 20% cho Học sinh / Sinh viên.
-* **US05: Cổng thanh toán Sandbox (Online Payment Sandbox):**  
-  Mô phỏng thanh toán trực tuyến qua Ví MoMo, Cổng VNPAY (QR Pay), ZaloPay hoặc Thẻ Ngân hàng, kích hoạt tức thì không cần chờ đợi.
-* **US06: Xuất vé điện tử & Tạo mã QR động (E-Ticket with Dynamic QR):**  
-  Tự động sinh vé điện tử kèm mã QR động (`ticket:TKT-...`) hiển thị trực tiếp trên web và hỗ trợ in/tải về.
-* **US07: Quản lý lịch sử vé cá nhân & Hủy vé trực tuyến (User Dashboard & Cancellation):**  
-  Hành khách quản lý danh sách vé sắp đi và lịch sử chuyến đi; thực hiện hủy vé trực tuyến (áp dụng quy định trước 24h) kèm giải phóng ghế tự động.
-* **US08: Màn hình Soát vé thời gian thực dành cho Tài xế (Driver Ticket Verification):**  
-  Tài xế nhập mã hoặc quét QR để kiểm tra vé: Báo xanh `VÉ HỢP LỆ`, cảnh báo vàng `VÉ ĐÃ SỬ DỤNG TRƯỚC ĐÓ` (chống gian lận vé trùng) hoặc báo đỏ `VÉ KHÔNG HỢP LỆ`.
-* **🌟 Nâng cấp đặc biệt: Bản đồ Lộ trình & Trạm dừng GPS (Interactive Smart Bus Map):**  
-  Tích hợp bản đồ Leaflet / OpenStreetMap hiển thị các trạm dừng (`TRAM_DUNG`), cự ly từng chặng (`CHI_TIET_TUYEN_TRAM`), đường nối lộ trình (polyline) và vị trí xe buýt đang vận hành (`XE_BUYT`).
+Dự án trang bị kiến trúc **Dual-Engine**:
+- Mặc định hệ thống chạy với SQLite tại `data/bus_booking.db` (đảm bảo demo mượt mà ngay cả khi chưa bật dịch vụ MySQL).
+- Khi kết nối MySQL, chỉ cần chỉ định biến môi trường `DATABASE_URL`.
 
----
+### Cách 1: Chạy công cụ di chuyển dữ liệu tự động (CLI Migration)
+Đảm bảo dịch vụ MySQL trên máy tính đang chạy (Port 3306), sau đó chạy lệnh:
 
-## 🛠️ 5. Hướng Dẫn Cài Đặt & Khởi Chạy
+```bash
+python migrate_to_mysql.py
+```
+> Script sẽ tự động:
+> 1. Kết nối MySQL với tài khoản `root` (hoặc cấu hình qua biến môi trường).
+> 2. Tự động tạo cơ sở dữ liệu `smart_bus_ticketing` với mã hóa UTF-8 (`utf8mb4`).
+> 3. Tự động thực thi toàn bộ cấu trúc 18 bảng từ `schema_mysql.sql`.
+> 4. Sao chép và di chuyển toàn bộ dữ liệu hiện có từ SQLite sang MySQL (vô hiệu hóa tạm thời Foreign Keys để tránh xung đột).
+> 5. Xác thực số lượng bản ghi của tất cả 18 bảng.
 
-### Yêu cầu hệ thống:
-- **Python:** 3.10+ (Đã thử nghiệm hoàn hảo trên Python 3.12)
-- **Node.js:** 18+ (Đã thử nghiệm trên Node.js v24)
-- **Database:** SQLite (Mặc định tích hợp sẵn zero-config) hoặc MySQL 8.0+
-
-### Bước 1: Cài đặt thư viện Backend
-```powershell
-pip install fastapi sqlalchemy apscheduler qrcode uvicorn httpx
+### Cách 2: Nhập trực tiếp file DDL vào MySQL Workbench / Command Line
+```sql
+mysql -u root -p < schema_mysql.sql
 ```
 
-### Bước 2: Khởi tạo CSDL & Nạp Dữ liệu Mẫu (Seed Data)
-```powershell
-python seed_data.py
-```
-*Lệnh này sẽ khởi tạo toàn bộ schema và nạp dữ liệu mẫu cho các tuyến đường (Hồ Chí Minh - Đà Lạt, Hà Nội - Thái Nguyên, Đà Nẵng - Huế), trạm dừng GPS, xe buýt, chuyến xe và tài khoản thử nghiệm.*
-
-### Bước 3: Khởi chạy Backend Server (Port 8000)
-```powershell
+Sau đó khởi động Backend với kết nối MySQL:
+```bash
+set DATABASE_URL=mysql+pymysql://root:password@localhost:3306/smart_bus_ticketing
 python main.py
 ```
-- API Server sẽ hoạt động tại: **`http://127.0.0.1:8000`**
-- Tài liệu Swagger UI tương tác trực tiếp: **`http://127.0.0.1:8000/docs`**
 
-### Bước 4: Khởi chạy Frontend React / Vite (Port 5173)
-Mở cửa sổ Terminal thứ hai:
+---
+
+## 💻 5. Hướng Dẫn Cài Đặt & Chạy Demo Hệ Thống
+
+### Bước 1: Khởi động Backend
+Mở PowerShell tại thư mục gốc dự án:
+```powershell
+# 1. Cài đặt các thư viện cần thiết
+pip install -r requirements.txt
+
+# 2. Khởi tạo cơ sở dữ liệu và nạp dữ liệu mẫu
+python seed_data.py
+
+# 3. Khởi chạy Backend Server (FastAPI + APScheduler Cronjob)
+python main.py
+```
+> Server Backend sẽ chạy tại: **http://127.0.0.1:8000**  
+> Tài liệu Swagger API tương tác: **http://127.0.0.1:8000/docs**
+
+### Bước 2: Khởi động Frontend
+Mở một cửa sổ Terminal mới:
 ```powershell
 cd ve-xe-frontend
 npm install
 npm run dev
 ```
-- Ứng dụng Web sẽ hoạt động tại: **`http://localhost:5173`**
+> Giao diện người dùng sẽ chạy tại: **http://localhost:5173**
 
 ---
 
-## 🧪 6. Tài Khoản Mẫu Để Demo Ra Mắt Sản Phẩm
+## 🧪 6. Chạy Kiểm Thử Tự Động Toàn Diện (Unit Tests)
 
-Hệ thống đã tích hợp tính năng **1-Click Đăng Nhập Nhanh** tại màn hình [Đăng nhập](http://localhost:5173/login) để Leader dễ dàng thao tác thuyết trình trước hội đồng:
-
-| Tài khoản Demo | Mật khẩu | Vai Trò | Tính Năng Nổi Bật Thể Hiện |
-|:---|:---:|:---:|:---|
-| **`customer@example.com`** | `123456` | **Hành khách (HSSV)** | Xem ưu đãi giảm 20%, tìm chuyến, chọn ghế, thanh toán Sandbox, xem vé QR cá nhân, hủy vé. |
-| **`taixe.nguyen@smartbus.vn`** | `123456` | **Tài xế / Phụ xe** | Truy cập màn hình Soát vé (`/verify-ticket`), quét mã QR, kiểm tra vé trùng. |
-| **`admin@smartbus.vn`** | `123456` | **Quản trị viên** | Giám sát toàn bộ hệ thống, mạng lưới tuyến xe và bản đồ GPS. |
-
----
-
-## 🏆 7. Chạy Bộ Test Tự Động (QA / Tester)
-
-Bộ kiểm thử tự động toàn diện bao quát tính toàn vẹn CSDL, logic nghiệp vụ đổi/hủy vé và API thanh toán:
-
+Bộ kiểm thử bao gồm 33 test case bao phủ toàn bộ chức năng Sprint 1 & Sprint 2:
 ```powershell
 python -m unittest discover -s . -p "test_*.py" -v
 ```
-
-### Kết quả kiểm thử:
-```text
-test_callback_retry_and_conflict (test_api.SandboxApiTests) ... ok
-test_frontend_cors (test_api.SandboxApiTests) ... ok
-test_payment_success_unlocks_existing_demo_ticket (test_api.SandboxApiTests) ... ok
-test_ticket_results_and_audit (test_api.SandboxApiTests) ... ok
-test_validation_and_missing_payment (test_api.SandboxApiTests) ... ok
-test_seed_can_run_twice_and_preserves_references (test_database.DatabaseSeedTests) ... ok
-test_cancel_ticket (test_ticket_changes.TicketChangeTests) ... ok
-test_change_seat (test_ticket_changes.TicketChangeTests) ... ok
-test_cutoff_and_cancelled_trip (test_ticket_changes.TicketChangeTests) ... ok
-test_multi_ticket_booking_not_cancelled_partially (test_ticket_changes.TicketChangeTests) ... ok
-test_occupied_and_invalid_seat (test_ticket_changes.TicketChangeTests) ... ok
-test_unauthorized_and_used_ticket (test_ticket_changes.TicketChangeTests) ... ok
-
-----------------------------------------------------------------------
-Ran 12 tests in 0.627s
-
-OK (12/12 PASSED)
-```
+Kết quả kiểm thử: **33/33 Tests Passed (100% OK)**.
 
 ---
 
-## 📁 8. Cấu Trúc Mã Nguồn
+## 🗺️ 7. Danh Sách Endpoint API Sprint 2 (Mới Bổ Sung)
 
-```text
-Project_TTCS_K7S3_N1_BusTicketing/
-├── .gitignore                          # Cấu hình bỏ qua tệp tạm, venv, node_modules
-├── schema_smart_bus_ticketing.sql     # DDL CSDL chuẩn 14 thực thể theo ERD Word
-├── database.py                         # Mô hình SQLAlchemy ORM & SQLite compatibility
-├── seed_data.py                        # Khởi tạo dữ liệu mẫu & dữ liệu bản đồ GPS
-├── main.py                             # Backend Entry Point, APScheduler Cronjob
-├── api.py                              # FastAPI router đầy đủ 8 User Stories
-├── ticket_changes.py                   # Nghiệp vụ US05: Hủy vé & Đổi ghế
-├── requirements.txt                    # Danh sách thư viện Python
-├── test_database.py                    # Unit tests kiểm tra CSDL
-├── test_ticket_changes.py              # Unit tests nghiệp vụ vé
-├── test_api.py                         # Unit tests API & Sandbox
-├── README.md                           # Tài liệu hướng dẫn sử dụng & vận hành
-└── ve-xe-frontend/                     # Giao diện người dùng React + Vite
-    ├── package.json
-    ├── vite.config.js
-    └── src/
-        ├── api.js                      # Service gọi API Backend
-        ├── App.jsx                     # Router điều hướng các trang
-        ├── App.css                     # Định kiểu giao diện
-        ├── components/
-        │   ├── Header.jsx              # Thanh điều hướng đồng bộ
-        │   ├── Footer.jsx              # Chân trang thông tin
-        │   ├── SearchForm.jsx          # Thanh tìm kiếm chuyến xe
-        │   ├── CountdownTimer.jsx      # Đồng hồ đếm ngược giữ ghế 10:00
-        │   └── PaymentForm.jsx         # Form thanh toán & Xem vé QR
-        └── pages/
-            ├── HomePage.jsx            # Trang chủ & Tuyến phổ biến
-            ├── MapPage.jsx             # Bản đồ thông minh OpenStreetMap/Leaflet
-            ├── BusListPage.jsx         # Danh sách chuyến & Sơ đồ chọn ghế 2 tầng
-            ├── PaymentPage.jsx         # Trang thanh toán đơn hàng
-            ├── UserDashboard.jsx       # Quản lý vé cá nhân & Hủy vé
-            ├── TicketVerification.jsx  # Màn hình Soát vé tài xế
-            ├── LoginPage.jsx           # Đăng nhập (Kèm 1-Click Demo)
-            └── RegisterPage.jsx        # Đăng ký tài khoản
-```
+| Method | Endpoint | Mô Tả Chức Năng | User Story |
+|:---|:---|:---|:---:|
+| `GET` | `/api/v1/vouchers` | Lấy danh sách mã khuyến mãi khả dụng | BE4 |
+| `POST` | `/api/v1/vouchers/apply` | Áp dụng Voucher tính toán chiết khấu đơn hàng | BE4 |
+| `GET` | `/api/v1/fees` | Danh sách các loại phí dịch vụ bến bãi, bảo hiểm | BE4 |
+| `POST` | `/api/v1/fees/calculate` | Tính tổng phụ phí dịch vụ cho hành trình | BE4 |
+| `POST` | `/api/v1/payments/vnpay/create` | Tạo URL thanh toán VNPay kèm chữ ký HMAC-SHA512 | US17 |
+| `GET` | `/api/v1/payments/vnpay/ipn` | Webhook IPN xử lý kết quả giao dịch VNPay | US18 |
+| `GET` | `/api/v1/payments/vnpay/return` | Điều hướng khách hàng về web sau thanh toán VNPay | US18 |
+| `POST` | `/api/v1/payments/zalopay/create` | Khởi tạo đơn hàng thanh toán qua ZaloPay | US17 |
+| `POST` | `/api/v1/payments/zalopay/callback` | Webhook Callback ZaloPay kèm xác thực MAC SHA256 | US18 |
+| `POST` | `/api/v1/tickets/boarding` | Xác nhận hành khách lên xe sau khi quét QR | US24 |
+| `GET` | `/api/v1/tickets/{code}/boarding` | Tra cứu trạng thái soát vé lên xe (`DaSoat` / `ChuaLenXe`) | US24 |
+| `GET` | `/api/v1/notifications` | Danh sách thông báo tức thì (Email/SMS/In-app) | US20 |
 
 ---
 

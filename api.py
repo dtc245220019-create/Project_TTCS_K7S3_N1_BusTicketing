@@ -18,13 +18,29 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 import database
 from database import DATABASE_PATH, get_connection, initialize_database
 from ticket_changes import TicketChangeError, cancel_ticket, change_seat
+from notification import send_email_confirmation, send_sms_confirmation
+from BE1_zalo_vnpay.app.config import (
+    VNPAY_TMN_CODE,
+    VNPAY_HASH_SECRET,
+    VNPAY_PAYMENT_URL,
+    VNPAY_RETURN_URL,
+    ZALOPAY_KEY1,
+    ZALOPAY_KEY2,
+)
+from BE1_zalo_vnpay.app.payment_gateway import (
+    create_vnpay_payment_url,
+    verify_vnpay_signature,
+    create_zalopay_mac,
+    verify_zalopay_callback,
+)
+from boarding_api import BoardingRequest, board_ticket, normalize_code, resolve_staff
 
 app = FastAPI(title="Smart Bus Ticketing API - Unified System", version="1.0.0")
 
@@ -160,6 +176,51 @@ def _find_ticket(connection, ticket_code: str):
     return connection.execute(
         _ticket_query() + " WHERE UPPER(t.ticket_code) = ?", (ticket_code.strip().upper(),)
     ).fetchone()
+
+
+def _send_and_record_notification(
+    connection,
+    ticket_data: dict,
+    user_email: Optional[str] = None,
+    user_phone: Optional[str] = None,
+    user_id: Optional[int] = None,
+    ticket_id: Optional[int] = None,
+):
+    email = user_email or "nguyenvana@gmail.com"
+    phone = user_phone or "0912345678"
+
+    try:
+        send_email_confirmation(email, ticket_data)
+    except Exception as exc:
+        print(f"[NOTIFICATION] Loi gui email: {exc}")
+
+    try:
+        send_sms_confirmation(phone, ticket_data)
+    except Exception as exc:
+        print(f"[NOTIFICATION] Loi gui SMS: {exc}")
+
+    try:
+        t_code = ticket_data.get("ticket_code", "N/A")
+        r_name = ticket_data.get("route_name", "Tuyen xe")
+        s_num = ticket_data.get("seat_number", "A01")
+        d_time = ticket_data.get("departure_time", "")
+        
+        email_msg = f"Xác nhận đặt vé #{t_code} thành công cho tuyến {r_name}, ghế {s_num}, xuất bến {d_time}."
+        sms_msg = f"[BusTicket] Dat ve thanh cong! Ma ve: {t_code}, Ghe: {s_num}, Gio chay: {d_time}. Cam on quy khach!"
+        
+        connection.execute(
+            """INSERT INTO notifications (user_id, ticket_id, type, recipient, title, message, status)
+               VALUES (?, ?, 'EMAIL', ?, ?, ?, 'SENT')""",
+            (user_id, ticket_id, email, f"[BusTicket] Xác nhận đặt vé thành công #{t_code}", email_msg),
+        )
+        connection.execute(
+            """INSERT INTO notifications (user_id, ticket_id, type, recipient, title, message, status)
+               VALUES (?, ?, 'SMS', ?, 'SMS Xác nhận đặt vé', ?, 'SENT')""",
+            (user_id, ticket_id, phone, sms_msg),
+        )
+        connection.commit()
+    except Exception as exc:
+        print(f"[NOTIFICATION] Loi luu DB: {exc}")
 
 
 # =============================================================================
@@ -430,6 +491,188 @@ def create_payment(payload: PaymentRequest):
     return dict(row)
 
 
+# =============================================================================
+# US17 & US18: CỔNG THANH TOÁN VNPAY & ZALOPAY (BE1)
+# =============================================================================
+
+class VNPayCreateRequest(BaseModel):
+    amount: int = Field(gt=0)
+    order_info: Optional[str] = "Thanh toan ve xe buyt SmartBus"
+    booking_code: Optional[str] = None
+
+
+class ZaloPayCreateRequest(BaseModel):
+    amount: int = Field(gt=0)
+    booking_code: Optional[str] = None
+
+
+@app.post("/api/v1/payments/vnpay/create", summary="Tạo URL thanh toán VNPay (US17)")
+def create_vnpay_payment(payload: VNPayCreateRequest):
+    transaction_code = "VNP" + uuid4().hex[:12].upper()
+    with get_connection() as connection:
+        connection.execute(
+            """INSERT INTO payments (booking_code, transaction_code, amount, provider, status)
+               VALUES (?, ?, ?, 'VNPAY', 'PENDING')""",
+            (payload.booking_code, transaction_code, payload.amount),
+        )
+        connection.commit()
+
+    payment_url = create_vnpay_payment_url(
+        txn_ref=transaction_code,
+        amount=payload.amount,
+        order_info=payload.order_info or "Thanh toan ve xe",
+        tmn_code=VNPAY_TMN_CODE,
+        hash_secret=VNPAY_HASH_SECRET,
+        payment_url=VNPAY_PAYMENT_URL,
+        return_url=VNPAY_RETURN_URL,
+    )
+    return {
+        "success": True,
+        "transaction_code": transaction_code,
+        "status": "PENDING",
+        "payment_url": payment_url,
+    }
+
+
+@app.get("/api/v1/payments/vnpay/ipn", summary="VNPay IPN Webhook (US18)")
+def vnpay_ipn(request: Request):
+    params = dict(request.query_params)
+    if not verify_vnpay_signature(params, VNPAY_HASH_SECRET):
+        return {"RspCode": "97", "Message": "Invalid signature"}
+
+    txn_ref = params.get("vnp_TxnRef")
+    response_code = params.get("vnp_ResponseCode")
+    amount = int(params.get("vnp_Amount", "0")) // 100
+
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM payments WHERE transaction_code = ?", (txn_ref,)
+        ).fetchone()
+        if not row:
+            return {"RspCode": "01", "Message": "Order not found"}
+
+        if row["amount"] != amount:
+            return {"RspCode": "04", "Message": "Invalid amount"}
+
+        if row["status"] == "SUCCESS":
+            return {"RspCode": "00", "Message": "Confirm Success"}
+
+        now_str = datetime.now().isoformat()
+        if response_code == "00":
+            connection.execute(
+                "UPDATE payments SET status = 'SUCCESS', paid_at = ? WHERE id = ?",
+                (now_str, row["id"]),
+            )
+            if row["booking_code"]:
+                connection.execute(
+                    "UPDATE bookings SET status = 'PAID' WHERE booking_code = ?",
+                    (row["booking_code"],),
+                )
+                connection.execute(
+                    """UPDATE tickets SET status = 'PAID'
+                       WHERE booking_item_id IN (
+                           SELECT bi.id FROM booking_items bi
+                           JOIN bookings b ON b.id = bi.booking_id
+                           WHERE b.booking_code = ?
+                       )""",
+                    (row["booking_code"],),
+                )
+        else:
+            connection.execute("UPDATE payments SET status = 'FAILED' WHERE id = ?", (row["id"],))
+
+        connection.commit()
+
+    return {"RspCode": "00", "Message": "Confirm Success"}
+
+
+@app.get("/api/v1/payments/vnpay/return", summary="VNPay Return URL (US18)")
+def vnpay_return(request: Request):
+    params = dict(request.query_params)
+    valid = verify_vnpay_signature(params, VNPAY_HASH_SECRET)
+    txn_ref = params.get("vnp_TxnRef", "")
+    code = params.get("vnp_ResponseCode", "")
+    success = valid and code == "00"
+    return {
+        "success": success,
+        "transaction_code": txn_ref,
+        "response_code": code,
+        "message": "Giao dịch VNPay thành công!" if success else "Giao dịch VNPay không thành công hoặc chữ ký không hợp lệ.",
+    }
+
+
+@app.post("/api/v1/payments/zalopay/create", summary="Tạo giao dịch ZaloPay (US17)")
+def create_zalopay_payment(payload: ZaloPayCreateRequest):
+    transaction_code = "ZLP" + uuid4().hex[:12].upper()
+    with get_connection() as connection:
+        connection.execute(
+            """INSERT INTO payments (booking_code, transaction_code, amount, provider, status)
+               VALUES (?, ?, ?, 'ZALOPAY', 'PENDING')""",
+            (payload.booking_code, transaction_code, payload.amount),
+        )
+        connection.commit()
+
+    mac_data = f"{transaction_code}|{payload.amount}"
+    mac = create_zalopay_mac(mac_data, ZALOPAY_KEY1)
+
+    return {
+        "success": True,
+        "transaction_code": transaction_code,
+        "status": "PENDING",
+        "mac": mac,
+        "message": "Đã khởi tạo giao dịch ZaloPay thành công!",
+    }
+
+
+@app.post("/api/v1/payments/zalopay/callback", summary="ZaloPay Callback Webhook (US18)")
+async def zalopay_callback(request: Request):
+    body = await request.json()
+    data = body.get("data", "")
+    mac = body.get("mac", "")
+
+    if not verify_zalopay_callback(data, mac, ZALOPAY_KEY2):
+        return {"return_code": -1, "return_message": "Invalid MAC"}
+
+    import json
+    try:
+        payload = json.loads(data)
+    except Exception:
+        return {"return_code": -1, "return_message": "Invalid data format"}
+
+    txn_code = payload.get("transaction_code") or payload.get("app_trans_id")
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM payments WHERE transaction_code = ?", (txn_code,)
+        ).fetchone()
+        if not row:
+            return {"return_code": 0, "return_message": "Order not found"}
+
+        if row["status"] == "SUCCESS":
+            return {"return_code": 1, "return_message": "Success"}
+
+        now_str = datetime.now().isoformat()
+        connection.execute(
+            "UPDATE payments SET status = 'SUCCESS', paid_at = ? WHERE id = ?",
+            (now_str, row["id"]),
+        )
+        if row["booking_code"]:
+            connection.execute(
+                "UPDATE bookings SET status = 'PAID' WHERE booking_code = ?",
+                (row["booking_code"],),
+            )
+            connection.execute(
+                """UPDATE tickets SET status = 'PAID'
+                   WHERE booking_item_id IN (
+                       SELECT bi.id FROM booking_items bi
+                       JOIN bookings b ON b.id = bi.booking_id
+                       WHERE b.booking_code = ?
+                   )""",
+                (row["booking_code"],),
+            )
+        connection.commit()
+
+    return {"return_code": 1, "return_message": "Success"}
+
+
 @app.get("/api/v1/payments/{transaction_code}", summary="Tra cứu trạng thái thanh toán")
 def get_payment(transaction_code: str):
     with get_connection() as connection:
@@ -547,6 +790,36 @@ def create_order(payload: CreateOrderRequest):
             generated_tickets.append(ticket_code)
 
         connection.commit()
+
+        # Gửi thông báo Email + SMS xác nhận đặt vé thành công (US20)
+        try:
+            trip_info = connection.execute(
+                "SELECT origin, destination, departure_at FROM trips WHERE id = ?",
+                (payload.trip_id,),
+            ).fetchone()
+            u_info = connection.execute(
+                "SELECT email, phone FROM users WHERE id = ?",
+                (payload.user_id,),
+            ).fetchone()
+            user_email = u_info["email"] if u_info else "nguyenvana@gmail.com"
+            user_phone = payload.passenger_phone or (u_info["phone"] if u_info else "0912345678")
+
+            for t_code, s_num in zip(generated_tickets, payload.seat_numbers):
+                t_row = connection.execute("SELECT id FROM tickets WHERE ticket_code = ?", (t_code,)).fetchone()
+                ticket_id = t_row["id"] if t_row else None
+                t_data = {
+                    "ticket_code": t_code,
+                    "customer_name": payload.passenger_name,
+                    "route_name": f"{trip_info['origin']} - {trip_info['destination']}" if trip_info else "Tuyến xe liên tỉnh",
+                    "departure_time": trip_info["departure_at"] if trip_info else "Hôm nay",
+                    "seat_number": s_num,
+                    "total_price": payload.total_amount // len(payload.seat_numbers),
+                }
+                _send_and_record_notification(
+                    connection, t_data, user_email, user_phone, payload.user_id, ticket_id
+                )
+        except Exception as notify_err:
+            print(f"[NOTIFICATION] Lỗi thông báo đặt vé: {notify_err}")
 
         return {
             "success": True,
@@ -806,6 +1079,219 @@ def get_recent_inspections():
                LEFT JOIN tickets t ON t.id = ti.ticket_id
                ORDER BY ti.id DESC LIMIT 10"""
         ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# =============================================================================
+# VOUCHERS & SERVICE FEES (SPRINT 2 - BE4)
+# =============================================================================
+
+class VoucherApplyRequest(BaseModel):
+    code: str
+    order_value: float = Field(gt=0)
+
+
+class FeeCalculateRequest(BaseModel):
+    fee_id: int
+    order_value: float = Field(gt=0)
+
+
+class CreateVoucherRequest(BaseModel):
+    code: str
+    name: str
+    description: Optional[str] = None
+    discount_type: str = "percent"  # percent or fixed
+    discount_value: float = Field(gt=0)
+    min_order_value: float = Field(default=0, ge=0)
+    max_discount: Optional[float] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+
+
+class CreateFeeRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    fee_type: str = "fixed"  # fixed or percent
+    fee_value: float = Field(gt=0)
+
+
+@app.get("/api/v1/vouchers", summary="Danh sách mã giảm giá (BE4)")
+def list_vouchers():
+    with get_connection() as connection:
+        rows = connection.execute("SELECT * FROM vouchers WHERE is_active = 1 OR status = 'ACTIVE'").fetchall()
+        return [dict(r) for r in rows]
+
+
+@app.post("/api/v1/vouchers", summary="Tạo mới mã giảm giá (BE4)")
+def create_voucher(payload: CreateVoucherRequest):
+    code = payload.code.strip().upper()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    start = payload.start_date or now_str
+    end = payload.end_date or "2027-12-31 23:59:59"
+    max_disc = payload.max_discount or (payload.discount_value if payload.discount_type == "fixed" else 100000.0)
+
+    with get_connection() as connection:
+        existing = connection.execute(
+            "SELECT id FROM vouchers WHERE UPPER(code) = ? OR UPPER(voucher_code) = ?", (code, code)
+        ).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail="Mã giảm giá đã tồn tại")
+
+        cursor = connection.execute(
+            """INSERT INTO vouchers 
+               (code, voucher_code, name, description, discount_type, discount_value, discount_percent, min_order_value, max_discount, max_discount_amount, start_date, end_date, expires_at, is_active, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE')""",
+            (code, code, payload.name, payload.description or "", payload.discount_type, payload.discount_value,
+             payload.discount_value if payload.discount_type == "percent" else 0.0,
+             payload.min_order_value, max_disc, int(max_disc), start, end, end),
+        )
+        connection.commit()
+        row = connection.execute("SELECT * FROM vouchers WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        return dict(row)
+
+
+@app.post("/api/v1/vouchers/apply", summary="Áp dụng mã giảm giá (BE4)")
+def apply_voucher_endpoint(payload: VoucherApplyRequest):
+    code = payload.code.strip().upper()
+    with get_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM vouchers WHERE UPPER(code) = ? OR UPPER(voucher_code) = ?", (code, code)
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Mã giảm giá không tồn tại")
+
+        is_active = row["is_active"] if "is_active" in row.keys() else 1
+        status = row["status"] if "status" in row.keys() else "ACTIVE"
+        if not is_active or status != "ACTIVE":
+            raise HTTPException(status_code=400, detail="Mã giảm giá hiện không hoạt động")
+
+        min_val = row["min_order_value"] if "min_order_value" in row.keys() and row["min_order_value"] is not None else 0.0
+        if payload.order_value < min_val:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Giá trị đơn hàng phải từ {int(min_val):,} VNĐ để áp dụng mã này"
+            )
+
+        disc_type = row["discount_type"] if "discount_type" in row.keys() and row["discount_type"] else "percent"
+        disc_val = row["discount_value"] if "discount_value" in row.keys() and row["discount_value"] is not None else (row["discount_percent"] or 0.0)
+        max_disc = row["max_discount"] if "max_discount" in row.keys() and row["max_discount"] is not None else (row["max_discount_amount"] or None)
+
+        if disc_type == "percent":
+            discount_amount = payload.order_value * (disc_val / 100.0)
+        else:
+            discount_amount = disc_val
+
+        if max_disc is not None and max_disc > 0 and discount_amount > max_disc:
+            discount_amount = float(max_disc)
+
+        final_amount = max(0.0, payload.order_value - discount_amount)
+        return {
+            "code": code,
+            "order_value": payload.order_value,
+            "discount_amount": discount_amount,
+            "final_amount": final_amount,
+        }
+
+
+@app.get("/api/v1/fees", summary="Danh sách các loại phí dịch vụ (BE4)")
+def list_fees():
+    with get_connection() as connection:
+        rows = connection.execute("SELECT * FROM fees WHERE is_active = 1").fetchall()
+        return [dict(r) for r in rows]
+
+
+@app.post("/api/v1/fees", summary="Thêm mới loại phí dịch vụ (BE4)")
+def create_fee(payload: CreateFeeRequest):
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """INSERT INTO fees (name, description, fee_type, fee_value, is_active)
+               VALUES (?, ?, ?, ?, 1)""",
+            (payload.name, payload.description or "", payload.fee_type, payload.fee_value),
+        )
+        connection.commit()
+        row = connection.execute("SELECT * FROM fees WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        return dict(row)
+
+
+@app.post("/api/v1/fees/calculate", summary="Tính toán phí dịch vụ cho đơn hàng (BE4)")
+def calculate_fee_endpoint(payload: FeeCalculateRequest):
+    with get_connection() as connection:
+        row = connection.execute("SELECT * FROM fees WHERE id = ?", (payload.fee_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Không tìm thấy loại phí")
+
+        if not row["is_active"]:
+            raise HTTPException(status_code=400, detail="Loại phí này hiện không áp dụng")
+
+        if row["fee_type"] == "percent":
+            fee_amount = payload.order_value * (row["fee_value"] / 100.0)
+        else:
+            fee_amount = row["fee_value"]
+
+        return {
+            "fee_id": row["id"],
+            "order_value": payload.order_value,
+            "fee_amount": fee_amount,
+            "final_amount": payload.order_value + fee_amount,
+        }
+
+
+# =============================================================================
+# US24: XÁC NHẬN LÊN XE KHI QUÉT MÃ QR (BOARDING CHECK-IN)
+# =============================================================================
+
+@app.post("/api/v1/tickets/boarding", summary="Xác nhận hành khách lên xe sau khi quét QR (US24)")
+@app.post("/api/v1/tickets/board", include_in_schema=False)
+def boarding_endpoint(payload: BoardingRequest):
+    with get_connection() as connection:
+        return board_ticket(connection, payload)
+
+
+@app.get("/api/v1/tickets/{ticket_code}/boarding", summary="Tra cứu trạng thái lên xe của vé (US24)")
+def get_boarding_status_endpoint(
+    ticket_code: str,
+    staff_user_id: Optional[int] = Query(None, gt=0),
+    staff_email: Optional[str] = Query(None, max_length=255),
+):
+    with get_connection() as connection:
+        resolve_staff(connection, staff_user_id, staff_email)
+        try:
+            code = normalize_code(ticket_code)
+        except ValueError as err:
+            raise HTTPException(422, str(err)) from err
+
+        ticket = connection.execute(
+            "SELECT ticket_code, status, used_at FROM tickets WHERE UPPER(ticket_code) = ?", (code,)
+        ).fetchone()
+        if ticket is None:
+            raise HTTPException(404, "Không tìm thấy vé")
+
+        return {
+            "ticket_code": ticket["ticket_code"],
+            "canonical_ticket_status": ticket["status"],
+            "boarding_status": "DaSoat" if ticket["status"] in {"USED", "DaSoat"} else "ChuaLenXe",
+            "boarded_at": ticket["used_at"],
+        }
+
+
+# =============================================================================
+# US20: THÔNG BÁO TỨC THÌ (IN-APP & EMAIL/SMS NOTIFICATIONS)
+# =============================================================================
+
+@app.get("/api/v1/notifications", summary="Danh sách thông báo hệ thống và người dùng (US20)")
+def get_notifications_endpoint(user_id: Optional[int] = Query(None), limit: int = Query(20, ge=1, le=100)):
+    with get_connection() as connection:
+        if user_id:
+            rows = connection.execute(
+                """SELECT * FROM notifications 
+                   WHERE user_id = ? OR user_id IS NULL
+                   ORDER BY id DESC LIMIT ?""",
+                (user_id, limit),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                "SELECT * FROM notifications ORDER BY id DESC LIMIT ?", (limit,)
+            ).fetchall()
         return [dict(r) for r in rows]
 
 

@@ -9,6 +9,8 @@ import TicketVerification from './pages/TicketVerification';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MapPage from './pages/MapPage';
+import PaymentResultPage from './pages/PaymentResultPage';
+import TicketCancellation from './pages/TicketCancellation';
 import './App.css';
 
 function App() {
@@ -23,8 +25,12 @@ function App() {
             <Route path="/map" element={<MapPage />} />
             <Route path="/buses" element={<BusListPage />} />
             <Route path="/payment" element={<PaymentPage />} />
+            <Route path="/payment-result" element={<PaymentResultPage />} />
             <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/cancellation" element={<TicketCancellation />} />
+            <Route path="/cancel-ticket" element={<TicketCancellation />} />
             <Route path="/verify-ticket" element={<TicketVerification />} />
+            <Route path="/verify" element={<TicketVerification />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Routes>

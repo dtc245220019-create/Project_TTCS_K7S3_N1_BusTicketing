@@ -258,6 +258,45 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
         VALUES ('TKT-8892', 'BOOK-TN-01', 'ACTIVE')"""
     )
 
+    # 8. Demo Vouchers (Sprint 2 - BE4)
+    demo_vouchers = [
+        ("CHAO20", "CHAO20", "Ưu đãi chào mừng bạn mới", "Giảm 20% tối đa 50.000 VNĐ cho khách hàng mới", "percent", 20.0, 20.0, 50000, 50000, 50000, "2026-01-01 00:00:00", "2027-12-31 23:59:59", "2027-12-31", 1, "ACTIVE"),
+        ("BUS50", "BUS50", "Khuyến mãi du lịch thả ga", "Giảm ngay 50.000 VNĐ cho đơn từ 100.000 VNĐ", "fixed", 50000.0, 0.0, 100000, 50000, 50000, "2026-01-01 00:00:00", "2027-12-31 23:59:59", "2027-12-31", 1, "ACTIVE"),
+        ("GIAM10K", "GIAM10K", "Ưu đãi tiện lợi", "Giảm 10.000 VNĐ cho mọi chuyến đi", "fixed", 10000.0, 0.0, 0, 10000, 10000, "2026-01-01 00:00:00", "2027-12-31 23:59:59", "2027-12-31", 1, "ACTIVE"),
+        ("VIP15", "VIP15", "Tri ân thành viên VIP", "Giảm 15% cho hành khách thân thiết", "percent", 15.0, 15.0, 100000, 60000, 60000, "2026-01-01 00:00:00", "2027-12-31 23:59:59", "2027-12-31", 1, "ACTIVE"),
+    ]
+    for v in demo_vouchers:
+        connection.execute(
+            """INSERT OR IGNORE INTO vouchers 
+               (code, voucher_code, name, description, discount_type, discount_value, discount_percent, min_order_value, max_discount, max_discount_amount, start_date, end_date, expires_at, is_active, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            v,
+        )
+
+    # 9. Demo Service Fees (Sprint 2 - BE4)
+    demo_fees = [
+        (1, "Bảo hiểm hành khách chuyến đi", "Bảo hiểm tai nạn du lịch tiêu chuẩn 50.000.000 VNĐ", "fixed", 5000.0, 1),
+        (2, "Phí dịch vụ bến bãi & tiện ích thông minh", "Wifi tốc độ cao, nước uống tinh khiết & khăn lạnh", "fixed", 10000.0, 1),
+    ]
+    for f in demo_fees:
+        connection.execute(
+            """INSERT OR IGNORE INTO fees (id, name, description, fee_type, fee_value, is_active)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            f,
+        )
+
+    # 10. Demo Notifications (Sprint 2 - US20)
+    demo_notifications = [
+        (1, 10, 8892, "EMAIL", "nguyenvana@gmail.com", "[BusTicket] Xác nhận đặt vé thành công #TKT-8892", "Chúc mừng Quý khách Nguyễn Văn A đã đặt vé thành công cho chuyến Hà Nội - Thái Nguyên. Số ghế: A05. Giờ khởi hành: 07:30.", "SENT"),
+        (2, 10, 8892, "SMS", "+8491234567", "[BusTicket] SMS Xác nhận đặt vé", "[BusTicket] Dat ve thanh cong! Ma ve: TKT-8892, Ghe: A05. Cam on quy khach!", "SENT"),
+    ]
+    for n in demo_notifications:
+        connection.execute(
+            """INSERT OR IGNORE INTO notifications (id, user_id, ticket_id, type, recipient, title, message, status)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            n,
+        )
+
     connection.commit()
 
 

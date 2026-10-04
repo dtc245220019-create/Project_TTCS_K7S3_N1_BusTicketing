@@ -118,6 +118,62 @@ export function getRouteStops(routeId) {
   return fetchJson(`/api/v1/routes/${routeId}/stops`);
 }
 
+// 8. Khuyến mãi & Phí dịch vụ (Sprint 2 - BE4)
+export function getVouchers() {
+  return fetchJson('/api/v1/vouchers');
+}
+
+export function applyVoucher(code, orderValue) {
+  return fetchJson('/api/v1/vouchers/apply', {
+    method: 'POST',
+    body: JSON.stringify({ code, order_value: orderValue }),
+  });
+}
+
+export function getFees() {
+  return fetchJson('/api/v1/fees');
+}
+
+export function calculateFee(feeId, orderValue) {
+  return fetchJson('/api/v1/fees/calculate', {
+    method: 'POST',
+    body: JSON.stringify({ fee_id: feeId, order_value: orderValue }),
+  });
+}
+
+// 9. Cổng thanh toán VNPay & ZaloPay (Sprint 2 - BE1)
+export function createVnpayPayment(amount, orderInfo = 'Thanh toan ve xe', bookingCode = null) {
+  return fetchJson('/api/v1/payments/vnpay/create', {
+    method: 'POST',
+    body: JSON.stringify({ amount, order_info: orderInfo, booking_code: bookingCode }),
+  });
+}
+
+export function createZalopayPayment(amount, bookingCode = null) {
+  return fetchJson('/api/v1/payments/zalopay/create', {
+    method: 'POST',
+    body: JSON.stringify({ amount, booking_code: bookingCode }),
+  });
+}
+
+// 10. Xác nhận lên xe sau khi soát vé (Sprint 2 - US24)
+export function boardTicket(ticketCode, staffEmail = 'taixe.nguyen@smartbus.vn', tripId = null) {
+  return fetchJson('/api/v1/tickets/boarding', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_code: ticketCode, staff_email: staffEmail, trip_id: tripId }),
+  });
+}
+
+export function getBoardingStatus(ticketCode, staffEmail = 'taixe.nguyen@smartbus.vn') {
+  return fetchJson(`/api/v1/tickets/${ticketCode}/boarding?staff_email=${encodeURIComponent(staffEmail)}`);
+}
+
+// 11. Thông báo tức thì (Sprint 2 - US20)
+export function getNotifications(userId = null) {
+  const url = userId ? `/api/v1/notifications?user_id=${userId}` : '/api/v1/notifications';
+  return fetchJson(url);
+}
+
 // Storage helpers
 export function getCurrentUser() {
   try {

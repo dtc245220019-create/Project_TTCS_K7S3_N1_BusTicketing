@@ -123,14 +123,36 @@ CREATE TABLE IF NOT EXISTS seats (
     UNIQUE (trip_id, seat_number)
 );
 
--- 8. ERD: VOUCHER
+-- 8. ERD: VOUCHER (Sprint 2 - BE4)
 CREATE TABLE IF NOT EXISTS vouchers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    voucher_code TEXT NOT NULL UNIQUE,
+    code TEXT UNIQUE,
+    voucher_code TEXT UNIQUE,
+    name TEXT NOT NULL DEFAULT '',
+    description TEXT,
+    discount_type TEXT NOT NULL DEFAULT 'percent',
+    discount_value REAL NOT NULL DEFAULT 0.0,
     discount_percent REAL NOT NULL DEFAULT 0.0,
-    max_discount_amount INTEGER NOT NULL DEFAULT 0,
-    expires_at TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'ACTIVE'
+    min_order_value REAL DEFAULT 0.0,
+    max_discount REAL,
+    max_discount_amount INTEGER DEFAULT 0,
+    start_date TEXT DEFAULT CURRENT_TIMESTAMP,
+    end_date TEXT DEFAULT '2030-12-31 23:59:59',
+    expires_at TEXT DEFAULT '2030-12-31 23:59:59',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'ACTIVE',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 8b. ERD: FEES (Phí dịch vụ - Sprint 2 - BE4)
+CREATE TABLE IF NOT EXISTS fees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    fee_type TEXT NOT NULL DEFAULT 'fixed',
+    fee_value REAL NOT NULL DEFAULT 0.0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 9. ERD: BOOKINGS & BOOKING_ITEMS
@@ -231,6 +253,19 @@ CREATE TABLE IF NOT EXISTS feedbacks (
     content TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 16. ERD: THONG_BAO & NOTIFICATIONS (Sprint 2 - US20)
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    ticket_id INTEGER REFERENCES tickets(id) ON DELETE SET NULL,
+    type TEXT NOT NULL DEFAULT 'EMAIL',
+    recipient TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'SENT',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -244,6 +279,27 @@ def get_connection() -> sqlite3.Connection:
 
 def initialize_database(connection: sqlite3.Connection) -> None:
     connection.executescript(SCHEMA)
+    # Check and migrate missing columns in vouchers for existing sqlite databases
+    try:
+        cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
+                for row in connection.execute("PRAGMA table_info(vouchers)").fetchall()}
+        add_cols = [
+            ("code", "TEXT"),
+            ("name", "TEXT DEFAULT ''"),
+            ("description", "TEXT DEFAULT ''"),
+            ("discount_type", "TEXT DEFAULT 'percent'"),
+            ("discount_value", "REAL DEFAULT 0.0"),
+            ("min_order_value", "REAL DEFAULT 0.0"),
+            ("max_discount", "REAL DEFAULT 0.0"),
+            ("start_date", "TEXT DEFAULT CURRENT_TIMESTAMP"),
+            ("end_date", "TEXT DEFAULT '2030-12-31 23:59:59'"),
+            ("is_active", "INTEGER DEFAULT 1"),
+        ]
+        for col_name, col_type in add_cols:
+            if col_name not in cols:
+                connection.execute(f"ALTER TABLE vouchers ADD COLUMN {col_name} {col_type}")
+    except Exception:
+        pass
     connection.commit()
 
 
@@ -380,11 +436,22 @@ class Voucher(Base):
     __tablename__ = "vouchers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    voucher_code = Column(String(50), unique=True, nullable=False)
+    code = Column(String(50), unique=True, nullable=True, index=True)
+    voucher_code = Column(String(50), unique=True, nullable=True)
+    name = Column(String(255), default="")
+    description = Column(String(500), nullable=True)
+    discount_type = Column(String(20), default="percent")
+    discount_value = Column(Float, default=0.0)
     discount_percent = Column(Float, default=0.0)
+    min_order_value = Column(Float, default=0.0)
+    max_discount = Column(Float, nullable=True)
     max_discount_amount = Column(Integer, default=0)
-    expires_at = Column(String(50), nullable=False)
+    start_date = Column(DateTime, default=datetime.utcnow)
+    end_date = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(String(50), default="2030-12-31")
+    is_active = Column(Boolean, default=True)
     status = Column(String(30), default="ACTIVE")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class Booking(Base):
@@ -467,11 +534,59 @@ class TicketInspection(Base):
     note = Column(Text, nullable=True)
 
 
-# Initialize SQLite / MySQL engine
-DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
-connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
-engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
+
+class Fee(Base):
+    __tablename__ = "fees"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String(500), nullable=True)
+    fee_type = Column(String(20), nullable=False, default="fixed")
+    fee_value = Column(Float, nullable=False, default=0.0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="SET NULL"), nullable=True)
+    type = Column(String(20), default="EMAIL")
+    recipient = Column(String(255), nullable=False)
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    status = Column(String(20), default="SENT")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# Initialize SQLite / MySQL engine with graceful fallback
+def _init_engine():
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    db_url = os.getenv("DATABASE_URL")
+    if db_url and "mysql" in db_url.lower():
+        try:
+            test_eng = create_engine(db_url, echo=False, pool_pre_ping=True)
+            with test_eng.connect():
+                pass
+            return test_eng
+        except Exception:
+            pass
+    return create_engine(f"sqlite:///{DATABASE_PATH}", echo=False, connect_args={"check_same_thread": False})
+
+
+engine = _init_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 # Auto create tables on import
 with get_connection() as _raw_conn:

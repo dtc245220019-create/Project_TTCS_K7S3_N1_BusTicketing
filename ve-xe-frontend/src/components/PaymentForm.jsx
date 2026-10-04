@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createOrder, getCurrentUser } from '../api';
+import { createOrder, getCurrentUser, applyVoucher } from '../api';
 
 const AVAILABLE_VOUCHERS = {
   CHAO20: { type: 'percentage', value: 20 },
   BUS50: { type: 'fixed', value: 50000 },
+  GIAM10K: { type: 'fixed', value: 10000 },
+  VIP15: { type: 'percentage', value: 15 },
 };
 
 function PaymentForm({ bookingData }) {
@@ -40,18 +42,36 @@ function PaymentForm({ bookingData }) {
     : 0;
   const finalPrice = Math.max(0, priceAfterUserDiscount - voucherDiscountAmount);
 
-  const handleApplyVoucher = () => {
+  const handleApplyVoucher = async () => {
     const code = voucherCode.trim().toUpperCase();
-    const voucher = AVAILABLE_VOUCHERS[code];
-
-    if (!code || !voucher) {
+    if (!code) {
       setAppliedVoucher(null);
-      setVoucherMessage(code ? 'Mã giảm giá không hợp lệ.' : 'Vui lòng nhập mã giảm giá.');
+      setVoucherMessage('Vui lòng nhập mã giảm giá.');
       return;
     }
 
-    setAppliedVoucher({ ...voucher, code });
-    setVoucherMessage(`Đã áp dụng mã ${code}.`);
+    try {
+      const res = await applyVoucher(code, priceAfterUserDiscount);
+      if (res && res.discount_amount !== undefined) {
+        setAppliedVoucher({
+          type: 'fixed',
+          value: res.discount_amount,
+          code: res.code,
+        });
+        setVoucherMessage(`Đã áp dụng mã ${res.code}: Giảm ${res.discount_amount.toLocaleString('vi-VN')} VNĐ!`);
+        return;
+      }
+    } catch {
+      // Fallback local vouchers
+      const voucher = AVAILABLE_VOUCHERS[code];
+      if (voucher) {
+        setAppliedVoucher({ ...voucher, code });
+        setVoucherMessage(`Đã áp dụng mã ${code}.`);
+        return;
+      }
+      setAppliedVoucher(null);
+      setVoucherMessage('Mã giảm giá không hợp lệ hoặc đã hết hạn.');
+    }
   };
 
   // Mã giao dịch và chuyển khoản đồng bộ cho phiên đặt chỗ
