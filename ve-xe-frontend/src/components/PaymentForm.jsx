@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createOrder, getCurrentUser, applyVoucher } from '../api';
+import PrintableTicket from './PrintableTicket';
 
 const AVAILABLE_VOUCHERS = {
   CHAO20: { type: 'percentage', value: 20 },
@@ -15,6 +16,7 @@ function PaymentForm({ bookingData }) {
   const [processing, setProcessing] = useState(false);
   const [orderResult, setOrderResult] = useState(null);
   const [activeTicketTab, setActiveTicketTab] = useState(0);
+  const [showAllTickets, setShowAllTickets] = useState(false);
   const [copiedField, setCopiedField] = useState('');
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
@@ -160,13 +162,40 @@ function PaymentForm({ bookingData }) {
   };
 
   // =========================================================================
-  // GIAO DIỆN XUẤT VÉ ĐIỆN TỬ KÈM MÃ QR (US06)
+  // GIAO DIỆN XUẤT VÉ ĐIỆN TỬ KÈM MÃ QR & IN VÉ CHUẨN (US06)
   // =========================================================================
   if (orderResult) {
     const ticketList = orderResult.tickets || ['TKT-DEMO-01'];
     const currentTicketCode = ticketList[activeTicketTab] || ticketList[0];
     const currentSeatNumber = bookingData.selectedSeats?.[activeTicketTab] || bookingData.selectedSeats?.[0] || 'A05';
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=ticket:${currentTicketCode}`;
+
+    const seatCount = bookingData.selectedSeats?.length || 1;
+    const singleBasePrice = Math.round(basePrice / seatCount);
+    const singleDiscount = Math.round((discountAmount + voucherDiscountAmount) / seatCount);
+    const singleFinalPrice = Math.round(finalPrice / seatCount);
+
+    const invoiceKey = orderResult.transaction_code
+      ? `HDDT-${orderResult.transaction_code.replace(/[^A-Za-z0-9]/g, '').slice(-6)}`
+      : 'HDDT-2026-9912';
+
+    const formattedIssuedAt =
+      new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) +
+      ' - ' +
+      new Date().toLocaleDateString('vi-VN');
+
+    const handlePrintSingle = () => {
+      setShowAllTickets(false);
+      setTimeout(() => {
+        window.print();
+      }, 150);
+    };
+
+    const handlePrintAll = () => {
+      setShowAllTickets(true);
+      setTimeout(() => {
+        window.print();
+      }, 150);
+    };
 
     return (
       <div
@@ -179,18 +208,22 @@ function PaymentForm({ bookingData }) {
           border: '1px solid #e2e8f0',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+        {/* Banner thông báo (Chỉ hiển thị trên màn hình, ẩn khi in) */}
+        <div className="no-print success-header-banner" style={{ textAlign: 'center', marginBottom: '24px' }}>
           <span style={{ fontSize: '48px', display: 'inline-block', marginBottom: '8px' }}>🎉</span>
           <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#16a34a', margin: '0 0 6px 0' }}>
             Thanh Toán Thành Công & Đã Phát Hành Vé Điện Tử (US06)
           </h2>
           <p style={{ color: '#64748b', margin: 0, fontSize: '15px' }}>
-            Mã đặt chỗ: <b style={{ color: '#1e3a8a', fontFamily: 'monospace' }}>#{orderResult.booking_code}</b> | Giao dịch: <b style={{ color: '#475569', fontFamily: 'monospace' }}>{orderResult.transaction_code}</b>
+            Mã đặt chỗ:{' '}
+            <b style={{ color: '#1e3a8a', fontFamily: 'monospace' }}>#{orderResult.booking_code}</b> | Giao dịch:{' '}
+            <b style={{ color: '#475569', fontFamily: 'monospace' }}>{orderResult.transaction_code}</b>
           </p>
         </div>
 
         {orderResult.is_sandbox_fallback && (
           <div
+            className="no-print sandbox-badge-banner"
             style={{
               backgroundColor: '#f0fdf4',
               border: '1px solid #bbf7d0',
@@ -211,19 +244,36 @@ function PaymentForm({ bookingData }) {
           </div>
         )}
 
-        {/* Multi-seat ticket tab navigation if user booked more than 1 seat */}
+        {/* Thanh tab chọn vé nếu đặt nhiều chỗ (Ẩn khi in) */}
         {ticketList.length > 1 && (
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '20px', flexWrap: 'wrap' }}>
+          <div
+            className="no-print ticket-tabs-nav"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              justifyContent: 'center',
+              marginBottom: '20px',
+              flexWrap: 'wrap',
+            }}
+          >
             {ticketList.map((tCode, idx) => (
               <button
                 key={tCode}
-                onClick={() => setActiveTicketTab(idx)}
+                onClick={() => {
+                  setActiveTicketTab(idx);
+                  setShowAllTickets(false);
+                }}
                 style={{
                   padding: '8px 16px',
                   borderRadius: '20px',
-                  border: activeTicketTab === idx ? '2px solid #2563eb' : '1px solid #cbd5e1',
-                  backgroundColor: activeTicketTab === idx ? '#eff6ff' : 'white',
-                  color: activeTicketTab === idx ? '#1d4ed8' : '#475569',
+                  border:
+                    !showAllTickets && activeTicketTab === idx
+                      ? '2px solid #2563eb'
+                      : '1px solid #cbd5e1',
+                  backgroundColor:
+                    !showAllTickets && activeTicketTab === idx ? '#eff6ff' : 'white',
+                  color:
+                    !showAllTickets && activeTicketTab === idx ? '#1d4ed8' : '#475569',
                   fontWeight: '700',
                   fontSize: '13px',
                   cursor: 'pointer',
@@ -236,130 +286,104 @@ function PaymentForm({ bookingData }) {
                 <span style={{ color: '#2563eb' }}>Ghế {bookingData.selectedSeats?.[idx]}</span>
               </button>
             ))}
+
+            <button
+              onClick={() => setShowAllTickets(true)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '20px',
+                border: showAllTickets ? '2px solid #2563eb' : '1px solid #cbd5e1',
+                backgroundColor: showAllTickets ? '#eff6ff' : 'white',
+                color: showAllTickets ? '#1d4ed8' : '#475569',
+                fontWeight: '700',
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>📑 Xem & In Tất Cả ({ticketList.length} Vé)</span>
+            </button>
           </div>
         )}
 
-        {/* Boarding Pass Card Display */}
-        <div
-          id="printable-ticket"
-          style={{
-            maxWidth: '680px',
-            margin: '0 auto 28px auto',
-            border: '2px solid #3b82f6',
-            borderRadius: '16px',
-            overflow: 'hidden',
-            backgroundColor: '#ffffff',
-            boxShadow: '0 10px 25px rgba(37,99,235,0.1)',
-          }}
-        >
-          {/* Card Header */}
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-              color: 'white',
-              padding: '16px 24px',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '10px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '24px' }}>🚌</span>
-              <div>
-                <div style={{ fontWeight: '800', fontSize: '16px', letterSpacing: '0.5px' }}>SMART BUS TICKETING</div>
-                <div style={{ fontSize: '11px', opacity: 0.85 }}>THẺ LÊN XE ĐIỆN TỬ THÔNG MINH (E-PASS)</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <span style={{ backgroundColor: '#22c55e', color: 'white', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
-                ✓ ĐÃ THANH TOÁN
-              </span>
-              <span style={{ backgroundColor: 'rgba(255,255,255,0.2)', color: 'white', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
-                HỢP LỆ
-              </span>
-            </div>
-          </div>
-
-          {/* Ticket Body Grid */}
-          <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'center' }}>
-            {/* Left Trip Info */}
-            <div>
-              <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Hành Trình Chuyến Xe</div>
-              <div style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: '4px 0 12px 0' }}>
-                {bookingData.trip.from} ➔ {bookingData.trip.to}
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Khởi hành:</div>
-                  <div style={{ fontWeight: '700', color: '#1e293b', fontSize: '15px' }}>{bookingData.trip.departureTime}</div>
-                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>{bookingData.trip.departure_date || 'Hôm nay'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Vị trí ghế:</div>
-                  <div style={{ fontWeight: '800', color: '#2563eb', fontSize: '20px' }}>{currentSeatNumber}</div>
-                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>Tầng 1 - Ghế VIP</div>
-                </div>
-              </div>
-
-              <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
-                <div><span style={{ color: '#64748b' }}>Hành khách:</span> <b>{passengerName}</b> ({passengerPhone})</div>
-                <div><span style={{ color: '#64748b' }}>Loại xe:</span> <span>{bookingData.trip.busType} - Biển số: <b>{bookingData.trip.license_plate}</b></span></div>
-                <div><span style={{ color: '#64748b' }}>Mã vé bảo mật:</span> <b style={{ fontFamily: 'monospace', color: '#0284c7' }}>{currentTicketCode}</b></div>
-              </div>
-            </div>
-
-            {/* Right QR Code Section */}
-            <div
-              style={{
-                textAlign: 'center',
-                backgroundColor: '#f8fafc',
-                padding: '20px',
-                borderRadius: '14px',
-                border: '1.5px dashed #cbd5e1',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#1e3a8a', marginBottom: '8px' }}>
-                MÃ QR SOÁT VÉ ĐIỆN TỬ (US06)
-              </div>
-              <img
-                src={qrImageUrl}
-                alt={`Mã QR Vé ${currentTicketCode}`}
-                style={{
-                  width: '160px',
-                  height: '160px',
-                  padding: '6px',
-                  backgroundColor: 'white',
-                  borderRadius: '10px',
-                  border: '1px solid #cbd5e1',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.06)',
-                }}
+        {/* VÙNG HIỂN THỊ VÉ ĐIỆN TỬ CHUẨN IN (PRINTABLE TICKET) */}
+        <div id="printable-ticket" className="printable-ticket-wrapper">
+          {showAllTickets ? (
+            // Hiển thị và in toàn bộ danh sách vé
+            ticketList.map((tCode, idx) => (
+              <PrintableTicket
+                key={tCode}
+                ticketCode={tCode}
+                bookingCode={orderResult.booking_code || 'BOOK-DEMO'}
+                invoiceCode={invoiceKey}
+                issuedAt={formattedIssuedAt}
+                fromCity={bookingData.trip.from || bookingData.trip.departure_city || 'Hà Nội'}
+                toCity={bookingData.trip.to || bookingData.trip.arrival_city || 'Thái Nguyên'}
+                departureStation={bookingData.trip.departure_station || bookingData.trip.pickup_point}
+                arrivalStation={bookingData.trip.arrival_station || bookingData.trip.dropoff_point}
+                departureTime={bookingData.trip.departureTime || '07:30'}
+                departureDate={bookingData.trip.departure_date || 'Hôm nay'}
+                arrivalTime={bookingData.trip.arrivalTime || '09:15'}
+                arrivalDate={bookingData.trip.departure_date || 'Cùng ngày'}
+                seatNumber={bookingData.selectedSeats?.[idx] || `A0${idx + 1}`}
+                busType={bookingData.trip.busType || 'Ghế ngồi cao cấp 29 chỗ'}
+                licensePlate={bookingData.trip.license_plate || '29B-123.45'}
+                passengerName={passengerName}
+                passengerPhone={passengerPhone}
+                discountType={currentUser.discount_type || 'HSSV'}
+                originalPrice={`${singleBasePrice.toLocaleString('vi-VN')} VNĐ`}
+                discountAmount={singleDiscount > 0 ? `${singleDiscount.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'}
+                finalPrice={`${singleFinalPrice.toLocaleString('vi-VN')} VNĐ`}
+                paymentMethod={paymentMethod}
+                status="CONFIRMED"
+                showStub={true}
               />
-              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '8px' }}>
-                Xuất trình mã này cho phụ xe / tài xế khi lên xe
-              </div>
-              <div style={{ marginTop: '6px', fontSize: '12px', fontFamily: 'monospace', color: '#334155', fontWeight: 'bold' }}>
-                {currentTicketCode}
-              </div>
-            </div>
-          </div>
+            ))
+          ) : (
+            // Hiển thị vé đơn lẻ theo tab
+            <PrintableTicket
+              ticketCode={currentTicketCode}
+              bookingCode={orderResult.booking_code || 'BOOK-DEMO'}
+              invoiceCode={invoiceKey}
+              issuedAt={formattedIssuedAt}
+              fromCity={bookingData.trip.from || bookingData.trip.departure_city || 'Hà Nội'}
+              toCity={bookingData.trip.to || bookingData.trip.arrival_city || 'Thái Nguyên'}
+              departureStation={bookingData.trip.departure_station || bookingData.trip.pickup_point}
+              arrivalStation={bookingData.trip.arrival_station || bookingData.trip.dropoff_point}
+              departureTime={bookingData.trip.departureTime || '07:30'}
+              departureDate={bookingData.trip.departure_date || 'Hôm nay'}
+              arrivalTime={bookingData.trip.arrivalTime || '09:15'}
+              arrivalDate={bookingData.trip.departure_date || 'Cùng ngày'}
+              seatNumber={currentSeatNumber}
+              busType={bookingData.trip.busType || 'Ghế ngồi cao cấp 29 chỗ'}
+              licensePlate={bookingData.trip.license_plate || '29B-123.45'}
+              passengerName={passengerName}
+              passengerPhone={passengerPhone}
+              discountType={currentUser.discount_type || 'HSSV'}
+              originalPrice={`${singleBasePrice.toLocaleString('vi-VN')} VNĐ`}
+              discountAmount={singleDiscount > 0 ? `${singleDiscount.toLocaleString('vi-VN')} VNĐ` : '0 VNĐ'}
+              finalPrice={`${singleFinalPrice.toLocaleString('vi-VN')} VNĐ`}
+              paymentMethod={paymentMethod}
+              status="CONFIRMED"
+              showStub={true}
+            />
+          )}
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+        {/* Action Buttons (Chỉ hiển thị trên màn hình, ẩn 100% khi in) */}
+        <div
+          className="no-print payment-actions-bar"
+          style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '24px' }}
+        >
           <button
-            onClick={() => window.print()}
+            onClick={handlePrintSingle}
             style={{
-              backgroundColor: '#f1f5f9',
-              color: '#1e293b',
-              border: '1px solid #cbd5e1',
-              padding: '12px 20px',
+              backgroundColor: '#1e293b',
+              color: 'white',
+              border: 'none',
+              padding: '12px 22px',
               borderRadius: '10px',
               fontWeight: '700',
               cursor: 'pointer',
@@ -367,15 +391,38 @@ function PaymentForm({ bookingData }) {
               alignItems: 'center',
               gap: '6px',
               fontSize: '14px',
+              boxShadow: '0 4px 12px rgba(30,41,59,0.15)',
             }}
           >
-            🖨️ In Vé / Lưu PDF
+            🖨️ In Vé Này (Ghế {currentSeatNumber})
           </button>
+
+          {ticketList.length > 1 && (
+            <button
+              onClick={handlePrintAll}
+              style={{
+                backgroundColor: '#0284c7',
+                color: 'white',
+                border: 'none',
+                padding: '12px 22px',
+                borderRadius: '10px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '14px',
+                boxShadow: '0 4px 12px rgba(2,132,199,0.2)',
+              }}
+            >
+              🖨️ In Tất Cả {ticketList.length} Vé
+            </button>
+          )}
 
           <button
             onClick={() => navigate('/verify', { state: { ticketCode: currentTicketCode } })}
             style={{
-              backgroundColor: '#0284c7',
+              backgroundColor: '#0f766e',
               color: 'white',
               border: 'none',
               padding: '12px 22px',
@@ -414,8 +461,8 @@ function PaymentForm({ bookingData }) {
             onClick={() => navigate('/buses')}
             style={{
               backgroundColor: '#ffffff',
-              color: '#64748b',
-              border: '1px solid #e2e8f0',
+              color: '#475569',
+              border: '1px solid #cbd5e1',
               padding: '12px 18px',
               borderRadius: '10px',
               fontWeight: '600',

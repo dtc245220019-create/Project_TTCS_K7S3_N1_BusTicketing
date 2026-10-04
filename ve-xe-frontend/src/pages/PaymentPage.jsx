@@ -35,7 +35,7 @@ function PaymentPage() {
   };
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
+    <div className="payment-page-container" style={{ maxWidth: '900px', margin: '0 auto', padding: '24px 20px' }}>
       <CountdownTimer initialMinutes={10} heldUntil={bookingData.heldUntil} onExpire={handleExpire} />
 
       {expired ? (

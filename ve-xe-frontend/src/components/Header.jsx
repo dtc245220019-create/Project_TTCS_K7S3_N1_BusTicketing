@@ -69,7 +69,7 @@ function Header() {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <header className="navbar">
+    <header className="navbar no-print">
       <div className="logo">
         <Link to="/" style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span className="logo-icon" style={{ fontSize: '24px' }}>🚌</span>

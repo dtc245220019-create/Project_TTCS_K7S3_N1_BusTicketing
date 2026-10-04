@@ -41,7 +41,7 @@ function CountdownTimer({ initialMinutes = 10, heldUntil = null, onExpire = null
 
   return (
     <div
-      className="countdown-box"
+      className="countdown-box no-print"
       style={{
         backgroundColor: timeLeft > 60 ? '#eff6ff' : '#fef2f2',
         border: `1.5px solid ${timeLeft > 60 ? '#93c5fd' : '#f87171'}`,

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cancelTicket, getCurrentUser, getTickets } from '../api';
+import PrintableTicket from '../components/PrintableTicket';
 
 function UserDashboard() {
   const [activeTab, setActiveTab] = useState('upcoming');
@@ -112,8 +113,8 @@ function UserDashboard() {
   });
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 20px', minHeight: '80vh' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+    <div className="user-dashboard-wrapper" style={{ maxWidth: '1000px', margin: '0 auto', padding: '24px 20px', minHeight: '80vh' }}>
+      <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e3a8a', margin: '0 0 4px 0' }}>
             Quản Lý Vé Xe Cá Nhân (US07)
@@ -138,7 +139,7 @@ function UserDashboard() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '24px' }}>
+      <div className="dashboard-navigation no-print" style={{ display: 'flex', borderBottom: '2px solid #e2e8f0', marginBottom: '24px' }}>
         <button
           onClick={() => setActiveTab('upcoming')}
           style={{
@@ -177,13 +178,13 @@ function UserDashboard() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>Đang tải vé...</div>
       ) : filteredTickets.length === 0 ? (
-        <div style={{ backgroundColor: 'white', padding: '50px 20px', borderRadius: '14px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
+        <div className="dashboard-ticket-list no-print" style={{ backgroundColor: 'white', padding: '50px 20px', borderRadius: '14px', textAlign: 'center', border: '1px solid #e2e8f0' }}>
           <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎟️</div>
           <h3 style={{ color: '#1e293b', margin: '0 0 6px 0' }}>Không có vé nào trong mục này</h3>
           <p style={{ color: '#64748b', fontSize: '14px' }}>Bạn chưa đặt vé hoặc chuyến đi đã hoàn thành.</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div className="dashboard-ticket-list no-print" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {filteredTickets.map((ticket) => {
             const isConfirmed = ticket.status === 'CONFIRMED' || ticket.status === 'PAID';
 
@@ -265,7 +266,7 @@ function UserDashboard() {
                         fontWeight: '600',
                       }}
                     >
-                      👁️ Xem chi tiết
+                      👁️ Xem chi tiết & In vé
                     </button>
                     {isConfirmed && (
                       <button
@@ -292,76 +293,158 @@ function UserDashboard() {
         </div>
       )}
 
-      {/* Ticket Detail Modal */}
-      {selectedTicketDetail && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px',
-          }}
-          onClick={() => setSelectedTicketDetail(null)}
-        >
-          <div
-            style={{
-              backgroundColor: 'white',
-              borderRadius: '16px',
-              padding: '28px',
-              maxWidth: '460px',
-              width: '100%',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
-              <h3 style={{ margin: 0, color: '#1e3a8a', fontSize: '18px' }}>🚌 VÉ ĐIỆN TỬ SMART BUS</h3>
-              <button onClick={() => setSelectedTicketDetail(null)} style={{ border: 'none', background: 'none', fontSize: '18px', cursor: 'pointer' }}>✕</button>
-            </div>
+      {/* Ticket Detail Modal with PrintableTicket */}
+      {selectedTicketDetail && (() => {
+        const routeName = selectedTicketDetail.routeName || selectedTicketDetail.route_name || 'Hà Nội - Thái Nguyên';
+        const parts = routeName.split(/[-➔]/).map((s) => s.trim());
+        const fromCity = selectedTicketDetail.departure_city || parts[0] || 'Hà Nội';
+        const toCity = selectedTicketDetail.arrival_city || parts[1] || 'Thái Nguyên';
+        const seatNum = selectedTicketDetail.seatNumber || selectedTicketDetail.seat_numbers?.[0] || 'A05';
+        const ticketCode = selectedTicketDetail.id || selectedTicketDetail.ticket_code || 'TKT-DEMO';
+        const bookingCode = selectedTicketDetail.booking_code || `BOOK-${ticketCode.replace(/[^a-zA-Z0-9]/g, '').slice(-4)}`;
+        const invoiceCode = `HDDT-2026-${ticketCode.replace(/[^a-zA-Z0-9]/g, '').slice(-4)}`;
 
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-              <img
-                src={selectedTicketDetail.qrCode || `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=ticket:${selectedTicketDetail.id || selectedTicketDetail.ticket_code}`}
-                alt="QR Code"
-                style={{ width: '150px', height: '150px', border: '1px solid #cbd5e1', padding: '6px', borderRadius: '10px' }}
-              />
-              <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#1e293b', marginTop: '6px', fontFamily: 'monospace' }}>
-                {selectedTicketDetail.id || selectedTicketDetail.ticket_code}
+        return (
+          <div
+            className="dashboard-modal-backdrop"
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+              padding: '20px',
+            }}
+            onClick={() => setSelectedTicketDetail(null)}
+          >
+            <div
+              className="dashboard-modal-content"
+              style={{
+                backgroundColor: 'white',
+                borderRadius: '16px',
+                padding: '24px',
+                maxWidth: '820px',
+                width: '100%',
+                maxHeight: '92vh',
+                overflowY: 'auto',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Top Bar (Chỉ hiển thị trên màn hình, ẩn khi in) */}
+              <div
+                className="no-print"
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '16px',
+                  borderBottom: '1px solid #e2e8f0',
+                  paddingBottom: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '22px' }}>🎫</span>
+                  <h3 style={{ margin: 0, color: '#1e3a8a', fontSize: '18px', fontWeight: '800' }}>
+                    CHI TIẾT VÉ ĐIỆN TỬ SMART BUS (US07)
+                  </h3>
+                </div>
+                <button
+                  className="modal-close-btn"
+                  onClick={() => setSelectedTicketDetail(null)}
+                  style={{
+                    border: 'none',
+                    background: '#f1f5f9',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#64748b',
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Form In Vé Chuẩn Hóa */}
+              <div id="printable-ticket" className="printable-ticket-wrapper">
+                <PrintableTicket
+                  ticketCode={ticketCode}
+                  bookingCode={bookingCode}
+                  invoiceCode={invoiceCode}
+                  issuedAt="Hôm nay"
+                  fromCity={fromCity}
+                  toCity={toCity}
+                  departureTime={selectedTicketDetail.departureTime || selectedTicketDetail.departure_time || '07:30'}
+                  seatNumber={seatNum}
+                  passengerName={selectedTicketDetail.passenger_name || currentUser.full_name || 'Nguyễn Văn A'}
+                  passengerPhone={selectedTicketDetail.passenger_phone || currentUser.phone || '0901234567'}
+                  busType={selectedTicketDetail.bus_type || 'Ghế ngồi cao cấp 29 chỗ'}
+                  licensePlate={selectedTicketDetail.license_plate || '29B-123.45'}
+                  finalPrice={selectedTicketDetail.price || '120.000 VNĐ'}
+                  qrCodeUrl={selectedTicketDetail.qrCode || ''}
+                  status={selectedTicketDetail.status || 'CONFIRMED'}
+                  showStub={true}
+                />
+              </div>
+
+              {/* Action Buttons (Chỉ hiển thị trên màn hình, ẩn khi in) */}
+              <div
+                className="no-print"
+                style={{
+                  marginTop: '20px',
+                  display: 'flex',
+                  gap: '12px',
+                  justifyContent: 'flex-end',
+                }}
+              >
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    backgroundColor: '#1e293b',
+                    color: 'white',
+                    border: 'none',
+                    padding: '11px 22px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '14px',
+                  }}
+                >
+                  🖨️ In Vé Này / Lưu PDF
+                </button>
+                <button
+                  onClick={() => setSelectedTicketDetail(null)}
+                  style={{
+                    backgroundColor: '#f1f5f9',
+                    border: '1px solid #cbd5e1',
+                    padding: '11px 20px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    color: '#475569',
+                    fontSize: '14px',
+                  }}
+                >
+                  Đóng Cửa Sổ
+                </button>
               </div>
             </div>
-
-            <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '10px', fontSize: '13px', lineHeight: '1.8' }}>
-              <div>📍 <b>Tuyến:</b> {selectedTicketDetail.routeName || selectedTicketDetail.route_name}</div>
-              <div>🕒 <b>Khởi hành:</b> {selectedTicketDetail.departureTime || selectedTicketDetail.departure_time}</div>
-              <div>💺 <b>Số ghế:</b> {selectedTicketDetail.seatNumber || selectedTicketDetail.seat_numbers?.[0]}</div>
-              <div>👤 <b>Hành khách:</b> {selectedTicketDetail.passenger_name || currentUser.full_name}</div>
-              <div>💵 <b>Giá vé:</b> {selectedTicketDetail.price}</div>
-            </div>
-
-            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-              <button
-                onClick={() => window.print()}
-                style={{ flex: 1, backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '10px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
-              >
-                🖨️ In Vé
-              </button>
-              <button
-                onClick={() => setSelectedTicketDetail(null)}
-                style={{ flex: 1, backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
-              >
-                Đóng
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

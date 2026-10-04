@@ -388,26 +388,95 @@
   }
 }
 
-/* Print Styles for E-Ticket US06 */
+/* ========================================================================= */
+/* Print Styles for E-Ticket & Boarding Pass (US06)                          */
+/* ========================================================================= */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  /* Reset all containers */
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide website layout elements */
+  header,
+  footer,
+  nav,
   .navbar,
   .footer,
+  .no-print,
   .countdown-box,
-  .payment-success-card > div:first-child,
-  .payment-success-card > div:nth-child(2),
-  .payment-success-card > div:nth-child(3),
-  .payment-success-card > div:last-child {
+  .payment-actions-bar,
+  .ticket-tabs-nav,
+  .success-header-banner,
+  .sandbox-badge-banner,
+  .modal-close-btn,
+  button,
+  .dashboard-navigation,
+  .dashboard-ticket-list {
     display: none !important;
   }
-  body, .app-wrapper, .main-content {
-    background: white !important;
+
+  /* Flatten wrappers */
+  .app-wrapper,
+  .main-content,
+  .payment-success-card,
+  .payment-page-container {
+    background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
-  }
-  #printable-ticket {
-    max-width: 100% !important;
-    border: 2px solid #000 !important;
+    border: none !important;
     box-shadow: none !important;
-    page-break-inside: avoid;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Modal print override for UserDashboard */
+  .dashboard-modal-backdrop {
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    display: block !important;
+  }
+
+  .dashboard-modal-content {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Printable Ticket Styling */
+  .smartbus-printable-ticket,
+  #printable-ticket {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto 12mm auto !important;
+    box-shadow: none !important;
+    border: 2px solid #1e3a8a !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    background: #ffffff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .smartbus-printable-ticket * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
