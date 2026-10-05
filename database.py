@@ -225,14 +225,18 @@ CREATE TABLE IF NOT EXISTS ticket_inspections (
     note TEXT
 );
 
--- 14. ERD: VE_THANG (Monthly Passes)
+-- 14. ERD: VE_THANG (Monthly Passes - US16 CẬP NHẬT ĐẦY ĐỦ THÔNG TIN)
 CREATE TABLE IF NOT EXISTS monthly_passes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),
+    passenger_name TEXT NOT NULL,
+    passenger_id_card TEXT NOT NULL,
     route_id INTEGER NOT NULL REFERENCES routes(id),
     start_date TEXT NOT NULL,
     end_date TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'ConHan'
+    price REAL NOT NULL DEFAULT 300000.0,
+    status TEXT NOT NULL DEFAULT 'ConHan',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 15. ERD: BAO_CAO_SU_CO & PHAN_ANH
@@ -279,7 +283,8 @@ def get_connection() -> sqlite3.Connection:
 
 def initialize_database(connection: sqlite3.Connection) -> None:
     connection.executescript(SCHEMA)
-    # Check and migrate missing columns in vouchers for existing sqlite databases
+
+    # 1. Migration bổ sung cột cho vouchers nếu CSDL đã tồn tại từ trước
     try:
         cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
                 for row in connection.execute("PRAGMA table_info(vouchers)").fetchall()}
@@ -300,6 +305,23 @@ def initialize_database(connection: sqlite3.Connection) -> None:
                 connection.execute(f"ALTER TABLE vouchers ADD COLUMN {col_name} {col_type}")
     except Exception:
         pass
+
+    # 2. Migration tự động cho monthly_passes nếu chạy trên CSDL cũ
+    try:
+        pass_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
+                     for row in connection.execute("PRAGMA table_info(monthly_passes)").fetchall()}
+        add_pass_cols = [
+            ("passenger_name", "TEXT DEFAULT ''"),
+            ("passenger_id_card", "TEXT DEFAULT ''"),
+            ("price", "REAL DEFAULT 300000.0"),
+            ("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP"),
+        ]
+        for col_name, col_type in add_pass_cols:
+            if col_name not in pass_cols:
+                connection.execute(f"ALTER TABLE monthly_passes ADD COLUMN {col_name} {col_type}")
+    except Exception:
+        pass
+
     connection.commit()
 
 
@@ -533,6 +555,23 @@ class TicketInspection(Base):
     inspected_at = Column(DateTime, default=datetime.now)
     note = Column(Text, nullable=True)
 
+
+class MonthlyPass(Base):
+    __tablename__ = "monthly_passes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    passenger_name = Column(String(100), nullable=False)
+    passenger_id_card = Column(String(50), nullable=False)
+    route_id = Column(Integer, ForeignKey("routes.id"), nullable=False)
+    start_date = Column(String(20), nullable=False)
+    end_date = Column(String(20), nullable=False)
+    price = Column(Float, default=300000.0)
+    status = Column(String(30), default="ConHan")  # ConHan, HetHan
+    created_at = Column(DateTime, default=datetime.now)
+
+    user = relationship("User")
+    route = relationship("Route")
 
 
 class Fee(Base):
