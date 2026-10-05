@@ -11,6 +11,8 @@ import RegisterPage from './pages/RegisterPage';
 import MapPage from './pages/MapPage';
 import PaymentResultPage from './pages/PaymentResultPage';
 import TicketCancellation from './pages/TicketCancellation';
+import MonthlyPassPage from './pages/MonthlyPassPage';
+import AdminDashboard from './pages/AdminDashboard';
 import './App.css';
 
 function App() {
@@ -26,11 +28,14 @@ function App() {
             <Route path="/buses" element={<BusListPage />} />
             <Route path="/payment" element={<PaymentPage />} />
             <Route path="/payment-result" element={<PaymentResultPage />} />
+            <Route path="/monthly-pass" element={<MonthlyPassPage />} />
+            <Route path="/ve-thang" element={<MonthlyPassPage />} />
             <Route path="/dashboard" element={<UserDashboard />} />
-            <Route path="/cancellation" element={<TicketCancellation />} />
-            <Route path="/cancel-ticket" element={<TicketCancellation />} />
+            <Route path="/cancellation" element={<UserDashboard defaultTab="exchange-cancel" />} />
+            <Route path="/cancel-ticket" element={<UserDashboard defaultTab="exchange-cancel" />} />
             <Route path="/verify-ticket" element={<TicketVerification />} />
             <Route path="/verify" element={<TicketVerification />} />
+            <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Routes>

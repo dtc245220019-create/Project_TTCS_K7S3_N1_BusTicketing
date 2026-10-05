@@ -240,10 +240,14 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE TABLE IF NOT EXISTS monthly_passes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
+    passenger_name VARCHAR(100) NULL,
+    passenger_id_card VARCHAR(50) NULL,
     route_id INT NOT NULL,
     start_date VARCHAR(50) NOT NULL,
     end_date VARCHAR(50) NOT NULL,
+    price DECIMAL(12, 2) DEFAULT 300000.00,
     status VARCHAR(30) NOT NULL DEFAULT 'ConHan',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_mp_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
     CONSTRAINT fk_mp_route FOREIGN KEY (route_id) REFERENCES routes(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

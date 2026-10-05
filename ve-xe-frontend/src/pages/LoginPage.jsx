@@ -28,17 +28,25 @@ function LoginPage() {
   const fillQuickAccount = (quickEmail, quickRole) => {
     setEmail(quickEmail);
     setPassword('123456');
-    // Pre-set user so demo works instantly even before submit
     const mockUser = {
-      id: quickRole === 'TaiXe' ? 11 : quickRole === 'Admin' ? 12 : 1,
-      full_name: quickRole === 'TaiXe' ? 'Trần Văn Tài (Tài Xế)' : quickRole === 'Admin' ? 'Lê Quản Lý (Admin)' : 'Nguyễn Văn A',
+      id: quickRole === 'TaiXe' ? 11 : quickRole === 'PhuXe' ? 2 : quickRole === 'Admin' ? 12 : 1,
+      full_name:
+        quickRole === 'TaiXe'
+          ? 'Trần Văn Tài (Tài Xế)'
+          : quickRole === 'PhuXe'
+          ? 'Lê Phụ Xe (Nhân Viên)'
+          : quickRole === 'Admin'
+          ? 'Lê Quản Lý (Admin)'
+          : 'Nguyễn Văn A (Hành Khách)',
       email: quickEmail,
       role: quickRole,
       discount_type: quickRole === 'HanhKhach' ? 'HSSV' : 'Khong',
     };
     setCurrentUser(mockUser);
     setTimeout(() => {
-      navigate('/dashboard');
+      if (quickRole === 'Admin') navigate('/admin');
+      else if (quickRole === 'TaiXe' || quickRole === 'PhuXe') navigate('/verify-ticket');
+      else navigate('/dashboard');
     }, 200);
   };
 
@@ -120,15 +128,19 @@ function LoginPage() {
                 backgroundColor: '#f0fdf4',
                 color: '#166534',
                 border: '1px solid #bbf7d0',
-                padding: '8px',
+                padding: '10px 12px',
                 borderRadius: '8px',
                 fontSize: '13px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
             >
-              👤 Hành khách: <b>customer@example.com</b> (Ưu đãi HSSV)
+              <span>👤 1. Hành khách: <b>customer@example.com</b></span>
+              <span style={{ fontSize: '11px', color: '#15803d', backgroundColor: '#dcfce7', padding: '2px 6px', borderRadius: '4px' }}>HSSV -20%</span>
             </button>
             <button
               type="button"
@@ -137,15 +149,40 @@ function LoginPage() {
                 backgroundColor: '#fffbeb',
                 color: '#92400e',
                 border: '1px solid #fde68a',
-                padding: '8px',
+                padding: '10px 12px',
                 borderRadius: '8px',
                 fontSize: '13px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
             >
-              🚌 Tài xế / Phụ xe: <b>taixe.nguyen@smartbus.vn</b> (Soát vé)
+              <span>🚌 2. Tài xế: <b>taixe.nguyen@smartbus.vn</b></span>
+              <span style={{ fontSize: '11px', color: '#b45309', backgroundColor: '#fef3c7', padding: '2px 6px', borderRadius: '4px' }}>Soát vé & Khách</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => fillQuickAccount('nhanvien@smartbus.vn', 'PhuXe')}
+              style={{
+                backgroundColor: '#faf5ff',
+                color: '#6b21a8',
+                border: '1px solid #e9d5ff',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span>🎫 3. Phụ xe / Quầy: <b>nhanvien@smartbus.vn</b></span>
+              <span style={{ fontSize: '11px', color: '#7e22ce', backgroundColor: '#f3e8ff', padding: '2px 6px', borderRadius: '4px' }}>Soát vé QR</span>
             </button>
             <button
               type="button"
@@ -154,15 +191,19 @@ function LoginPage() {
                 backgroundColor: '#eff6ff',
                 color: '#1d4ed8',
                 border: '1px solid #bfdbfe',
-                padding: '8px',
+                padding: '10px 12px',
                 borderRadius: '8px',
                 fontSize: '13px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
               }}
             >
-              👑 Quản trị viên: <b>admin@smartbus.vn</b>
+              <span>👑 4. Quản trị viên: <b>admin@smartbus.vn</b></span>
+              <span style={{ fontSize: '11px', color: '#1e40af', backgroundColor: '#dbeafe', padding: '2px 6px', borderRadius: '4px' }}>Toàn quyền RBAC</span>
             </button>
           </div>
         </div>

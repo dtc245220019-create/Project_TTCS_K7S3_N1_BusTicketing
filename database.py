@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE,
     phone TEXT DEFAULT '0901234567',
     password_hash TEXT DEFAULT 'pbkdf2:sha256:123456',
-    role TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (role IN ('CUSTOMER', 'STAFF', 'ADMIN', 'DRIVER', 'CONDUCTOR', 'TaiXe', 'PhuXe', 'HanhKhach')),
+    role TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (role IN ('CUSTOMER', 'STAFF', 'ADMIN', 'DRIVER', 'CONDUCTOR', 'TaiXe', 'PhuXe', 'HanhKhach', 'Admin', 'QuanTriVien')),
     discount_type TEXT DEFAULT 'Khong',
     discount_status TEXT DEFAULT 'ChoDuyet',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -229,10 +229,14 @@ CREATE TABLE IF NOT EXISTS ticket_inspections (
 CREATE TABLE IF NOT EXISTS monthly_passes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),
+    passenger_name TEXT,
+    passenger_id_card TEXT,
     route_id INTEGER NOT NULL REFERENCES routes(id),
     start_date TEXT NOT NULL,
     end_date TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'ConHan'
+    price REAL DEFAULT 300000.0,
+    status TEXT NOT NULL DEFAULT 'ConHan',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 15. ERD: BAO_CAO_SU_CO & PHAN_ANH
@@ -268,16 +272,32 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 """
 
+import unicodedata
+
+
+def remove_accents(input_str: Optional[str]) -> str:
+    """Normalize and strip Vietnamese accents for accent-insensitive search."""
+    if not input_str:
+        return ""
+    s = str(input_str).replace("đ", "d").replace("Đ", "D")
+    nfkd = unicodedata.normalize("NFKD", s)
+    return "".join([c for c in nfkd if not unicodedata.combining(c)]).lower().strip()
+
 
 def get_connection() -> sqlite3.Connection:
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATABASE_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    connection.create_function("clean_str", 1, remove_accents)
     return connection
 
 
 def initialize_database(connection: sqlite3.Connection) -> None:
+    try:
+        connection.create_function("clean_str", 1, remove_accents)
+    except Exception:
+        pass
     connection.executescript(SCHEMA)
     # Check and migrate missing columns in vouchers for existing sqlite databases
     try:
@@ -300,6 +320,23 @@ def initialize_database(connection: sqlite3.Connection) -> None:
                 connection.execute(f"ALTER TABLE vouchers ADD COLUMN {col_name} {col_type}")
     except Exception:
         pass
+
+    # Check and migrate missing columns in monthly_passes for existing sqlite databases
+    try:
+        pass_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
+                     for row in connection.execute("PRAGMA table_info(monthly_passes)").fetchall()}
+        add_pass_cols = [
+            ("passenger_name", "TEXT"),
+            ("passenger_id_card", "TEXT"),
+            ("price", "REAL DEFAULT 300000.0"),
+            ("created_at", "TEXT DEFAULT CURRENT_TIMESTAMP"),
+        ]
+        for col_name, col_type in add_pass_cols:
+            if col_name not in pass_cols:
+                connection.execute(f"ALTER TABLE monthly_passes ADD COLUMN {col_name} {col_type}")
+    except Exception:
+        pass
+
     connection.commit()
 
 
@@ -324,6 +361,7 @@ class User(Base):
 
     bookings = relationship("Booking", back_populates="user")
     tickets = relationship("Ticket", back_populates="user")
+    monthly_passes = relationship("MonthlyPass", back_populates="user")
 
 
 class Route(Base):
@@ -339,6 +377,7 @@ class Route(Base):
 
     trips = relationship("Trip", back_populates="route")
     route_stops = relationship("RouteStopDetail", back_populates="route", cascade="all, delete-orphan")
+    monthly_passes = relationship("MonthlyPass", back_populates="route")
 
 
 class BusStop(Base):
@@ -533,6 +572,23 @@ class TicketInspection(Base):
     inspected_at = Column(DateTime, default=datetime.now)
     note = Column(Text, nullable=True)
 
+
+class MonthlyPass(Base):
+    __tablename__ = "monthly_passes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    passenger_name = Column(String(100), nullable=True)
+    passenger_id_card = Column(String(50), nullable=True)
+    route_id = Column(Integer, ForeignKey("routes.id"), nullable=False)
+    start_date = Column(String(20), nullable=False)
+    end_date = Column(String(20), nullable=False)
+    price = Column(Float, default=300000.0)
+    status = Column(String(30), default="ConHan")  # ConHan, HetHan
+    created_at = Column(DateTime, default=datetime.now)
+
+    user = relationship("User", back_populates="monthly_passes")
+    route = relationship("Route", back_populates="monthly_passes")
 
 
 class Fee(Base):

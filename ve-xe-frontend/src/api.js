@@ -75,12 +75,27 @@ export function getTicketByCode(ticketCode, userId = null) {
   return fetchJson(url);
 }
 
-export function cancelTicket(ticketId, userId) {
+export function cancelTicket(ticketId, userId = 1) {
   return fetchJson(`/api/v1/tickets/${ticketId}/cancel`, {
     method: 'POST',
     body: JSON.stringify({ user_id: userId }),
   });
 }
+
+export function changeTicketSeat(ticketId, newSeatNumber, userId = 1) {
+  return fetchJson(`/api/v1/tickets/${ticketId}/change-seat`, {
+    method: 'POST',
+    body: JSON.stringify({ new_seat_number: newSeatNumber, user_id: userId }),
+  });
+}
+
+export function changeTicketTrip(ticketId, newTripId, newSeatNumber = null, userId = 1) {
+  return fetchJson(`/api/v1/tickets/${ticketId}/change-trip`, {
+    method: 'POST',
+    body: JSON.stringify({ new_trip_id: newTripId, new_seat_number: newSeatNumber, user_id: userId }),
+  });
+}
+
 
 // 5. Soát vé (Driver Verification)
 export function verifyTicket(ticketCode, staffEmail = 'taixe.nguyen@smartbus.vn') {
@@ -174,6 +189,28 @@ export function getNotifications(userId = null) {
   return fetchJson(url);
 }
 
+// 12. Danh sách tuyến xe (Routes)
+export function getRoutes() {
+  return fetchJson('/api/v1/routes');
+}
+
+// 13. Vé tháng - Đăng ký & Quản lý (Sprint 2 - US16)
+export function getMonthlyPassPlans() {
+  return fetchJson('/api/v1/monthly-passes/plans');
+}
+
+export function getMonthlyPasses(userId = null) {
+  const url = userId ? `/api/v1/monthly-passes?user_id=${userId}` : '/api/v1/monthly-passes';
+  return fetchJson(url);
+}
+
+export function registerMonthlyPass(payload) {
+  return fetchJson('/api/v1/monthly-passes/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // Storage helpers
 export function getCurrentUser() {
   try {
@@ -190,4 +227,44 @@ export function setCurrentUser(user) {
   } else {
     localStorage.removeItem('smartbus_user');
   }
+}
+
+// 14. Quản trị hệ thống & Phân quyền RBAC (Sprint 2 - Admin Hub)
+export function getAdminUsers() {
+  return fetchJson('/api/v1/admin/users');
+}
+
+export function updateUserRole(userId, role) {
+  return fetchJson(`/api/v1/admin/users/${userId}/role`, {
+    method: 'PUT',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function getAdminStats() {
+  return fetchJson('/api/v1/admin/stats');
+}
+
+export function getAdminTrips() {
+  return fetchJson('/api/v1/admin/trips');
+}
+
+export function updateTripStatus(tripId, status = null, driverId = null) {
+  return fetchJson(`/api/v1/admin/trips/${tripId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ status, driver_id: driverId }),
+  });
+}
+
+// 15. Nghiệp vụ Tài xế & Danh sách hành khách (Driver Manifest)
+export function getDriverTrips(driverId = null) {
+  const url = driverId ? `/api/v1/driver/trips?driver_id=${driverId}` : '/api/v1/driver/trips';
+  return fetchJson(url);
+}
+
+export function boardPassenger(ticketId, staffEmail = 'taixe.nguyen@smartbus.vn') {
+  return fetchJson('/api/v1/driver/board-passenger', {
+    method: 'POST',
+    body: JSON.stringify({ ticket_id: ticketId, staff_email: staffEmail }),
+  });
 }

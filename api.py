@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import io
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
@@ -90,6 +90,12 @@ class ChangeSeatRequest(BaseModel):
     new_seat_number: str = Field(..., min_length=1)
 
 
+class ChangeTripRequest(BaseModel):
+    user_id: int = Field(..., gt=0)
+    new_trip_id: int = Field(..., gt=0)
+    new_seat_number: Optional[str] = None
+
+
 class HoldSeatRequest(BaseModel):
     seat_ids: List[int]
     user_id: Optional[int] = 1
@@ -132,11 +138,15 @@ def _ticket_query():
                tr.origin || ' - ' || tr.destination AS route_name,
                tr.departure_at AS departure_time, tr.arrival_at AS arrival_time,
                COALESCE(s.seat_number, 'A12') AS seat_number,
-               COALESCE(u.full_name, 'Hành khách') AS passenger_name
+               COALESCE(bi.passenger_name, u.full_name, 'Hành khách') AS passenger_name,
+               COALESCE(u.phone, '0901234567') AS passenger_phone,
+               COALESCE(bus.bus_type, 'SmartBus VIP Limousine 36 chỗ') AS bus_type,
+               COALESCE(bus.license_plate, '29B-123.45') AS license_plate
         FROM tickets t
         LEFT JOIN booking_items bi ON bi.id = t.booking_item_id
         LEFT JOIN bookings b ON b.id = bi.booking_id OR b.id = t.id
         LEFT JOIN trips tr ON tr.id = COALESCE(b.trip_id, t.trip_id)
+        LEFT JOIN buses bus ON bus.id = tr.bus_id
         LEFT JOIN seats s ON s.id = COALESCE(bi.seat_id, t.seat_id)
         LEFT JOIN users u ON u.id = COALESCE(b.user_id, t.user_id)
     """
@@ -146,6 +156,32 @@ def _serialize_ticket(row: Any) -> dict[str, Any]:
     qr_payload = row["qr_payload"] or f"ticket:{row['ticket_code']}"
     # QR image URL using public QR API as dynamic fallback
     qr_img = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={qr_payload}"
+
+    # Kiểm tra xem chuyến xe đã khởi hành trong quá khứ chưa
+    dep_str = str(row["departure_time"] or "")
+    is_past = False
+    try:
+        if len(dep_str) >= 16:
+            dep_dt = datetime.strptime(dep_str[:16], "%Y-%m-%d %H:%M")
+            if dep_dt < datetime.now():
+                is_past = True
+    except Exception:
+        pass
+
+    raw_st = row["status"]
+    if raw_st in ("USED", "DaSoat", "COMPLETED"):
+        ui_status = "COMPLETED"
+    elif raw_st in ("CANCELLED", "DaHuy"):
+        ui_status = "CANCELLED"
+    elif is_past:
+        ui_status = "COMPLETED"
+    else:
+        ui_status = "CONFIRMED"
+
+    row_keys = row.keys() if hasattr(row, "keys") else []
+    p_phone = row["passenger_phone"] if "passenger_phone" in row_keys else "0901234567"
+    b_type = row["bus_type"] if "bus_type" in row_keys else "SmartBus VIP Limousine 36 chỗ"
+    l_plate = row["license_plate"] if "license_plate" in row_keys else "29B-123.45"
 
     return {
         "id": row["ticket_code"],
@@ -165,8 +201,12 @@ def _serialize_ticket(row: Any) -> dict[str, Any]:
         "price": f"{int(row['total_amount']):,} VNĐ" if row["total_amount"] else "120.000 VNĐ",
         "total_amount": row["total_amount"],
         "passenger_name": row["passenger_name"] or "Hành khách",
-        "status": "CONFIRMED" if row["status"] in ("PAID", "DaThanhToan") else ("COMPLETED" if row["status"] in ("USED", "DaSoat") else row["status"]),
-        "raw_status": row["status"],
+        "passenger_phone": p_phone,
+        "bus_type": b_type,
+        "license_plate": l_plate,
+        "status": ui_status,
+        "raw_status": raw_st,
+        "is_past": is_past,
         "qrCode": qr_img,
         "qr_payload": qr_payload,
     }
@@ -233,6 +273,8 @@ def search_trips(
     destination: Optional[str] = Query(None),
     date: Optional[str] = Query(None),
 ):
+    from database import remove_accents
+
     with get_connection() as connection:
         query = """
             SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type
@@ -242,21 +284,56 @@ def search_trips(
             WHERE tr.status = 'SCHEDULED'
         """
         params = []
-        if origin:
-            query += " AND LOWER(tr.origin) LIKE ?"
-            params.append(f"%{origin.strip().lower()}%")
-        if destination:
-            query += " AND LOWER(tr.destination) LIKE ?"
-            params.append(f"%{destination.strip().lower()}%")
-        if date:
+        if origin and isinstance(origin, str):
+            clean_orig = remove_accents(origin)
+            query += " AND (clean_str(tr.origin) LIKE ? OR clean_str(r.departure_city) LIKE ?)"
+            params.extend([f"%{clean_orig}%", f"%{clean_orig}%"])
+        if destination and isinstance(destination, str):
+            clean_dest = remove_accents(destination)
+            query += " AND (clean_str(tr.destination) LIKE ? OR clean_str(r.arrival_city) LIKE ?)"
+            params.extend([f"%{clean_dest}%", f"%{clean_dest}%"])
+        if date and isinstance(date, str):
             query += " AND tr.departure_at LIKE ?"
             params.append(f"{date.strip()}%")
 
         query += " ORDER BY tr.departure_at ASC"
         rows = connection.execute(query, params).fetchall()
 
+        # Nếu không có chuyến nào vào đúng ngày đã chọn nhưng có chuyến trên cùng tuyến,
+        # tìm các chuyến xe sắp tới trên tuyến đó để người dùng dễ lựa chọn!
+        if len(rows) == 0 and date and isinstance(date, str) and (origin or destination):
+            fallback_query = """
+                SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type
+                FROM trips tr
+                LEFT JOIN routes r ON r.id = tr.route_id
+                LEFT JOIN buses b ON b.id = tr.bus_id
+                WHERE tr.status = 'SCHEDULED'
+            """
+            fb_params = []
+            if origin and isinstance(origin, str):
+                clean_orig = remove_accents(origin)
+                fallback_query += " AND (clean_str(tr.origin) LIKE ? OR clean_str(r.departure_city) LIKE ?)"
+                fb_params.extend([f"%{clean_orig}%", f"%{clean_orig}%"])
+            if destination and isinstance(destination, str):
+                clean_dest = remove_accents(destination)
+                fallback_query += " AND (clean_str(tr.destination) LIKE ? OR clean_str(r.arrival_city) LIKE ?)"
+                fb_params.extend([f"%{clean_dest}%", f"%{clean_dest}%"])
+            fallback_query += " ORDER BY tr.departure_at ASC"
+            rows = connection.execute(fallback_query, fb_params).fetchall()
+
         results = []
         for r in rows:
+            dest_lower = (r["destination"] or "").lower()
+            orig_lower = (r["origin"] or "").lower()
+            if "lạt" in dest_lower or "dalat" in dest_lower:
+                duration_str = "6 tiếng 30 phút"
+            elif "thái nguyên" in dest_lower or "thai nguyen" in dest_lower:
+                duration_str = "2 tiếng"
+            elif "huế" in dest_lower or "hue" in dest_lower:
+                duration_str = "2 tiếng 30 phút"
+            else:
+                duration_str = "8 tiếng"
+
             results.append({
                 "id": r["id"],
                 "trip_code": r["trip_code"],
@@ -268,7 +345,7 @@ def search_trips(
                 "departureTime": r["departure_at"].split(" ")[-1] if " " in r["departure_at"] else r["departure_at"],
                 "arrivalTime": r["arrival_at"].split(" ")[-1] if " " in r["arrival_at"] else r["arrival_at"],
                 "departure_date": r["departure_at"].split(" ")[0] if " " in r["departure_at"] else "",
-                "duration": "8 tiếng",
+                "duration": duration_str,
                 "price": r["base_price"],
                 "availableSeatsCount": r["available_seats"] or 18,
                 "status": r["status"],
@@ -876,7 +953,7 @@ def get_ticket_qr_image(ticket_id: int):
 
 
 @app.post("/api/v1/tickets/{ticket_id}/cancel", summary="Hủy vé trực tuyến (US07)")
-def cancel_ticket_endpoint(ticket_id: int, payload: CancelRequest):
+def cancel_ticket_endpoint(ticket_id: str, payload: CancelRequest):
     with get_connection() as connection:
         row = connection.execute(
             "SELECT ticket_code FROM tickets WHERE id = ? OR ticket_code = ?",
@@ -893,7 +970,7 @@ def cancel_ticket_endpoint(ticket_id: int, payload: CancelRequest):
 
 
 @app.post("/api/v1/tickets/{ticket_id}/change-seat", summary="Đổi ghế chuyến xe")
-def change_seat_endpoint(ticket_id: int, payload: ChangeSeatRequest):
+def change_seat_endpoint(ticket_id: str, payload: ChangeSeatRequest):
     with get_connection() as connection:
         row = connection.execute(
             "SELECT ticket_code FROM tickets WHERE id = ? OR ticket_code = ?",
@@ -907,6 +984,57 @@ def change_seat_endpoint(ticket_id: int, payload: ChangeSeatRequest):
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         updated = _find_ticket(connection, row["ticket_code"])
     return _serialize_ticket(updated)
+
+
+@app.post("/api/v1/tickets/{ticket_id}/change-trip", summary="Đổi chuyến xe (US05 & US07)")
+def change_trip_endpoint(ticket_id: str, payload: ChangeTripRequest):
+    with get_connection() as connection:
+        row = connection.execute(
+            """SELECT t.id, t.ticket_code, t.status AS ticket_status, b.id AS booking_id,
+                      b.status AS booking_status, b.trip_id, bi.id AS item_id, bi.seat_id
+               FROM tickets t
+               LEFT JOIN booking_items bi ON bi.id = t.booking_item_id
+               LEFT JOIN bookings b ON b.id = bi.booking_id OR b.id = t.id
+               WHERE t.id = ? OR t.ticket_code = ?""",
+            (ticket_id, str(ticket_id)),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+
+        new_trip = connection.execute("SELECT * FROM trips WHERE id = ?", (payload.new_trip_id,)).fetchone()
+        if not new_trip:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe mới")
+
+        if payload.new_seat_number:
+            seat = connection.execute(
+                "SELECT * FROM seats WHERE trip_id = ? AND UPPER(seat_number) = ?",
+                (payload.new_trip_id, payload.new_seat_number.strip().upper()),
+            ).fetchone()
+            if not seat:
+                raise HTTPException(status_code=400, detail=f"Ghế {payload.new_seat_number} không tồn tại trên chuyến mới")
+        else:
+            seat = connection.execute(
+                "SELECT * FROM seats WHERE trip_id = ? AND status = 'AVAILABLE' LIMIT 1",
+                (payload.new_trip_id,),
+            ).fetchone()
+            if not seat:
+                raise HTTPException(status_code=400, detail="Chuyến xe mới đã hết ghế trống")
+
+        if row["seat_id"]:
+            connection.execute("UPDATE seats SET status = 'AVAILABLE' WHERE id = ?", (row["seat_id"],))
+        connection.execute("UPDATE seats SET status = 'BOOKED' WHERE id = ?", (seat["id"],))
+
+        if row["item_id"]:
+            connection.execute("UPDATE booking_items SET seat_id = ? WHERE id = ?", (seat["id"], row["item_id"]))
+
+        if row["booking_id"]:
+            connection.execute("UPDATE bookings SET trip_id = ? WHERE id = ?", (payload.new_trip_id, row["booking_id"]))
+
+        connection.execute("UPDATE tickets SET trip_id = ?, seat_id = ? WHERE id = ?", (payload.new_trip_id, seat["id"], row["id"]))
+        connection.commit()
+
+        updated = _find_ticket(connection, row["ticket_code"])
+        return _serialize_ticket(updated)
 
 
 # =============================================================================
@@ -924,6 +1052,73 @@ def verify_ticket(payload: InspectionRequest):
 
     if not ticket:
         raise HTTPException(status_code=422, detail="Ticket code is required")
+
+    # Phân quyền: Kiểm tra người thực hiện soát vé có vai trò hợp lệ không
+    with get_connection() as connection:
+        staff_row = connection.execute(
+            "SELECT * FROM users WHERE id = ? OR LOWER(email) = ?",
+            (staff_id, staff_email),
+        ).fetchone()
+        if staff_row and staff_row["role"] in {"CUSTOMER", "HanhKhach"}:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Tài khoản '{staff_row['full_name']}' (Hành khách) không có quyền soát vé! Nghiệp vụ này chỉ dành cho Tài xế, Phụ xe và Quản trị viên."
+            )
+
+    # Kiểm tra nếu là vé tháng (PASS)
+    if ticket.startswith("PASS:") or ticket.startswith("PASS-") or ticket.startswith("PASS_"):
+        pass_id_str = ticket.replace("PASS:", "").replace("PASS-", "").replace("PASS_", "").strip()
+        try:
+            pass_id = int(pass_id_str)
+        except ValueError:
+            pass_id = None
+
+        if pass_id is not None:
+            with get_connection() as connection:
+                mp = connection.execute(
+                    """SELECT p.*, r.name as route_name, r.departure_city, r.arrival_city,
+                              COALESCE(p.passenger_name, u.full_name) as cust_name, u.phone
+                       FROM monthly_passes p
+                       JOIN routes r ON r.id = p.route_id
+                       JOIN users u ON u.id = p.user_id
+                       WHERE p.id = ?""",
+                    (pass_id,),
+                ).fetchone()
+
+                if mp:
+                    today = datetime.now().date()
+                    end_d = datetime.fromisoformat(str(mp["end_date"])[:10]).date()
+                    days_left = (end_d - today).days
+                    if days_left >= 0:
+                        res_status = "VALID"
+                        is_valid = True
+                        msg = f"Thẻ vé tháng HỢP LỆ! Tuyến: {mp['route_name']} (Còn {days_left} ngày sử dụng)"
+                    else:
+                        res_status = "EXPIRED"
+                        is_valid = False
+                        msg = f"Thẻ vé tháng ĐÃ HẾT HẠN vào ngày {mp['end_date']}!"
+
+                    # Ghi log soát vé
+                    connection.execute(
+                        """INSERT INTO ticket_inspections (ticket_id, ticket_code, staff_user_id, staff_email, result, note)
+                           VALUES (NULL, ?, ?, ?, ?, ?)""",
+                        (ticket, staff_id, staff_email, res_status, msg),
+                    )
+                    connection.commit()
+
+                    return {
+                        "valid": is_valid,
+                        "result": res_status,
+                        "reason": msg,
+                        "ticket_code": ticket,
+                        "message": msg,
+                        "details": {
+                            "customer": mp["cust_name"],
+                            "route": mp["route_name"],
+                            "seat": "Thẻ vé tháng (Tự do)",
+                            "time": f"Hạn dùng: {mp['end_date']} (Còn {max(days_left, 0)} ngày)",
+                        },
+                    }
 
     with get_connection() as connection:
         # Kiểm tra bảng demo_tickets (hỗ trợ test case Sandbox)
@@ -1293,6 +1488,431 @@ def get_notifications_endpoint(user_id: Optional[int] = Query(None), limit: int 
                 "SELECT * FROM notifications ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
         return [dict(r) for r in rows]
+
+
+# =============================================================================
+# US16: VÉ THÁNG - ĐĂNG KÝ, GIA HẠN & QUẢN LÝ (MONTHLY PASSES)
+# =============================================================================
+
+PASS_DAYS_PER_MONTH = 30
+PASS_TRIPS_PER_MONTH = 10          # 1 tháng = 10 lượt giá gốc (ưu đãi đi lại hàng tháng)
+PASS_MONTH_DISCOUNT = {1: 0.0, 3: 0.08, 6: 0.15, 12: 0.25}   # mua dài hạn giảm thêm
+PASS_STUDENT_DISCOUNT = 0.20        # HSSV giảm 20%
+
+
+class RegisterPassRequest(BaseModel):
+    user_id: int = Field(..., gt=0)
+    route_id: int = Field(..., gt=0)
+    months: int = Field(1, description="Số tháng: 1, 3, 6 hoặc 12")
+    pass_id: Optional[int] = None       # có pass_id => gia hạn vé cũ
+    passenger_name: Optional[str] = None
+    passenger_id_card: Optional[str] = None
+    price: Optional[float] = None
+    payment_method: Optional[str] = "SANDBOX"
+
+
+def _pass_price(base_price: int, months: int, discount_type: Optional[str]) -> dict[str, int]:
+    full = base_price * PASS_TRIPS_PER_MONTH * months
+    term_off = round(full * PASS_MONTH_DISCOUNT.get(months, 0.0))
+    after_term = full - term_off
+    student_off = round(after_term * PASS_STUDENT_DISCOUNT) if discount_type and discount_type != "Khong" else 0
+    return {
+        "full": full,
+        "term_discount": term_off,
+        "student_discount": student_off,
+        "total": after_term - student_off,
+    }
+
+
+def _serialize_pass(row: Any) -> dict[str, Any]:
+    d = dict(row)
+    today = datetime.now().date()
+    end = datetime.fromisoformat(str(d["end_date"])[:10]).date()
+    days_left = (end - today).days
+    d["days_left"] = max(days_left, 0)
+    d["status"] = "ConHan" if days_left >= 0 else "HetHan"
+    d["qr_payload"] = f"pass:{d['id']}"
+    d["ticket_code"] = f"PASS-{d['id']:04d}"
+    d["passenger_name"] = d.get("passenger_name") or d.get("full_name") or "Hành khách"
+    d["passenger_id_card"] = d.get("passenger_id_card") or d.get("phone") or "N/A"
+    return d
+
+
+_PASS_SELECT = """SELECT p.id, p.user_id, p.route_id, p.start_date, p.end_date, p.status,
+                         COALESCE(p.passenger_name, u.full_name) AS passenger_name,
+                         COALESCE(p.passenger_id_card, u.phone) AS passenger_id_card,
+                         COALESCE(p.price, 0) AS price,
+                         p.created_at,
+                         r.name AS route_name, r.departure_city, r.arrival_city, r.base_price, r.distance_km,
+                         u.full_name, u.email, u.phone, u.discount_type
+                  FROM monthly_passes p
+                  JOIN routes r ON r.id = p.route_id
+                  JOIN users u ON u.id = p.user_id"""
+
+
+@app.get("/api/v1/monthly-passes/plans", summary="Danh sách gói cước vé tháng và chính sách ưu đãi")
+def get_monthly_pass_plans():
+    return {
+        "trips_per_month_equivalent": PASS_TRIPS_PER_MONTH,
+        "student_discount_rate": PASS_STUDENT_DISCOUNT,
+        "plans": [
+            {"months": 1, "duration_days": 30, "discount_rate": 0.0, "name": "Gói 1 Tháng (Tiêu chuẩn)", "badge": "Phổ thông"},
+            {"months": 3, "duration_days": 90, "discount_rate": 0.08, "name": "Gói 3 Tháng (Tiết kiệm)", "badge": "Tiết kiệm 8%"},
+            {"months": 6, "duration_days": 180, "discount_rate": 0.15, "name": "Gói 6 Tháng (Bán niên)", "badge": "Ưu đãi 15%"},
+            {"months": 12, "duration_days": 360, "discount_rate": 0.25, "name": "Gói 1 Năm (Toàn niên)", "badge": "Siêu tiết kiệm 25%"},
+        ],
+        "benefits": [
+            "Không giới hạn số lượt đi lại trên tuyến đăng ký",
+            "Mã QR động check-in tức thì bằng điện thoại hoặc in thẻ cứng",
+            "Học sinh, Sinh viên & Người cao tuổi được giảm thêm 20%",
+            "Tự động cộng dồn thời hạn sử dụng khi gia hạn trước hạn",
+        ]
+    }
+
+
+@app.get("/api/v1/monthly-passes", summary="Danh sách vé tháng của người dùng")
+def list_monthly_passes(user_id: Optional[int] = Query(None, gt=0)):
+    with get_connection() as connection:
+        if user_id:
+            rows = connection.execute(_PASS_SELECT + " WHERE p.user_id = ? ORDER BY p.end_date DESC", (user_id,)).fetchall()
+        else:
+            rows = connection.execute(_PASS_SELECT + " ORDER BY p.end_date DESC").fetchall()
+        return [_serialize_pass(r) for r in rows]
+
+
+@app.get("/api/v1/monthly-passes/user/{user_id}", summary="Danh sách vé tháng theo User ID (BE Compatibility)")
+def get_user_monthly_passes(user_id: int):
+    with get_connection() as connection:
+        rows = connection.execute(_PASS_SELECT + " WHERE p.user_id = ? ORDER BY p.end_date DESC", (user_id,)).fetchall()
+        return [_serialize_pass(r) for r in rows]
+
+
+@app.get("/api/v1/monthly-passes/{pass_id}", summary="Chi tiết vé tháng")
+def get_monthly_pass_detail(pass_id: int):
+    with get_connection() as connection:
+        row = connection.execute(_PASS_SELECT + " WHERE p.id = ?", (pass_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Không tìm thấy vé tháng")
+        return _serialize_pass(row)
+
+
+@app.post("/api/v1/monthly-passes/register", status_code=201, summary="Đăng ký mới hoặc gia hạn vé tháng (US16)")
+def register_monthly_pass(payload: RegisterPassRequest):
+    if payload.months not in PASS_MONTH_DISCOUNT:
+        raise HTTPException(status_code=400, detail="Gói vé tháng chỉ hỗ trợ 1, 3, 6 hoặc 12 tháng")
+
+    with get_connection() as connection:
+        route = connection.execute(
+            "SELECT id, name, departure_city, arrival_city, base_price FROM routes WHERE id = ? AND status = 'HoatDong'",
+            (payload.route_id,)
+        ).fetchone()
+        if not route:
+            raise HTTPException(status_code=404, detail="Tuyến xe không tồn tại hoặc đã ngừng hoạt động")
+        user = connection.execute("SELECT id, full_name, email, phone, discount_type FROM users WHERE id = ?", (payload.user_id,)).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+        today = datetime.now().date()
+        price = _pass_price(route["base_price"], payload.months, user["discount_type"])
+        final_price = payload.price if payload.price is not None and payload.price > 0 else price["total"]
+        added_days = PASS_DAYS_PER_MONTH * payload.months
+
+        passenger_name = (payload.passenger_name or user["full_name"] or "Hành khách").strip()
+        passenger_id_card = (payload.passenger_id_card or user["phone"] or "001202012345").strip()
+
+        if payload.pass_id:  # ---- GIA HẠN ----
+            old = connection.execute(
+                "SELECT * FROM monthly_passes WHERE id = ? AND user_id = ?", (payload.pass_id, payload.user_id)
+            ).fetchone()
+            if not old:
+                raise HTTPException(status_code=404, detail="Không tìm thấy vé tháng cần gia hạn")
+            old_end = datetime.fromisoformat(str(old["end_date"])[:10]).date()
+            still_active = old_end >= today
+            # còn hạn: cộng dồn vào ngày hết hạn cũ; đã hết hạn: bắt đầu lại từ hôm nay
+            new_start = old["start_date"] if still_active else today.isoformat()
+            new_end = (old_end if still_active else today - timedelta(days=1)) + timedelta(days=added_days)
+            connection.execute(
+                """UPDATE monthly_passes 
+                   SET start_date = ?, end_date = ?, status = 'ConHan', price = ?,
+                       passenger_name = COALESCE(?, passenger_name),
+                       passenger_id_card = COALESCE(?, passenger_id_card)
+                   WHERE id = ?""",
+                (new_start, new_end.isoformat(), final_price, passenger_name, passenger_id_card, old["id"]),
+            )
+            pass_id, action = old["id"], "RENEW"
+        else:  # ---- ĐĂNG KÝ MỚI ----
+            dup = connection.execute(
+                "SELECT id FROM monthly_passes WHERE user_id = ? AND route_id = ? AND end_date >= ?",
+                (payload.user_id, payload.route_id, today.isoformat()),
+            ).fetchone()
+            if dup:
+                raise HTTPException(status_code=409, detail="Bạn đang có vé tháng còn hạn trên tuyến này, hãy chọn Gia hạn")
+            start = today
+            new_end = today + timedelta(days=added_days - 1)
+            cur = connection.execute(
+                """INSERT INTO monthly_passes 
+                   (user_id, passenger_name, passenger_id_card, route_id, start_date, end_date, price, status)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'ConHan')""",
+                (payload.user_id, passenger_name, passenger_id_card, payload.route_id, start.isoformat(), new_end.isoformat(), final_price),
+            )
+            pass_id, action = cur.lastrowid, "NEW"
+
+        txn_code = f"TXN-PASS-{uuid4().hex[:8].upper()}"
+        connection.execute(
+            """INSERT INTO payments (booking_id, booking_code, transaction_code, amount, provider, status, paid_at)
+               VALUES (NULL, ?, ?, ?, ?, 'SUCCESS', ?)""",
+            (f"PASS-{pass_id}", txn_code, final_price, (payload.payment_method or "SANDBOX").upper(), datetime.now().isoformat()),
+        )
+
+        # Gửi thông báo In-app cho người dùng (US20)
+        try:
+            start_display = start.isoformat() if action == "NEW" else new_start
+            end_display = new_end.isoformat()
+            act_text = "Gia hạn" if action == "RENEW" else "Đăng ký"
+            connection.execute(
+                """INSERT INTO notifications (user_id, title, message, type, recipient, status)
+                   VALUES (?, ?, ?, 'EMAIL', ?, 'SENT')""",
+                (
+                    user["id"],
+                    f"[SmartBus] {act_text} vé tháng thành công #{pass_id}",
+                    f"Vé tháng tuyến {route['departure_city']} - {route['arrival_city']} đã kích hoạt thành công (Hạn: {start_display} đến {end_display}). Số tiền: {int(final_price):,} VNĐ.",
+                    user["email"] or "customer@smartbus.vn",
+                ),
+            )
+        except Exception:
+            pass
+
+        connection.commit()
+
+        row = connection.execute(_PASS_SELECT + " WHERE p.id = ?", (pass_id,)).fetchone()
+        serialized = _serialize_pass(row)
+        return {
+            "success": True,
+            "action": action,
+            "transaction_code": txn_code,
+            "amount": final_price,
+            "price_detail": price,
+            "pass": serialized,
+            "pass_info": serialized,
+            "message": "Gia hạn vé tháng thành công!" if action == "RENEW" else "Đăng ký vé tháng thành công!",
+        }
+
+
+# =============================================================================
+# RBAC & PHÂN QUYỀN 4 ACTOR (ADMIN & DRIVER APIs)
+# =============================================================================
+
+@app.get("/api/v1/admin/users", summary="Danh sách người dùng và phân quyền (Admin)")
+def list_admin_users():
+    with get_connection() as connection:
+        rows = connection.execute(
+            """SELECT id, full_name, email, phone, role, discount_type, discount_status, created_at
+               FROM users ORDER BY id ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+class UpdateRoleRequest(BaseModel):
+    role: str
+    admin_user_id: Optional[int] = 12
+
+
+@app.put("/api/v1/admin/users/{user_id}/role", summary="Cập nhật vai trò người dùng (Admin)")
+def update_user_role(user_id: int, payload: UpdateRoleRequest):
+    allowed_roles = {"HanhKhach", "TaiXe", "PhuXe", "Admin", "CUSTOMER", "DRIVER", "STAFF", "ADMIN"}
+    if payload.role not in allowed_roles:
+        raise HTTPException(status_code=400, detail="Vai trò không hợp lệ")
+
+    with get_connection() as connection:
+        user = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+        connection.execute(
+            "UPDATE users SET role = ? WHERE id = ?",
+            (payload.role, user_id),
+        )
+        connection.commit()
+        updated = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return {"success": True, "role": payload.role, "message": f"Đã cập nhật vai trò thành '{payload.role}'", "user": dict(updated)}
+
+
+@app.get("/api/v1/admin/stats", summary="Thống kê tổng quan hệ thống (Admin)")
+def get_admin_stats():
+    with get_connection() as connection:
+        total_rev = connection.execute(
+            "SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'SUCCESS'"
+        ).fetchone()[0]
+        total_tickets = connection.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
+        total_trips = connection.execute("SELECT COUNT(*) FROM trips").fetchone()[0]
+        total_users = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        total_passes = connection.execute("SELECT COUNT(*) FROM monthly_passes").fetchone()[0]
+
+        # Đếm số lượng theo vai trò
+        roles_rows = connection.execute(
+            "SELECT role, COUNT(*) as cnt FROM users GROUP BY role"
+        ).fetchall()
+        role_counts = {r["role"]: r["cnt"] for r in roles_rows}
+
+        recent_bookings = connection.execute(
+            """SELECT b.id, b.booking_code, b.total_amount, b.status,
+                      COALESCE(u.full_name, 'Khách hàng') as customer_name,
+                      tr.origin, tr.destination, tr.departure_at
+               FROM bookings b
+               LEFT JOIN users u ON u.id = b.user_id
+               LEFT JOIN trips tr ON tr.id = b.trip_id
+               ORDER BY b.id DESC LIMIT 10"""
+        ).fetchall()
+
+        return {
+            "total_revenue": int(total_rev),
+            "total_tickets": total_tickets,
+            "total_trips": total_trips,
+            "total_users": total_users,
+            "total_monthly_passes": total_passes,
+            "role_counts": role_counts,
+            "recent_bookings": [dict(r) for r in recent_bookings],
+        }
+
+
+@app.get("/api/v1/admin/trips", summary="Quản lý chuyến xe (Admin)")
+def list_admin_trips():
+    with get_connection() as connection:
+        rows = connection.execute(
+            """SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type, u.full_name as driver_name
+               FROM trips tr
+               LEFT JOIN routes r ON r.id = tr.route_id
+               LEFT JOIN buses b ON b.id = tr.bus_id
+               LEFT JOIN users u ON u.id = tr.driver_id
+               ORDER BY tr.departure_at ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+class UpdateTripStatusRequest(BaseModel):
+    status: Optional[str] = None
+    driver_id: Optional[int] = None
+
+
+@app.put("/api/v1/admin/trips/{trip_id}/status", summary="Cập nhật trạng thái chuyến xe (Admin)")
+def update_trip_status(trip_id: int, payload: UpdateTripStatusRequest):
+    with get_connection() as connection:
+        trip = connection.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")
+
+        updates = []
+        params = []
+        if payload.status:
+            updates.append("status = ?")
+            params.append(payload.status)
+        if payload.driver_id is not None:
+            updates.append("driver_id = ?")
+            params.append(payload.driver_id)
+
+        if updates:
+            params.append(trip_id)
+            connection.execute(f"UPDATE trips SET {', '.join(updates)} WHERE id = ?", params)
+            connection.commit()
+
+        updated = connection.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        return {"success": True, "trip": dict(updated)}
+
+
+@app.get("/api/v1/driver/trips", summary="Lịch trình và danh sách phân công của Tài xế")
+def get_driver_trips(driver_id: Optional[int] = Query(None)):
+    with get_connection() as connection:
+        query = """
+            SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type, u.full_name as driver_name
+            FROM trips tr
+            LEFT JOIN routes r ON r.id = tr.route_id
+            LEFT JOIN buses b ON b.id = tr.bus_id
+            LEFT JOIN users u ON u.id = tr.driver_id
+        """
+        params = []
+        if driver_id:
+            query += " WHERE tr.driver_id = ?"
+            params.append(driver_id)
+        query += " ORDER BY tr.departure_at ASC"
+        rows = connection.execute(query, params).fetchall()
+
+        results = []
+        for r in rows:
+            tid = r["id"]
+            p_rows = connection.execute(
+                """SELECT t.id as ticket_id, t.ticket_code, t.status as ticket_status,
+                          COALESCE(s.seat_number, 'A01') as seat_number,
+                          COALESCE(bi.passenger_name, u.full_name, 'Hành khách') as passenger_name,
+                          COALESCE(u.phone, '0901234567') as phone
+                   FROM tickets t
+                   LEFT JOIN booking_items bi ON bi.id = t.booking_item_id
+                   LEFT JOIN bookings b ON b.id = bi.booking_id
+                   LEFT JOIN seats s ON s.id = COALESCE(bi.seat_id, t.seat_id)
+                   LEFT JOIN users u ON u.id = COALESCE(b.user_id, t.user_id)
+                   WHERE (t.trip_id = ? OR b.trip_id = ?)
+                   ORDER BY s.seat_number ASC""",
+                (tid, tid),
+            ).fetchall()
+
+            results.append({
+                "id": r["id"],
+                "trip_code": r["trip_code"],
+                "origin": r["origin"],
+                "destination": r["destination"],
+                "departure_at": r["departure_at"],
+                "arrival_at": r["arrival_at"],
+                "status": r["status"],
+                "license_plate": r["license_plate"] or "29B-123.45",
+                "bus_type": r["bus_type"] or "Giường nằm cao cấp",
+                "driver_name": r["driver_name"] or "Trần Văn Tài",
+                "passengers": [
+                    {
+                        "ticket_id": p["ticket_id"],
+                        "ticket_code": p["ticket_code"],
+                        "seat_number": p["seat_number"],
+                        "passenger_name": p["passenger_name"],
+                        "phone": p["phone"],
+                        "boarded": p["ticket_status"] in ("USED", "DaSoat"),
+                        "ticket_status": p["ticket_status"],
+                    }
+                    for p in p_rows
+                ],
+            })
+        return results
+
+
+class BoardPassengerRequest(BaseModel):
+    ticket_id: Union[int, str]
+    staff_email: Optional[str] = "taixe.nguyen@smartbus.vn"
+
+
+@app.post("/api/v1/driver/board-passenger", summary="Xác nhận khách lên xe trực tiếp (Tài xế/Phụ xe)")
+def driver_board_passenger(payload: BoardPassengerRequest):
+    with get_connection() as connection:
+        ticket = connection.execute(
+            "SELECT * FROM tickets WHERE id = ? OR ticket_code = ?",
+            (str(payload.ticket_id), str(payload.ticket_id)),
+        ).fetchone()
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Không tìm thấy vé")
+
+        connection.execute(
+            "UPDATE tickets SET status = 'USED', used_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (ticket["id"],),
+        )
+        connection.execute(
+            """INSERT INTO ticket_inspections (ticket_id, ticket_code, staff_user_id, staff_email, result, note)
+               VALUES (?, ?, 11, ?, 'VALID', 'Tài xế xác nhận lên xe trực tiếp từ danh sách hành khách')""",
+            (ticket["id"], ticket["ticket_code"], payload.staff_email),
+        )
+        connection.commit()
+        return {
+            "success": True,
+            "boarded": True,
+            "status": "USED",
+            "message": "Xác nhận hành khách lên xe thành công!",
+            "ticket_code": ticket["ticket_code"],
+        }
 
 
 if __name__ == "__main__":

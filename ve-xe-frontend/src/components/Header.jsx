@@ -66,6 +66,55 @@ function Header() {
     navigate('/');
   };
 
+  const handleActorSwitch = (targetRole) => {
+    let newUser = null;
+    if (targetRole === 'HanhKhach') {
+      newUser = {
+        id: 1,
+        full_name: 'Nguyễn Văn A (Hành Khách)',
+        email: 'customer@example.com',
+        role: 'HanhKhach',
+        discount_type: 'HSSV',
+      };
+      setCurrentUser(newUser);
+      setUser(newUser);
+      navigate('/dashboard');
+    } else if (targetRole === 'TaiXe') {
+      newUser = {
+        id: 11,
+        full_name: 'Trần Văn Tài (Tài Xế)',
+        email: 'taixe.nguyen@smartbus.vn',
+        role: 'TaiXe',
+        discount_type: 'Khong',
+      };
+      setCurrentUser(newUser);
+      setUser(newUser);
+      navigate('/verify-ticket');
+    } else if (targetRole === 'PhuXe') {
+      newUser = {
+        id: 2,
+        full_name: 'Lê Phụ Xe (Nhân Viên)',
+        email: 'nhanvien@smartbus.vn',
+        role: 'PhuXe',
+        discount_type: 'Khong',
+      };
+      setCurrentUser(newUser);
+      setUser(newUser);
+      navigate('/verify-ticket');
+    } else if (targetRole === 'Admin') {
+      newUser = {
+        id: 12,
+        full_name: 'Lê Quản Lý (Admin)',
+        email: 'admin@smartbus.vn',
+        role: 'Admin',
+        discount_type: 'Khong',
+      };
+      setCurrentUser(newUser);
+      setUser(newUser);
+      navigate('/admin');
+    }
+  };
+
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -83,21 +132,81 @@ function Header() {
         <Link to="/" className={isActive('/') ? 'active' : ''}>
           Trang chủ
         </Link>
-        <Link to="/map" className={isActive('/map') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span>🗺️</span> Bản đồ chặng
-        </Link>
-        <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
-          Chuyến xe & Chọn ghế
-        </Link>
-        <Link to="/dashboard" className={isActive('/dashboard') ? 'active' : ''}>
-          Vé của tôi
-        </Link>
-        <Link to="/cancellation" className={isActive('/cancellation') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span>🔄</span> Hủy vé & Đổi vé
-        </Link>
-        <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span>🛡️</span> Soát vé (Tài xế)
-        </Link>
+
+        {/* Link theo quyền của 4 Actor */}
+        {(!user || user.role === 'HanhKhach') && (
+          <>
+            <Link to="/map" className={isActive('/map') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>🗺️</span> Bản đồ
+            </Link>
+            <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
+              Chuyến xe & Đặt vé
+            </Link>
+            <Link to="/monthly-pass" className={isActive('/monthly-pass') || isActive('/ve-thang') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>🎫</span> Vé tháng
+            </Link>
+            <Link to="/dashboard" className={isActive('/dashboard') || isActive('/cancellation') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>🎟️</span> Vé của tôi
+            </Link>
+          </>
+        )}
+
+        {user && user.role === 'TaiXe' && (
+          <>
+            <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
+              Lịch trình xe
+            </Link>
+            <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(245, 158, 11, 0.2)', border: '1px solid #f59e0b', color: '#fef08a' }}>
+              <span>🚌</span> Soát vé & Lên xe (Tài xế)
+            </Link>
+            <Link to="/dashboard" className={isActive('/dashboard') ? 'active' : ''}>
+              Lịch sử chuyến
+            </Link>
+          </>
+        )}
+
+        {user && user.role === 'PhuXe' && (
+          <>
+            <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
+              Bán vé tại quầy
+            </Link>
+            <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid #a855f7', color: '#f3e8ff' }}>
+              <span>🎫</span> Soát vé QR (Phụ xe)
+            </Link>
+            <Link to="/monthly-pass" className={isActive('/monthly-pass') ? 'active' : ''}>
+              Vé tháng
+            </Link>
+          </>
+        )}
+
+        {user && (user.role === 'Admin' || user.role === 'QuanTriVien') && (
+          <>
+            <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
+              Điều phối chuyến
+            </Link>
+            <Link to="/monthly-pass" className={isActive('/monthly-pass') ? 'active' : ''}>
+              Vé tháng
+            </Link>
+            <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''}>
+              Soát vé
+            </Link>
+            <Link
+              to="/admin"
+              className={isActive('/admin') ? 'active' : ''}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                border: '1px solid #ef4444',
+                color: '#fecaca',
+                fontWeight: 'bold',
+              }}
+            >
+              <span>👑</span> Quản Trị Hệ Thống
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="auth-buttons" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -253,6 +362,31 @@ function Header() {
           )}
         </div>
 
+        {/* Quick Actor Switcher for Demo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 'bold' }}>Actor:</span>
+          <select
+            value={user?.role || 'HanhKhach'}
+            onChange={(e) => handleActorSwitch(e.target.value)}
+            style={{
+              background: 'rgba(255, 255, 255, 0.18)',
+              border: '1px solid rgba(255, 255, 255, 0.35)',
+              color: 'white',
+              borderRadius: '8px',
+              padding: '5px 8px',
+              fontSize: '12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="HanhKhach" style={{ color: '#0f172a' }}>👤 Hành Khách</option>
+            <option value="TaiXe" style={{ color: '#0f172a' }}>🚌 Tài Xế</option>
+            <option value="PhuXe" style={{ color: '#0f172a' }}>🎫 Phụ Xe / Quầy</option>
+            <option value="Admin" style={{ color: '#0f172a' }}>👑 Quản Trị Viên</option>
+          </select>
+        </div>
+
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ textAlign: 'right' }}>
@@ -263,12 +397,25 @@ function Header() {
                     fontSize: '10px',
                     padding: '1px 6px',
                     borderRadius: '8px',
-                    backgroundColor: user.role === 'TaiXe' ? '#f59e0b' : user.role === 'Admin' ? '#ef4444' : '#10b981',
+                    backgroundColor:
+                      user.role === 'TaiXe'
+                        ? '#f59e0b'
+                        : user.role === 'PhuXe'
+                        ? '#a855f7'
+                        : (user.role === 'Admin' || user.role === 'QuanTriVien')
+                        ? '#ef4444'
+                        : '#10b981',
                     color: 'white',
                     fontWeight: 'bold',
                   }}
                 >
-                  {user.role === 'TaiXe' ? 'Tài xế' : user.role === 'Admin' ? 'Quản lý' : 'Hành khách'}
+                  {user.role === 'TaiXe'
+                    ? 'Tài xế'
+                    : user.role === 'PhuXe'
+                    ? 'Phụ xe'
+                    : (user.role === 'Admin' || user.role === 'QuanTriVien')
+                    ? 'Quản trị'
+                    : 'Hành khách'}
                 </span>
                 {user.discount_type && user.discount_type !== 'Khong' && (
                   <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '8px', backgroundColor: '#3b82f6', color: 'white' }}>

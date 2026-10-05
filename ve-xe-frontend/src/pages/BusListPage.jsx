@@ -44,16 +44,18 @@ function BusListPage() {
 
   useEffect(() => {
     setLoading(true);
-    getTrips({ origin: originParam, destination: destinationParam, date: dateParam })
+    const searchParamsObj = {};
+    if (originParam) searchParamsObj.origin = originParam;
+    if (destinationParam) searchParamsObj.destination = destinationParam;
+    if (dateParam) searchParamsObj.date = dateParam;
+
+    getTrips(searchParamsObj)
       .then((data) => {
-        if (data.length === 0) {
-          return getTrips();
-        }
-        return data;
+        setTrips(Array.isArray(data) ? data : []);
       })
-      .then((data) => setTrips(data))
       .catch((err) => {
         console.error('Lỗi tải danh sách chuyến:', err);
+        setTrips([]);
       })
       .finally(() => setLoading(false));
   }, [originParam, destinationParam, dateParam]);
