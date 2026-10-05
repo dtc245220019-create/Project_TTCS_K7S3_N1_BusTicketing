@@ -1295,6 +1295,125 @@ def get_notifications_endpoint(user_id: Optional[int] = Query(None), limit: int 
         return [dict(r) for r in rows]
 
 
+# =============================================================================
+# VÉ THÁNG: ĐĂNG KÝ MỚI / GIA HẠN (bảng monthly_passes)
+# =============================================================================
+
+PASS_DAYS_PER_MONTH = 30
+PASS_TRIPS_PER_MONTH = 10          # 1 tháng = 10 lượt giá gốc (đi/về mỗi ngày làm việc ~ 20 lượt, đã ưu đãi)
+PASS_MONTH_DISCOUNT = {1: 0.0, 3: 0.08, 6: 0.15}   # mua dài hạn giảm thêm
+PASS_STUDENT_DISCOUNT = 0.20        # HSSV giảm 20% (đồng bộ với vé lẻ)
+
+
+class RegisterPassRequest(BaseModel):
+    user_id: int = Field(..., gt=0)
+    route_id: int = Field(..., gt=0)
+    months: int = Field(..., description="Số tháng: 1, 3 hoặc 6")
+    pass_id: Optional[int] = None       # có pass_id => gia hạn vé cũ
+    payment_method: Optional[str] = "SANDBOX"
+
+
+def _pass_price(base_price: int, months: int, discount_type: Optional[str]) -> dict[str, int]:
+    full = base_price * PASS_TRIPS_PER_MONTH * months
+    term_off = round(full * PASS_MONTH_DISCOUNT[months])
+    after_term = full - term_off
+    student_off = round(after_term * PASS_STUDENT_DISCOUNT) if discount_type and discount_type != "Khong" else 0
+    return {"full": full, "term_discount": term_off, "student_discount": student_off, "total": after_term - student_off}
+
+
+def _serialize_pass(row: Any) -> dict[str, Any]:
+    d = dict(row)
+    today = datetime.now().date()
+    end = datetime.fromisoformat(d["end_date"]).date()
+    days_left = (end - today).days
+    d["days_left"] = max(days_left, 0)
+    d["status"] = "ConHan" if days_left >= 0 else "HetHan"
+    d["qr_payload"] = f"pass:{d['id']}"
+    return d
+
+
+_PASS_SELECT = """SELECT p.id, p.user_id, p.route_id, p.start_date, p.end_date, p.status,
+                         r.name AS route_name, r.departure_city, r.arrival_city, r.base_price, r.distance_km
+                  FROM monthly_passes p JOIN routes r ON r.id = p.route_id"""
+
+
+@app.get("/api/v1/monthly-passes", summary="Danh sách vé tháng của người dùng")
+def list_monthly_passes(user_id: int = Query(..., gt=0)):
+    with get_connection() as connection:
+        rows = connection.execute(_PASS_SELECT + " WHERE p.user_id = ? ORDER BY p.end_date DESC", (user_id,)).fetchall()
+        return [_serialize_pass(r) for r in rows]
+
+
+@app.post("/api/v1/monthly-passes/register", status_code=201, summary="Đăng ký mới hoặc gia hạn vé tháng")
+def register_monthly_pass(payload: RegisterPassRequest):
+    if payload.months not in PASS_MONTH_DISCOUNT:
+        raise HTTPException(status_code=400, detail="Gói vé tháng chỉ hỗ trợ 1, 3 hoặc 6 tháng")
+
+    with get_connection() as connection:
+        route = connection.execute(
+            "SELECT id, base_price FROM routes WHERE id = ? AND status = 'HoatDong'", (payload.route_id,)
+        ).fetchone()
+        if not route:
+            raise HTTPException(status_code=404, detail="Tuyến xe không tồn tại hoặc đã ngừng hoạt động")
+        user = connection.execute("SELECT id, discount_type FROM users WHERE id = ?", (payload.user_id,)).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+        today = datetime.now().date()
+        price = _pass_price(route["base_price"], payload.months, user["discount_type"])
+        added_days = PASS_DAYS_PER_MONTH * payload.months
+
+        if payload.pass_id:  # ---- GIA HẠN ----
+            old = connection.execute(
+                "SELECT * FROM monthly_passes WHERE id = ? AND user_id = ?", (payload.pass_id, payload.user_id)
+            ).fetchone()
+            if not old:
+                raise HTTPException(status_code=404, detail="Không tìm thấy vé tháng cần gia hạn")
+            old_end = datetime.fromisoformat(old["end_date"]).date()
+            still_active = old_end >= today
+            # còn hạn: cộng dồn vào ngày hết hạn cũ; đã hết hạn: bắt đầu lại từ hôm nay
+            new_start = old["start_date"] if still_active else today.isoformat()
+            new_end = (old_end if still_active else today - timedelta(days=1)) + timedelta(days=added_days)
+            connection.execute(
+                "UPDATE monthly_passes SET start_date = ?, end_date = ?, status = 'ConHan' WHERE id = ?",
+                (new_start, new_end.isoformat(), old["id"]),
+            )
+            pass_id, action = old["id"], "RENEW"
+        else:  # ---- ĐĂNG KÝ MỚI ----
+            dup = connection.execute(
+                "SELECT id FROM monthly_passes WHERE user_id = ? AND route_id = ? AND end_date >= ?",
+                (payload.user_id, payload.route_id, today.isoformat()),
+            ).fetchone()
+            if dup:
+                raise HTTPException(status_code=409, detail="Bạn đang có vé tháng còn hạn trên tuyến này, hãy chọn Gia hạn")
+            start = today
+            new_end = today + timedelta(days=added_days - 1)
+            cur = connection.execute(
+                "INSERT INTO monthly_passes (user_id, route_id, start_date, end_date, status) VALUES (?, ?, ?, ?, 'ConHan')",
+                (payload.user_id, payload.route_id, start.isoformat(), new_end.isoformat()),
+            )
+            pass_id, action = cur.lastrowid, "NEW"
+
+        txn_code = f"TXN-PASS-{uuid4().hex[:8].upper()}"
+        connection.execute(
+            """INSERT INTO payments (booking_id, booking_code, transaction_code, amount, provider, status, paid_at)
+               VALUES (NULL, ?, ?, ?, ?, 'SUCCESS', ?)""",
+            (f"PASS-{pass_id}", txn_code, price["total"], (payload.payment_method or "SANDBOX").upper(), datetime.now().isoformat()),
+        )
+        connection.commit()
+
+        row = connection.execute(_PASS_SELECT + " WHERE p.id = ?", (pass_id,)).fetchone()
+        return {
+            "success": True,
+            "action": action,
+            "transaction_code": txn_code,
+            "amount": price["total"],
+            "price_detail": price,
+            "pass": _serialize_pass(row),
+            "message": "Gia hạn vé tháng thành công!" if action == "RENEW" else "Đăng ký vé tháng thành công!",
+        }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)
