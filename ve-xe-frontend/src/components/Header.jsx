@@ -140,7 +140,7 @@ function Header() {
               <span>🗺️</span> Bản đồ
             </Link>
             <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
-              Chuyến xe & Đặt vé
+              Chuyến xe
             </Link>
             <Link to="/monthly-pass" className={isActive('/monthly-pass') || isActive('/ve-thang') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>🎫</span> Vé tháng
@@ -157,7 +157,7 @@ function Header() {
               Lịch trình xe
             </Link>
             <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(245, 158, 11, 0.2)', border: '1px solid #f59e0b', color: '#fef08a' }}>
-              <span>🚌</span> Soát vé & Lên xe (Tài xế)
+              <span>🚌</span> Soát vé & Lên xe
             </Link>
             <Link to="/dashboard" className={isActive('/dashboard') ? 'active' : ''}>
               Lịch sử chuyến
@@ -168,10 +168,10 @@ function Header() {
         {user && user.role === 'PhuXe' && (
           <>
             <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
-              Bán vé tại quầy
+              Bán vé quầy
             </Link>
             <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid #a855f7', color: '#f3e8ff' }}>
-              <span>🎫</span> Soát vé QR (Phụ xe)
+              <span>🎫</span> Soát vé QR
             </Link>
             <Link to="/monthly-pass" className={isActive('/monthly-pass') ? 'active' : ''}>
               Vé tháng

@@ -401,11 +401,15 @@ function BusListPage() {
                             color: 'white',
                             border: '1px solid rgba(255,255,255,0.2)',
                             fontWeight: '700',
-                            padding: '11px 22px',
+                            padding: '10px 20px',
                             borderRadius: '10px',
                             cursor: 'pointer',
-                            fontSize: '14px',
-                            transition: 'all 0.15s',
+                            fontSize: '13.5px',
+                            whiteSpace: 'nowrap',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.15s ease',
                             boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
                           }}
                         >
