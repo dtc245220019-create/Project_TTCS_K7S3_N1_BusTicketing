@@ -270,6 +270,15 @@ CREATE TABLE IF NOT EXISTS notifications (
     status TEXT NOT NULL DEFAULT 'SENT',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    action TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id INTEGER,
+    details TEXT,
+    created_at TEXT
+);
 """
 
 import unicodedata
