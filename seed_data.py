@@ -180,7 +180,7 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
             (2, "Trần Thị B (Phụ Xe / Nhân Viên)", "nhanvien@smartbus.vn", "0907654321", "PhuXe", "Khong", "DaDuyet", "123456"),
             (10, "Nguyễn Văn A (Ưu đãi HSSV)", "nguyenvana@gmail.com", "0912345678", "HanhKhach", "HSSV", "DaDuyet", "123456"),
             (11, "Trần Văn Tài (Tài Xế)", "taixe.nguyen@smartbus.vn", "0988776655", "TaiXe", "Khong", "DaDuyet", "123456"),
-            (12, "Lê Quản Lý (Admin)", "admin@smartbus.vn", "0900112233", "Admin", "Khong", "DaDuyet", "123456"),
+            (12, "Lê Quản Lý (Admin)", "admin@smartbus.vn", "0900112233", "ADMIN", "Khong", "DaDuyet", "123456"),
         ],
     )
     # Cập nhật alias staff@example.com cho user 2 nếu cần
