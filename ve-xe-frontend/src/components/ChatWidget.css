@@ -1,0 +1,67 @@
+/* Chatbot AI nổi (prefix .cw-) */
+.cw-root { position: fixed; right: 24px; bottom: 24px; z-index: 900; display: flex; flex-direction: column; align-items: flex-end; gap: 14px; }
+
+.cw-fab {
+  width: 58px; height: 58px; border-radius: 50%; border: none; cursor: pointer;
+  font-size: 26px; color: #fff; display: grid; place-items: center;
+  background: linear-gradient(135deg, #2563eb, #1e3a8a);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.45);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.cw-fab:hover { transform: translateY(-2px) scale(1.04); box-shadow: 0 14px 28px rgba(37, 99, 235, 0.5); }
+.cw-fab.is-open { font-size: 20px; background: #334155; box-shadow: 0 8px 18px rgba(15, 23, 42, 0.35); }
+.cw-fab:focus-visible, .cw-icon-btn:focus-visible, .cw-chips button:focus-visible,
+.cw-actions button:focus-visible, .cw-input button:focus-visible { outline: 3px solid rgba(56, 189, 248, 0.7); outline-offset: 2px; }
+
+.cw-panel {
+  width: 380px; max-width: calc(100vw - 32px); height: 560px; max-height: calc(100vh - 120px);
+  display: flex; flex-direction: column; overflow: hidden;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3);
+  animation: cw-in 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+@keyframes cw-in { from { opacity: 0; transform: translateY(14px) scale(0.97); } }
+
+.cw-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 14px 16px; color: #fff; background: linear-gradient(135deg, #0b1329, #1e3a8a 70%, #2563eb); }
+.cw-avatar { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; background: rgba(255, 255, 255, 0.15); }
+.cw-head-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.cw-head-text strong { font-size: 15px; }
+.cw-head-text span { font-size: 12px; color: #bfdbfe; display: flex; align-items: center; gap: 6px; }
+.cw-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; display: inline-block; }
+.cw-icon-btn { width: 32px; height: 32px; border-radius: 8px; border: none; cursor: pointer; font-size: 15px; color: #fff; background: rgba(255, 255, 255, 0.12); }
+.cw-icon-btn:hover { background: rgba(255, 255, 255, 0.24); }
+
+.cw-body { flex: 1; overflow-y: auto; padding: 16px 14px 8px; background: #f8fafc; display: flex; flex-direction: column; gap: 10px; }
+.cw-row { display: flex; }
+.cw-row.user { justify-content: flex-end; }
+.cw-bubble { max-width: 86%; padding: 10px 13px; border-radius: 16px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.cw-bubble.bot { background: #fff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
+.cw-bubble.user { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #fff; border-bottom-right-radius: 4px; }
+.cw-bubble.error { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+
+.cw-chips, .cw-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.cw-chips { margin-top: 4px; }
+.cw-actions { margin-top: 10px; }
+.cw-chips button, .cw-actions button {
+  border: 1.5px solid #bfdbfe; background: #eff6ff; color: #1d4ed8; border-radius: 999px;
+  padding: 7px 13px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cw-chips button:hover, .cw-actions button:hover { background: #dbeafe; border-color: #60a5fa; }
+
+.cw-typing { display: flex; gap: 5px; align-items: center; padding: 14px 16px; }
+.cw-typing span { width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; animation: cw-bounce 1.2s infinite ease-in-out; }
+.cw-typing span:nth-child(2) { animation-delay: 0.15s; }
+.cw-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes cw-bounce { 0%, 60%, 100% { transform: translateY(0); opacity: 0.5; } 30% { transform: translateY(-5px); opacity: 1; } }
+
+.cw-input { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #e2e8f0; background: #fff; }
+.cw-input input { flex: 1; min-width: 0; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 10px 14px; font-size: 14px; outline: none; background: #f8fafc; }
+.cw-input input:focus { border-color: #2563eb; background: #fff; }
+.cw-input button { width: 44px; border: none; border-radius: 12px; cursor: pointer; font-size: 16px; color: #fff; background: #2563eb; }
+.cw-input button:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+@media (max-width: 480px) {
+  .cw-root { right: 12px; bottom: 12px; }
+  .cw-panel { width: calc(100vw - 24px); height: calc(100vh - 100px); }
+}
+@media (prefers-reduced-motion: reduce) { .cw-panel, .cw-typing span { animation: none; } .cw-fab { transition: none; } }
