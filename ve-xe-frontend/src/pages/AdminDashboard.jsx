@@ -498,7 +498,32 @@ function AdminDashboard() {
         >
           <span>🛡️</span> Cấu Trúc Quyền Hạn & Ma Trận Truy Cập
         </button>
+
+        <button
+          onClick={() => setActiveTab('discounts')}
+          style={{
+            padding: '12px 16px',
+            fontWeight: '700',
+            fontSize: '15px',
+            border: 'none',
+            background: 'none',
+            color: activeTab === 'discounts' ? '#2563eb' : '#64748b',
+            borderBottom:
+              activeTab === 'discounts'
+                ? '3px solid #2563eb'
+                : '3px solid transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span>🎓</span> Duyệt ưu đãi
+        </button>
       </div>
+
+      
+ 
 
       {/* TAB 1: USER MANAGEMENT & ROLE RBAC */}
       {activeTab === 'users' && (
@@ -950,6 +975,192 @@ function AdminDashboard() {
               <li>Cấu hình phí dịch vụ, hoàn/hủy và ưu đãi giảm giá</li>
               <li>Truy cập mọi chức năng kiểm toán và bảo mật cao cấp</li>
             </ul>
+          </div>
+        </div>
+      )}
+      
+      {/* TAB 4: DUYỆT ƯU ĐÃI */}
+      {activeTab === 'discounts' && (
+        <div
+          style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '24px',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '16px',
+              marginBottom: '20px',
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 'bold',
+                  color: '#1e293b',
+                  margin: 0,
+                }}
+              >
+                🎓 Quản lý hồ sơ ưu đãi
+              </h2>
+              <p
+                style={{
+                  color: '#64748b',
+                  fontSize: '13px',
+                  margin: '6px 0 0',
+                  lineHeight: 1.6,
+                }}
+              >
+                Theo dõi thông tin ưu đãi của người dùng. Trạng thái xét duyệt
+                chỉ hiển thị khi hệ thống có dữ liệu tương ứng.
+              </p>
+            </div>
+
+            <span
+              style={{
+                backgroundColor: '#eff6ff',
+                color: '#1d4ed8',
+                border: '1px solid #bfdbfe',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: '700',
+              }}
+            >
+              Tổng người dùng: {users.length}
+            </span>
+          </div>
+
+          <div
+            style={{
+              overflowX: 'auto',
+              borderRadius: '10px',
+            }}
+          >
+            <table
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                textAlign: 'left',
+                fontSize: '14px',
+              }}
+            >
+              <thead>
+                <tr
+                  style={{
+                    backgroundColor: '#f8fafc',
+                    borderBottom: '2px solid #e2e8f0',
+                    color: '#475569',
+                  }}
+                >
+                  <th style={{ padding: '12px 14px' }}>ID</th>
+                  <th style={{ padding: '12px 14px' }}>Họ và tên</th>
+                  <th style={{ padding: '12px 14px' }}>Email</th>
+                  <th style={{ padding: '12px 14px' }}>Số điện thoại</th>
+                  <th style={{ padding: '12px 14px' }}>Loại ưu đãi</th>
+                  <th style={{ padding: '12px 14px' }}>Trạng thái xét duyệt</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {users.filter(
+                  (u) =>
+                    u.discount_type &&
+                    u.discount_type !== 'Khong'
+                ).length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      style={{
+                        textAlign: 'center',
+                        padding: '36px 20px',
+                        color: '#64748b',
+                      }}
+                    >
+                      <div style={{ fontSize: '32px', marginBottom: '8px' }}>
+                        🎓
+                      </div>
+                      <div
+                        style={{
+                          fontWeight: '700',
+                          color: '#334155',
+                          marginBottom: '6px',
+                        }}
+                      >
+                        Chưa có dữ liệu ưu đãi
+                      </div>
+                      <div style={{ fontSize: '13px', lineHeight: 1.6 }}>
+                        Danh sách người dùng hiện tại chưa có thông tin ưu đãi
+                        phù hợp để hiển thị.
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  users
+                    .filter(
+                      (u) =>
+                        u.discount_type &&
+                        u.discount_type !== 'Khong'
+                    )
+                    .map((u) => (
+                      <tr
+                        key={u.id}
+                        style={{ borderBottom: '1px solid #f1f5f9' }}
+                      >
+                        <td
+                          style={{
+                            padding: '12px 14px',
+                            fontWeight: '700',
+                            color: '#64748b',
+                          }}
+                        >
+                          #{u.id}
+                        </td>
+                        <td
+                          style={{
+                            padding: '12px 14px',
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          {u.full_name || 'Chưa cập nhật'}
+                        </td>
+                        <td style={{ padding: '12px 14px', color: '#475569' }}>
+                          {u.email || '—'}
+                        </td>
+                        <td style={{ padding: '12px 14px', color: '#475569' }}>
+                          {u.phone || '—'}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <span
+                            style={{
+                              backgroundColor: '#dbeafe',
+                              color: '#1e40af',
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                            }}
+                          >
+                            {u.discount_type}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', color: '#64748b' }}>
+                          Chưa có dữ liệu xét duyệt
+                        </td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
