@@ -7,8 +7,11 @@ import {
   updateUserRole,
   getAdminStats,
   getAdminTrips,
+  getTripSeats,
+  getRecentInspections,
   updateTripStatus,
 } from '../api';
+import './AdminDashboard.css';
 
 function AdminDashboard() {
   const navigate = useNavigate();
@@ -16,8 +19,13 @@ function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [trips, setTrips] = useState([]);
+  const [occupancy, setOccupancy] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsErrors, setAnalyticsErrors] = useState([]);
+  const [auditFilter, setAuditFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('users'); // 'users' | 'trips' | 'overview'
+  const [activeTab, setActiveTab] = useState('users');
   const [searchUser, setSearchUser] = useState('');
   const [filterRole, setFilterRole] = useState('ALL');
   const [feedbackMsg, setFeedbackMsg] = useState({ text: '', type: 'success' });
@@ -62,6 +70,61 @@ function AdminDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadAnalytics = async () => {
+    setAnalyticsLoading(true);
+    setAnalyticsErrors([]);
+
+    const [tripsResult, auditResult] = await Promise.allSettled([
+      getAdminTrips(),
+      getRecentInspections(),
+    ]);
+    const errors = [];
+    let tripList = trips;
+
+    if (tripsResult.status === 'fulfilled') {
+      tripList = tripsResult.value?.trips || tripsResult.value || [];
+      setTrips(tripList);
+    } else {
+      errors.push(`Không tải được danh sách chuyến: ${tripsResult.reason?.message || 'Lỗi không xác định'}`);
+    }
+
+    if (auditResult.status === 'fulfilled') {
+      setAuditLogs(auditResult.value?.inspections || auditResult.value || []);
+    } else {
+      setAuditLogs([]);
+      errors.push(`Không tải được audit log: ${auditResult.reason?.message || 'Lỗi không xác định'}`);
+    }
+
+    const occupancyResults = await Promise.allSettled(
+      tripList.map(async (trip) => {
+        const response = await getTripSeats(trip.id);
+        const seats = response?.seats || [];
+        const bookedSeats = seats.filter((seat) => seat.status === 'BOOKED').length;
+        const heldSeats = seats.filter((seat) => seat.status === 'HELD').length;
+        const totalSeats = Number(response?.total_seats) || seats.length;
+
+        return {
+          ...trip,
+          bookedSeats,
+          heldSeats,
+          totalSeats,
+          occupancyRate: totalSeats ? Math.round((bookedSeats / totalSeats) * 100) : 0,
+        };
+      })
+    );
+    const occupancyRows = occupancyResults.flatMap((result, index) => {
+      if (result.status === 'fulfilled') return [result.value];
+      errors.push(`Không tải được sơ đồ ghế chuyến ${tripList[index]?.trip_code || tripList[index]?.id}: ${result.reason?.message || 'Lỗi không xác định'}`);
+      return [{
+        ...tripList[index],
+        error: true,
+      }];
+    });
+    setOccupancy(occupancyRows);
+    setAnalyticsErrors(errors);
+    setAnalyticsLoading(false);
   };
 
   const handleRoleChange = async (userId, newRole) => {
@@ -127,6 +190,19 @@ function AdminDashboard() {
     const matchRole = filterRole === 'ALL' || u.role === filterRole;
     return matchSearch && matchRole;
   });
+  const filteredAuditLogs =
+    auditFilter === 'ALL' ? auditLogs : auditLogs.filter((log) => log.result === auditFilter);
+  const totalOccupancySeats = occupancy.reduce((sum, trip) => sum + (trip.error ? 0 : trip.totalSeats), 0);
+  const bookedOccupancySeats = occupancy.reduce((sum, trip) => sum + (trip.bookedSeats || 0), 0);
+  const overallOccupancy = totalOccupancySeats
+    ? Math.round((bookedOccupancySeats / totalOccupancySeats) * 100)
+    : 0;
+  const formatMoney = (amount) => `${Number(amount || 0).toLocaleString('vi-VN')} đ`;
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN');
+  };
 
   const getRoleBadge = (role) => {
     switch (role) {
@@ -261,7 +337,10 @@ function AdminDashboard() {
 
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
-            onClick={loadAdminData}
+            onClick={() => {
+              loadAdminData();
+              if (activeTab === 'analytics') loadAnalytics();
+            }}
             style={{
               backgroundColor: 'rgba(255,255,255,0.12)',
               border: '1px solid rgba(255,255,255,0.3)',
@@ -362,7 +441,7 @@ function AdminDashboard() {
             🎫 Tổng Vé Đã Đặt
           </div>
           <div style={{ fontSize: '24px', fontWeight: '800', color: '#2563eb' }}>
-            {stats?.total_tickets ?? stats?.paid_tickets ?? users.length > 0 ? (stats?.total_tickets || '12') : '---'}
+            {stats?.total_tickets ?? stats?.paid_tickets ?? '---'}
           </div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>Vé thường & vé điện tử</div>
         </div>
@@ -380,7 +459,7 @@ function AdminDashboard() {
             🚌 Chuyến Đang Vận Hành
           </div>
           <div style={{ fontSize: '24px', fontWeight: '800', color: '#d97706' }}>
-            {stats?.total_trips ?? trips.length ?? 8} chuyến
+            {stats?.total_trips ?? trips.length} chuyến
           </div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>Bao gồm 8 chuyến HCM ➔ Đà Lạt</div>
         </div>
@@ -398,7 +477,7 @@ function AdminDashboard() {
             👥 Người Dùng Hệ Thống
           </div>
           <div style={{ fontSize: '24px', fontWeight: '800', color: '#7c3aed' }}>
-            {stats?.total_users ?? users.length ?? 5} thành viên
+            {stats?.total_users ?? users.length} thành viên
           </div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>Được phân 4 vai trò rõ ràng</div>
         </div>
@@ -413,10 +492,10 @@ function AdminDashboard() {
           }}
         >
           <div style={{ color: '#64748b', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
-            💳 Vé Tháng Đang Hiệu Lực
+            💳 Tổng Vé Tháng
           </div>
           <div style={{ fontSize: '24px', fontWeight: '800', color: '#0891b2' }}>
-            {stats?.active_monthly_passes ?? 3} thẻ
+            {stats?.total_monthly_passes ?? '---'} thẻ
           </div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>Học sinh, sinh viên, công sở</div>
         </div>
@@ -478,6 +557,28 @@ function AdminDashboard() {
           }}
         >
           <span>🚌</span> Điều Phối Chuyến Xe ({trips.length})
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('analytics');
+            loadAnalytics();
+          }}
+          style={{
+            padding: '12px 16px',
+            fontWeight: '700',
+            fontSize: '15px',
+            border: 'none',
+            background: 'none',
+            color: activeTab === 'analytics' ? '#2563eb' : '#64748b',
+            borderBottom: activeTab === 'analytics' ? '3px solid #2563eb' : '3px solid transparent',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span>📊</span> Doanh thu · Lấp đầy · Audit log
         </button>
 
         <button
@@ -847,6 +948,223 @@ function AdminDashboard() {
             </table>
           </div>
         </div>
+      )}
+
+      {activeTab === 'analytics' && (
+        <section className="admin-analytics" aria-label="Báo cáo doanh thu, lấp đầy và audit log">
+          <div className="admin-analytics-heading">
+            <div>
+              <h2>Phân tích vận hành</h2>
+              <p>Doanh thu đã thanh toán, tình trạng ghế theo chuyến và lịch sử soát vé.</p>
+            </div>
+            <button
+              className="admin-analytics-refresh"
+              type="button"
+              onClick={loadAnalytics}
+              disabled={analyticsLoading}
+            >
+              {analyticsLoading ? 'Đang đồng bộ…' : '↻ Làm mới dữ liệu'}
+            </button>
+          </div>
+
+          {analyticsErrors.length > 0 && (
+            <div className="admin-analytics-alert" role="alert">
+              <strong>Một số dữ liệu chưa tải được.</strong>
+              <ul>
+                {analyticsErrors.map((error) => <li key={error}>{error}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <section className="admin-analytics-panel">
+            <div className="admin-analytics-panel-heading">
+              <div>
+                <span className="admin-analytics-eyebrow">TÀI CHÍNH</span>
+                <h3>Doanh thu hệ thống</h3>
+              </div>
+              <span className="admin-analytics-source">Tổng giao dịch SUCCESS</span>
+            </div>
+            <div className="admin-revenue-summary">
+              <article className="admin-revenue-primary">
+                <span>Tổng doanh thu ghi nhận</span>
+                <strong>{stats ? formatMoney(stats.total_revenue) : 'Đang tải…'}</strong>
+                <small>Số liệu lũy kế từ các thanh toán thành công</small>
+              </article>
+              <article className="admin-revenue-secondary">
+                <span>Vé đã ghi nhận</span>
+                <strong>{stats?.total_tickets ?? '—'}</strong>
+                <small>Toàn bộ vé trong hệ thống</small>
+              </article>
+              <article className="admin-revenue-secondary">
+                <span>Doanh thu / vé</span>
+                <strong>
+                  {stats?.total_tickets
+                    ? formatMoney(Number(stats.total_revenue || 0) / Number(stats.total_tickets))
+                    : '—'}
+                </strong>
+                <small>Ước tính từ tổng doanh thu và số vé</small>
+              </article>
+            </div>
+
+            <div className="admin-analytics-subheading">
+              <div>
+                <h4>Đơn đặt gần đây</h4>
+                <p>Giá trị đơn không đồng nghĩa với doanh thu đã thanh toán.</p>
+              </div>
+            </div>
+            <div className="admin-analytics-table-wrap">
+              <table className="admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Mã đơn</th>
+                    <th>Hành khách</th>
+                    <th>Tuyến</th>
+                    <th>Giá trị đơn</th>
+                    <th>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(stats?.recent_bookings || []).length === 0 ? (
+                    <tr><td className="admin-analytics-empty" colSpan="5">
+                      {stats ? 'Chưa có đơn đặt vé.' : 'Đang tải dữ liệu doanh thu…'}
+                    </td></tr>
+                  ) : (
+                    stats.recent_bookings.map((booking) => (
+                      <tr key={booking.id}>
+                        <td className="admin-analytics-strong">{booking.booking_code || `#${booking.id}`}</td>
+                        <td>{booking.customer_name || 'Khách hàng'}</td>
+                        <td>{booking.origin || '—'} → {booking.destination || '—'}</td>
+                        <td>{formatMoney(booking.total_amount)}</td>
+                        <td><span className={`admin-status-badge status-${String(booking.status || '').toLowerCase()}`}>
+                          {booking.status || '—'}
+                        </span></td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="admin-analytics-panel">
+            <div className="admin-analytics-panel-heading">
+              <div>
+                <span className="admin-analytics-eyebrow">ĐIỀU PHỐI</span>
+                <h3>Tình trạng lấp đầy ghế</h3>
+              </div>
+              <div className="admin-occupancy-summary">
+                <strong>{overallOccupancy}%</strong>
+                <span>lấp đầy · {bookedOccupancySeats}/{totalOccupancySeats} ghế đã đặt</span>
+              </div>
+            </div>
+            <div className="admin-analytics-table-wrap">
+              <table className="admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Chuyến xe</th>
+                    <th>Khởi hành</th>
+                    <th>Ghế đã đặt</th>
+                    <th>Đang giữ</th>
+                    <th>Tỷ lệ lấp đầy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {occupancy.length === 0 ? (
+                    <tr><td className="admin-analytics-empty" colSpan="5">
+                      {analyticsLoading ? 'Đang tải trạng thái ghế…' : 'Chưa có dữ liệu chuyến xe.'}
+                    </td></tr>
+                  ) : occupancy.map((trip) => (
+                    <tr key={trip.id}>
+                      <td>
+                        <span className="admin-analytics-strong">{trip.trip_code || `Chuyến #${trip.id}`}</span>
+                        <small className="admin-analytics-route">{trip.origin} → {trip.destination}</small>
+                      </td>
+                      <td>{formatDateTime(trip.departure_at)}</td>
+                      {trip.error ? (
+                        <td className="admin-analytics-row-error" colSpan="3">Không tải được trạng thái ghế.</td>
+                      ) : (
+                        <>
+                          <td>{trip.bookedSeats}/{trip.totalSeats}</td>
+                          <td>{trip.heldSeats}</td>
+                          <td>
+                            <div className="admin-occupancy-cell">
+                              <div className="admin-occupancy-track" aria-label={`${trip.occupancyRate}% lấp đầy`}>
+                                <span style={{ width: `${trip.occupancyRate}%` }} />
+                              </div>
+                              <strong>{trip.occupancyRate}%</strong>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="admin-analytics-footnote">
+              Tỷ lệ tính theo ghế BOOKED; ghế HELD được hiển thị riêng và chưa tính là vé đã bán.
+            </p>
+          </section>
+
+          <section className="admin-analytics-panel">
+            <div className="admin-analytics-panel-heading">
+              <div>
+                <span className="admin-analytics-eyebrow">KIỂM SOÁT</span>
+                <h3>Audit log soát vé</h3>
+                <p>10 lượt kiểm tra gần nhất được ghi nhận bởi nhân viên vận hành.</p>
+              </div>
+              <label className="admin-audit-filter">
+                <span>Lọc kết quả</span>
+                <select value={auditFilter} onChange={(event) => setAuditFilter(event.target.value)}>
+                  <option value="ALL">Tất cả</option>
+                  <option value="VALID">Hợp lệ</option>
+                  <option value="ALREADY_USED">Đã sử dụng</option>
+                  <option value="CANCELLED">Đã hủy</option>
+                  <option value="INVALID">Không hợp lệ</option>
+                  <option value="UNPAID">Chưa thanh toán</option>
+                </select>
+              </label>
+            </div>
+            <div className="admin-analytics-table-wrap">
+              <table className="admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Mã vé</th>
+                    <th>Nhân viên</th>
+                    <th>Kết quả</th>
+                    <th>Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAuditLogs.length === 0 ? (
+                    <tr><td className="admin-analytics-empty" colSpan="5">
+                      {analyticsLoading ? 'Đang tải audit log…' : 'Không có bản ghi phù hợp.'}
+                    </td></tr>
+                  ) : filteredAuditLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td>{formatDateTime(log.inspected_at)}</td>
+                      <td className="admin-analytics-strong">{log.ticket_code || '—'}</td>
+                      <td>{log.staff_email || `Nhân viên #${log.staff_user_id || '—'}`}</td>
+                      <td>
+                        <span className={`admin-status-badge audit-${String(log.result || '').toLowerCase()}`}>
+                          {({
+                            VALID: 'Hợp lệ',
+                            ALREADY_USED: 'Đã sử dụng',
+                            CANCELLED: 'Đã hủy',
+                            INVALID: 'Không hợp lệ',
+                            UNPAID: 'Chưa thanh toán',
+                          })[log.result] || log.result || 'Không rõ'}
+                        </span>
+                      </td>
+                      <td>{log.note || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
       )}
 
       {/* TAB 3: RBAC MATRIX & ARCHITECTURE */}
