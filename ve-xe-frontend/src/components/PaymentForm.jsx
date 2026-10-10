@@ -44,37 +44,54 @@ function PaymentForm({ bookingData }) {
     : 0;
   const finalPrice = Math.max(0, priceAfterUserDiscount - voucherDiscountAmount);
 
-  const handleApplyVoucher = async () => {
-    const code = voucherCode.trim().toUpperCase();
-    if (!code) {
-      setAppliedVoucher(null);
-      setVoucherMessage('Vui lòng nhập mã giảm giá.');
-      return;
-    }
+ 
+const handleApplyVoucher = async () => {
+  const code = voucherCode.trim().toUpperCase();
 
-    try {
-      const res = await applyVoucher(code, priceAfterUserDiscount);
-      if (res && res.discount_amount !== undefined) {
-        setAppliedVoucher({
-          type: 'fixed',
-          value: res.discount_amount,
-          code: res.code,
-        });
-        setVoucherMessage(`Đã áp dụng mã ${res.code}: Giảm ${res.discount_amount.toLocaleString('vi-VN')} VNĐ!`);
-        return;
-      }
-    } catch {
-      // Fallback local vouchers
-      const voucher = AVAILABLE_VOUCHERS[code];
-      if (voucher) {
-        setAppliedVoucher({ ...voucher, code });
-        setVoucherMessage(`Đã áp dụng mã ${code}.`);
-        return;
-      }
-      setAppliedVoucher(null);
-      setVoucherMessage('Mã giảm giá không hợp lệ hoặc đã hết hạn.');
+  if (!code) {
+    setAppliedVoucher(null);
+    setVoucherMessage('Vui lòng nhập mã giảm giá.');
+    return;
+  }
+
+  setAppliedVoucher(null);
+  setVoucherMessage('Đang kiểm tra mã giảm giá...');
+
+  try {
+    const res = await applyVoucher(code, priceAfterUserDiscount);
+
+    if (
+      res &&
+      res.discount_amount !== undefined &&
+      Number.isFinite(Number(res.discount_amount)) &&
+      Number(res.discount_amount) >= 0
+    ) {
+      const discount = Math.min(
+        Number(res.discount_amount),
+        priceAfterUserDiscount
+      );
+
+      setAppliedVoucher({
+        type: 'fixed',
+        value: discount,
+        code: res.code || code,
+      });
+
+      setVoucherMessage(
+        `Đã áp dụng mã ${res.code || code}: Giảm ${discount.toLocaleString('vi-VN')} VNĐ!`
+      );
+    } else {
+      setVoucherMessage(
+        res?.message || 'Không thể áp dụng mã giảm giá này.'
+      );
     }
-  };
+  } catch (error) {
+    setAppliedVoucher(null);
+    setVoucherMessage(
+      error?.message || 'Không thể kiểm tra voucher. Vui lòng thử lại.'
+    );
+  }
+};
 
   // Mã giao dịch và chuyển khoản đồng bộ cho phiên đặt chỗ
   const tripCodeClean = (bookingData.trip.trip_code || 'HN-TN').replace(/[^a-zA-Z0-9]/g, '');
