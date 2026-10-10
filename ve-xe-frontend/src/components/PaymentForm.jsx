@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createOrder, getCurrentUser, applyVoucher } from '../api';
 import PrintableTicket from './PrintableTicket';
+import VoucherModal from './VoucherModal';
 
 const AVAILABLE_VOUCHERS = {
   CHAO20: { type: 'percentage', value: 20 },
@@ -21,6 +22,19 @@ function PaymentForm({ bookingData }) {
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [voucherMessage, setVoucherMessage] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // THÊM ĐOẠN NÀY ĐỂ CÓ DỮ LIỆU ĐƯA VÀO MODAL
+  const myVouchers = [
+    { id: 'CHAO20', title: 'Giảm 20% (Tối đa 50k)', minOrder: 100000 },
+    { id: 'BUS50', title: 'Giảm 50.000đ cho đơn từ 200k', minOrder: 200000 },
+    { id: 'GIAM10K', title: 'Giảm trực tiếp 10.000đ', minOrder: 0 }
+  ];
+
+  const handleSelectVoucherFromModal = (code) => {
+    setVoucherCode(code); 
+    setIsModalOpen(false); 
+  };
 
   const currentUser = getCurrentUser() || bookingData.user || {
     id: 1,
@@ -33,10 +47,12 @@ function PaymentForm({ bookingData }) {
   const [passengerPhone, setPassengerPhone] = useState(currentUser.phone || '0901234567');
 
   const basePrice = bookingData.totalAmount || (bookingData.trip.price * (bookingData.selectedSeats?.length || 1));
+  
   // Ưu đãi giảm 20% cho HSSV / Người cao tuổi
   const hasDiscount = currentUser.discount_type === 'HSSV' || currentUser.discount_type === 'NguoiCaoTuoi';
   const discountAmount = hasDiscount ? Math.round(basePrice * 0.2) : 0;
   const priceAfterUserDiscount = basePrice - discountAmount;
+  
   const voucherDiscountAmount = appliedVoucher
     ? appliedVoucher.type === 'percentage'
       ? Math.round(priceAfterUserDiscount * appliedVoucher.value / 100)
@@ -44,54 +60,53 @@ function PaymentForm({ bookingData }) {
     : 0;
   const finalPrice = Math.max(0, priceAfterUserDiscount - voucherDiscountAmount);
 
- 
-const handleApplyVoucher = async () => {
-  const code = voucherCode.trim().toUpperCase();
+  const handleApplyVoucher = async () => {
+    const code = voucherCode.trim().toUpperCase();
 
-  if (!code) {
+    if (!code) {
+      setAppliedVoucher(null);
+      setVoucherMessage('Vui lòng nhập mã giảm giá.');
+      return;
+    }
+
     setAppliedVoucher(null);
-    setVoucherMessage('Vui lòng nhập mã giảm giá.');
-    return;
-  }
+    setVoucherMessage('Đang kiểm tra mã giảm giá...');
 
-  setAppliedVoucher(null);
-  setVoucherMessage('Đang kiểm tra mã giảm giá...');
+    try {
+      const res = await applyVoucher(code, priceAfterUserDiscount);
 
-  try {
-    const res = await applyVoucher(code, priceAfterUserDiscount);
+      if (
+        res &&
+        res.discount_amount !== undefined &&
+        Number.isFinite(Number(res.discount_amount)) &&
+        Number(res.discount_amount) >= 0
+      ) {
+        const discount = Math.min(
+          Number(res.discount_amount),
+          priceAfterUserDiscount
+        );
 
-    if (
-      res &&
-      res.discount_amount !== undefined &&
-      Number.isFinite(Number(res.discount_amount)) &&
-      Number(res.discount_amount) >= 0
-    ) {
-      const discount = Math.min(
-        Number(res.discount_amount),
-        priceAfterUserDiscount
-      );
+        setAppliedVoucher({
+          type: 'fixed',
+          value: discount,
+          code: res.code || code,
+        });
 
-      setAppliedVoucher({
-        type: 'fixed',
-        value: discount,
-        code: res.code || code,
-      });
-
+        setVoucherMessage(
+          `Đã áp dụng mã ${res.code || code}: Giảm ${discount.toLocaleString('vi-VN')} VNĐ!`
+        );
+      } else {
+        setVoucherMessage(
+          res?.message || 'Không thể áp dụng mã giảm giá này.'
+        );
+      }
+    } catch (error) {
+      setAppliedVoucher(null);
       setVoucherMessage(
-        `Đã áp dụng mã ${res.code || code}: Giảm ${discount.toLocaleString('vi-VN')} VNĐ!`
-      );
-    } else {
-      setVoucherMessage(
-        res?.message || 'Không thể áp dụng mã giảm giá này.'
+        error?.message || 'Không thể kiểm tra voucher. Vui lòng thử lại.'
       );
     }
-  } catch (error) {
-    setAppliedVoucher(null);
-    setVoucherMessage(
-      error?.message || 'Không thể kiểm tra voucher. Vui lòng thử lại.'
-    );
-  }
-};
+  };
 
   // Mã giao dịch và chuyển khoản đồng bộ cho phiên đặt chỗ
   const tripCodeClean = (bookingData.trip.trip_code || 'HN-TN').replace(/[^a-zA-Z0-9]/g, '');
@@ -563,9 +578,10 @@ const handleApplyVoucher = async () => {
               {hasDiscount && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
                   <span>Ưu đãi {currentUser.discount_type} (-20%):</span>
-                  <span>- {discountAmount.toLocaleString('vi-VN')} VNĐ</span>
+                  <span>-{discountAmount.toLocaleString('vi-VN')} VNĐ</span>
                 </div>
               )}
+              
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0', padding: '12px', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
                 <label htmlFor="voucher-code" style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>Mã giảm giá</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -587,6 +603,13 @@ const handleApplyVoucher = async () => {
                   />
                   <button
                     type="button"
+                    onClick={() => setIsModalOpen(true)}
+                    style={{ padding: '0 10px', border: '1px solid #cbd5e1', borderRadius: '6px', backgroundColor: '#f8fafc', color: '#1e293b', fontWeight: '600', cursor: 'pointer', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                    🎫 Chọn mã
+                  </button>
+                  
+                  <button
+                    type="button"
                     onClick={handleApplyVoucher}
                     style={{ padding: '0 14px', border: 'none', borderRadius: '6px', backgroundColor: '#1e293b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
                   >
@@ -597,10 +620,11 @@ const handleApplyVoucher = async () => {
                   {voucherMessage || 'Mã thử nghiệm: CHAO20 hoặc BUS50.'}
                 </p>
               </div>
+              
               {appliedVoucher && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
                   <span>Voucher {appliedVoucher.code}:</span>
-                  <span>- {voucherDiscountAmount.toLocaleString('vi-VN')} VNĐ</span>
+                  <span>-{voucherDiscountAmount.toLocaleString('vi-VN')} VNĐ</span>
                 </div>
               )}
 
@@ -624,7 +648,7 @@ const handleApplyVoucher = async () => {
                 type="text"
                 value={passengerName}
                 onChange={(e) => setPassengerName(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
               />
             </div>
             <div>
@@ -635,7 +659,7 @@ const handleApplyVoucher = async () => {
                 type="text"
                 value={passengerPhone}
                 onChange={(e) => setPassengerPhone(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px' }}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', boxSizing: 'border-box' }}
               />
             </div>
           </div>
@@ -724,6 +748,7 @@ const handleApplyVoucher = async () => {
 
                   {/* Transfer Details with 1-click copy */}
                   <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                    
                     <div style={{ backgroundColor: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                       <div style={{ fontSize: '11px', color: '#64748b' }}>Ngân hàng thụ hưởng:</div>
                       <div style={{ fontWeight: '700', color: '#1e293b' }}>MB Bank (Quân Đội)</div>
@@ -732,166 +757,89 @@ const handleApplyVoucher = async () => {
                     <div style={{ backgroundColor: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontSize: '11px', color: '#64748b' }}>Số tài khoản:</div>
-                        <div style={{ fontWeight: '800', fontFamily: 'monospace', color: '#2563eb' }}>0901 234 567</div>
+                        <div style={{ fontWeight: '700', color: '#1e293b' }}>0901234567</div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard('0901234567', 'stk')}
-                        style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
-                      >
-                        {copiedField === 'stk' ? '✓ Đã chép' : 'Sao chép'}
+                      <button onClick={() => copyToClipboard('0901234567', 'account')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '12px', fontWeight: 'bold' }}>
+                        {copiedField === 'account' ? 'Đã chép' : 'Copy'}
                       </button>
+                    </div>
+
+                    <div style={{ backgroundColor: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>Tên người nhận:</div>
+                      <div style={{ fontWeight: '700', color: '#1e293b' }}>CONG TY CP SMART BUS</div>
                     </div>
 
                     <div style={{ backgroundColor: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontSize: '11px', color: '#64748b' }}>Số tiền chính xác:</div>
-                        <div style={{ fontWeight: '800', color: '#dc2626' }}>{finalPrice.toLocaleString('vi-VN')} VNĐ</div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>Số tiền:</div>
+                        <div style={{ fontWeight: '700', color: '#dc2626' }}>{finalPrice.toLocaleString('vi-VN')} VNĐ</div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(String(finalPrice), 'price')}
-                        style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
-                      >
-                        {copiedField === 'price' ? '✓ Đã chép' : 'Sao chép'}
+                      <button onClick={() => copyToClipboard(finalPrice.toString(), 'amount')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '12px', fontWeight: 'bold' }}>
+                        {copiedField === 'amount' ? 'Đã chép' : 'Copy'}
                       </button>
                     </div>
 
                     <div style={{ backgroundColor: 'white', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontSize: '11px', color: '#64748b' }}>Nội dung chuyển khoản:</div>
-                        <div style={{ fontWeight: '800', fontFamily: 'monospace', color: '#16a34a' }}>{transferSyntax}</div>
+                        <div style={{ fontWeight: '700', color: '#1e293b' }}>{transferSyntax}</div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(transferSyntax, 'syntax')}
-                        style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
-                      >
-                        {copiedField === 'syntax' ? '✓ Đã chép' : 'Sao chép'}
+                      <button onClick={() => copyToClipboard(transferSyntax, 'syntax')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#2563eb', fontSize: '12px', fontWeight: 'bold' }}>
+                        {copiedField === 'syntax' ? 'Đã chép' : 'Copy'}
                       </button>
                     </div>
+
                   </div>
                 </div>
               </div>
             )}
 
-            {paymentMethod === 'MOMO' && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '14px', fontWeight: '800', color: '#a21caf', marginBottom: '4px' }}>
-                  🟣 CỔNG VÍ ĐIỆN TỬ MOMO (SANDBOX)
+            {paymentMethod !== 'VIETQR' && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b' }}>
+                <div style={{ fontSize: '40px', marginBottom: '12px' }}>
+                  {paymentMethod === 'MOMO' ? '🟣' : paymentMethod === 'VNPAY' ? '🔵' : '🏦'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
-                  Mở ứng dụng MoMo trên điện thoại và quét mã QR bên dưới
-                </div>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=2|99|0901234567|SMARTBUS|${finalPrice}|${encodeURIComponent(transferSyntax)}`}
-                  alt="QR MoMo"
-                  style={{ width: '170px', height: '170px', backgroundColor: 'white', padding: '6px', borderRadius: '12px', border: '2px solid #f472b6' }}
-                />
-                <div style={{ marginTop: '10px', fontSize: '13px' }}>
-                  Ví MoMo: <b>0901 234 567</b> | Số tiền: <b style={{ color: '#dc2626' }}>{finalPrice.toLocaleString('vi-VN')} VNĐ</b>
-                </div>
-              </div>
-            )}
-
-            {paymentMethod === 'VNPAY' && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '14px', fontWeight: '800', color: '#0284c7', marginBottom: '4px' }}>
-                  🔵 CỔNG THANH TOÁN VNPAY-QR
-                </div>
-                <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
-                  Hỗ trợ ứng dụng ngân hàng và ví VNPAY trên toàn quốc
-                </div>
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=vnpay:smartbus:${finalPrice}:${encodeURIComponent(transferSyntax)}`}
-                  alt="QR VNPAY"
-                  style={{ width: '170px', height: '170px', backgroundColor: 'white', padding: '6px', borderRadius: '12px', border: '2px solid #38bdf8' }}
-                />
-                <div style={{ marginTop: '10px', fontSize: '13px' }}>
-                  Đơn vị chấp nhận: <b>CÔNG TY XE KHÁCH SMART BUS</b>
-                </div>
-              </div>
-            )}
-
-            {paymentMethod === 'BANK' && (
-              <div style={{ fontSize: '13px', color: '#475569' }}>
-                <div style={{ fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                  🏦 Hướng dẫn Chuyển khoản Internet Banking / Thẻ ATM:
-                </div>
-                <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <li>Chuyển tiền vào tài khoản MB Bank: <b>0901 234 567</b> (SMART BUS CORP)</li>
-                  <li>Số tiền: <b style={{ color: '#dc2626' }}>{finalPrice.toLocaleString('vi-VN')} VNĐ</b></li>
-                  <li>Nội dung chuyển khoản: <b style={{ color: '#2563eb' }}>{transferSyntax}</b></li>
-                  <li>Sau khi chuyển khoản, bấm nút <b>"Xác Nhận Đã Chuyển Khoản"</b> bên dưới để nhận vé điện tử ngay tức thì.</li>
-                </ul>
+                <h4 style={{ margin: '0 0 8px 0', color: '#1e293b' }}>Đang chuẩn bị cổng thanh toán...</h4>
+                <p style={{ margin: 0, fontSize: '13px' }}>Hệ thống sẽ chuyển hướng bạn đến giao diện thanh toán {paymentMethod} sau khi nhấn Xác nhận.</p>
               </div>
             )}
           </div>
 
-          {/* Nút Thanh Toán & Nút Sandbox Siêu Tốc */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button
-              type="button"
-              onClick={handlePayment}
-              disabled={processing}
-              style={{
-                width: '100%',
-                backgroundColor: '#16a34a',
-                color: 'white',
-                border: 'none',
-                padding: '14px',
-                borderRadius: '10px',
-                fontSize: '16px',
-                fontWeight: '800',
-                cursor: processing ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 14px rgba(22,163,74,0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {processing ? (
-                <span>⏳ Đang xử lý phát hành vé điện tử...</span>
-              ) : (
-                <>
-                  <span>✓</span>
-                  <span>Tôi Đã Quét Mã & Xác Nhận Thanh Toán ({finalPrice.toLocaleString('vi-VN')} VNĐ)</span>
-                </>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handlePayment}
-              disabled={processing}
-              style={{
-                width: '100%',
-                backgroundColor: '#f8fafc',
-                color: '#2563eb',
-                border: '1.5px dashed #93c5fd',
-                padding: '10px',
-                borderRadius: '10px',
-                fontSize: '13px',
-                fontWeight: '700',
-                cursor: processing ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-              }}
-            >
-              <span>⚡</span>
-              <span>Mô Phỏng Thanh Toán Siêu Tốc 1 Chạm (Sandbox Demo)</span>
-            </button>
-          </div>
-
-          <div style={{ marginTop: '14px', textAlign: 'center', fontSize: '11px', color: '#94a3b8' }}>
-            🔒 Vé điện tử kèm mã QR thông minh sẽ được cấp và gửi đến số điện thoại ngay sau khi xác nhận.
-          </div>
+          <button
+            onClick={handlePayment}
+            disabled={processing}
+            style={{
+              width: '100%',
+              padding: '16px',
+              borderRadius: '12px',
+              border: 'none',
+              backgroundColor: processing ? '#94a3b8' : '#2563eb',
+              color: 'white',
+              fontWeight: '800',
+              fontSize: '16px',
+              cursor: processing ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '10px',
+              boxShadow: processing ? 'none' : '0 4px 14px rgba(37,99,235,0.3)',
+              transition: 'all 0.2s',
+            }}
+          >
+            {processing ? (
+              <span>Đang xử lý giao dịch...</span>
+            ) : (
+              <span>✅ Xác Nhận Đã Thanh Toán & Nhận Vé</span>
+            )}
+          </button>
         </div>
       </div>
+      <VoucherModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSelect={handleSelectVoucherFromModal}
+        vouchers={myVouchers}
+      />
     </div>
   );
 }
