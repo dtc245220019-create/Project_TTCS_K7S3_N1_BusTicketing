@@ -10,6 +10,43 @@ import {
   updateTripStatus,
 } from '../api';
 
+const downloadCsvFile = (filename, headers, rows) => {
+  if (!rows.length) return false;
+
+  const escapeCsvCell = (value) => {
+    let text = value == null ? '' : String(value);
+
+    // Tránh nội dung CSV bị hiểu nhầm thành công thức Excel.
+    if (/^[\t\r=+\-@]/.test(text)) {
+      text = `'${text}`;
+    }
+
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+
+  const csvContent = [headers, ...rows]
+    .map((row) => row.map(escapeCsvCell).join(','))
+    .join('\r\n');
+
+  // BOM giúp Excel nhận diện UTF-8 và hiển thị tiếng Việt.
+  const blob = new Blob(['\uFEFF', csvContent], {
+    type: 'text/csv;charset=utf-8;',
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return true;
+};
+
 function AdminDashboard() {
   const navigate = useNavigate();
   const [currentUser, setUser] = useState(getCurrentUser());
@@ -103,6 +140,69 @@ function AdminDashboard() {
         type: 'error',
       });
     }
+  };
+  
+  const handleExportUsers = () => {
+    const rows = filteredUsers.map((u) => [
+      u.id,
+      u.full_name,
+      u.email,
+      u.phone,
+      u.discount_type,
+      u.role,
+    ]);
+
+    const success = downloadCsvFile(
+      'danh-sach-nguoi-dung.csv',
+      ['ID', 'Họ và tên', 'Email', 'Số điện thoại', 'Loại ưu đãi', 'Vai trò'],
+      rows
+    );
+
+    setFeedbackMsg({
+      text: success
+        ? `Đã xuất ${rows.length} người dùng ra file CSV.`
+        : 'Không có người dùng để xuất.',
+      type: success ? 'success' : 'error',
+    });
+  };
+
+  const handleExportTrips = () => {
+    const rows = trips.map((t) => [
+      t.id,
+      t.origin,
+      t.destination,
+      t.departure_time,
+      t.license_plate,
+      t.bus_type,
+      t.price,
+      t.available_seats,
+      t.driver_name,
+      t.status,
+    ]);
+
+    const success = downloadCsvFile(
+      'danh-sach-chuyen-xe.csv',
+      [
+        'ID',
+        'Điểm đi',
+        'Điểm đến',
+        'Thời gian khởi hành',
+        'Biển số xe',
+        'Loại xe',
+        'Giá vé',
+        'Số ghế trống',
+        'Tài xế',
+        'Trạng thái',
+      ],
+      rows
+    );
+
+    setFeedbackMsg({
+      text: success
+        ? `Đã xuất ${rows.length} chuyến xe ra file CSV.`
+        : 'Không có chuyến xe để xuất.',
+      type: success ? 'success' : 'error',
+    });
   };
 
   const switchToAdminDemo = () => {
@@ -594,8 +694,8 @@ function AdminDashboard() {
               ))}
             </div>
           </div>
-
-          {/* Table */}
+          
+            {/* Table */}
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
               <thead>
@@ -720,6 +820,59 @@ function AdminDashboard() {
                 )}
               </tbody>
             </table>
+          </div>
+
+                    {/* Hai nút xuất CSV nằm cạnh nhau ở góc dưới bên phải */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              flexWrap: 'wrap',
+              gap: '10px',
+              marginTop: '16px',
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleExportUsers}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                backgroundColor: '#166534',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '10px 16px',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+              }}
+            >
+              ↓ Xuất người dùng CSV
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportTrips}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                backgroundColor: '#166534',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '10px 16px',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+              }}
+            >
+              ↓ Xuất chuyến xe CSV
+            </button>
           </div>
 
           <div
