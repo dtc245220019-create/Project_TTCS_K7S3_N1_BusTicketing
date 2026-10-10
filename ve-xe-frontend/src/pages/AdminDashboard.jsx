@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+
 import {
   getCurrentUser,
   setCurrentUser,
@@ -9,6 +10,7 @@ import {
   getAdminTrips,
   updateTripStatus,
 } from '../api';
+import CreateVoucher from '../components/CreateVoucher';
 
 const downloadCsvFile = (filename, headers, rows) => {
   if (!rows.length) return false;
@@ -59,6 +61,7 @@ function AdminDashboard() {
   const [filterRole, setFilterRole] = useState('ALL');
   const [feedbackMsg, setFeedbackMsg] = useState({ text: '', type: 'success' });
   const [updatingUserId, setUpdatingUserId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isAdmin =
     currentUser &&
@@ -522,6 +525,37 @@ function AdminDashboard() {
         </div>
       </div>
 
+      {/* giao diện tạo voucher */}
+        <div 
+          onClick={() => setIsModalOpen(true)}
+          style={{ 
+            backgroundColor: 'white', 
+            padding: '20px', 
+            borderRadius: '12px', 
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)', 
+            cursor: 'pointer',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            transition: 'all 0.2s',
+            marginBottom: '24px' 
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <div style={{ fontSize: '24px', color: '#4f46e5' }}>➕</div>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>Tạo Mã Ưu Đãi Mới</div>
+            <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>Thiết lập voucher giảm giá cho hệ thống</div>
+          </div>
+        </div>
+
+        {isModalOpen && (
+          <CreateVoucher onClose={() => setIsModalOpen(false)} />
+        )}
+      
+
       {/* Tab Navigation */}
       <div
         style={{
@@ -822,7 +856,7 @@ function AdminDashboard() {
             </table>
           </div>
 
-                    {/* Hai nút xuất CSV nằm cạnh nhau ở góc dưới bên phải */}
+          {/*xuất file CSV */}
           <div
             style={{
               display: 'flex',
