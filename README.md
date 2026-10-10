@@ -1,22 +1,25 @@
 # 🚌 HỆ THỐNG ĐẶT VÉ XE BUÝT THÔNG MINH (SMART BUS TICKETING)
 > **Đồ án Thực tập Cơ sở K7S3 — Nhóm 01**  
 > **Repository:** [Project_TTCS_K7S3_N1_BusTicketing](https://github.com/dtc245220019-create/Project_TTCS_K7S3_N1_BusTicketing.git)  
-> **Trạng thái Sprint 2:** Đã tích hợp hoàn tất (Git Merge All Sprint 2 Branches), Hỗ trợ MySQL 8.0+ & SQLite Dual-Engine, 100% vượt qua kiểm thử (33/33 Test Cases Passed), sẵn sàng Demo & Báo cáo.
+> **Trạng thái Sprint 3:** Đã tích hợp hoàn tất (Git Merge All Sprint 3 Branches), 100% vượt qua kiểm thử (**51/51 Test Cases Passed**), Frontend Vite Production Build Success, sẵn sàng Demo & Báo cáo Hội đồng.
 
 ---
 
-## 📌 1. Giới Thiệu Dự Án & Kế Hoạch Sprint 2
+## 📌 1. Giới Thiệu Dự Án & Tiến Độ Toàn Diện Sprint 1, 2 & 3
 
-Hệ thống **Smart Bus Ticketing** là nền tảng quản trị và bán vé xe buýt / xe khách trực tuyến toàn diện. Dự án áp dụng quy trình Scrum/Agile với tổng lộ trình **4 tuần (24 User Stories)**.
+Hệ thống **Smart Bus Ticketing** là nền tảng quản trị và bán vé xe buýt / xe khách trực tuyến toàn diện. Dự án áp dụng quy trình Scrum/Agile với tổng lộ trình phát triển:
 
-- **Sprint 1 (Tuần 1):** Bàn giao hệ thống **MVP cốt lõi (US01 - US08)**: Tra cứu chuyến, sơ đồ ghế 2 tầng (Dãy A & Dãy B), tạm giữ ghế 10 phút kèm Cronjob BackgroundScheduler tự động nhả ghế, thanh toán trực tuyến Sandbox, xuất vé điện tử kèm mã QR động, soát vé chống gian lận và Bản đồ tương tác OpenStreetMap/Leaflet với tọa độ GPS trạm dừng.
-- **Sprint 2 (Tuần 2):** Nâng cấp hệ thống lên quy mô doanh nghiệp với các chức năng mở rộng:
-  - **US17 & US18:** Tích hợp Cổng thanh toán quốc dân **VNPay** (Chữ ký điện tử HMAC-SHA512) và **ZaloPay** (Mã xác thực HMAC-SHA256), cơ chế Webhook IPN xử lý bất đồng bộ và Return URL điều hướng.
-  - **US20:** Hệ thống thông báo tức thì đa kênh: Gửi Email xác nhận hóa đơn vé xe chuẩn HTML (`smtp.gmail.com`) + SMS Gateway Mock đồng bộ thông tin chuyến đi + Chuông thông báo in-app Notification Bell với unread badge.
-  - **BE4:** Hệ sinh thái Khuyến mãi & Phí dịch vụ: Mã giảm giá (**Vouchers**: `CHAO20`, `BUS50`, `GIAM10K`, `VIP15`) và Phí dịch vụ tiện ích bến bãi, bảo hiểm hành khách.
-  - **US24:** Nghiệp vụ soát vé lên xe (**Boarding Check-in**): Cập nhật trạng thái vé `USED` / `DaSoat`, ghi nhận lịch sử kiểm soát vé và đối soát tài xế.
-  - **US25 & US26:** Màn hình kết quả giao dịch thanh toán chi tiết (**PaymentResultPage**) và Cổng tra cứu, hủy vé & yêu cầu hoàn tiền trực tuyến (**TicketCancellation**).
-  - **Kiến trúc CSDL MySQL quy mô lớn:** Cung cấp lược đồ DDL 18 bảng MySQL 8.0+ ([schema_mysql.sql](schema_mysql.sql)), công cụ di chuyển dữ liệu tự động ([migrate_to_mysql.py](migrate_to_mysql.py)) và kiến trúc **Dual-Engine** thông minh tự động kết nối MySQL hoặc fallback mượt mà về SQLite.
+- **Sprint 1 (Tuần 1): MVP Cốt Lõi (US01 - US08):** Tra cứu chuyến xe, sơ đồ ghế 2 tầng (Dãy A & Dãy B), giữ chỗ tạm thời 10 phút với Cronjob tự động nhả ghế, thanh toán Sandbox, xuất vé điện tử kèm mã QR động và Bản đồ tương tác Leaflet/GPS.
+- **Sprint 2 (Tuần 2): Cổng Thanh Toán & Nghiệp Vụ Vận Hành:** Tích hợp VNPay (HMAC-SHA512) & ZaloPay (HMAC-SHA256), thông báo Email SMTP & SMS Gateway (US20), soát vé lên xe Boarding Check-in (US24), hủy vé (TicketCancellation), Dual-Engine MySQL & SQLite.
+- **Sprint 3 (Tuần 3): AI Chatbot, Doanh Thu, Tỷ Lệ Lấp Đầy & Quản Trị 4 Actors:**
+  - 🤖 **Trợ Lý Ảo Chatbot AI (BE1 & FE1):** Hỗ trợ tư vấn lịch trình, giá vé, chính sách hoàn tiền 24/7 trực tiếp trên màn hình (`ChatWidget.jsx`).
+  - 📊 **Báo Cáo Doanh Thu & Xuất CSV (US17/Revenue):** Tổng hợp doanh thu đa chiều (theo ngày/tháng/tuyến), tính toán tỷ lệ lấp đầy ghế (**Occupancy Rate**) và tính năng xuất file báo cáo **CSV** 1-click.
+  - 🎓 **Xét Duyệt Ưu Đãi Sinh Viên / Linh Hoạt (US23):** Thẩm định minh chứng HSSV trực tiếp trên Admin Dashboard, tự động áp dụng mức chiết khấu 20%.
+  - 🎟️ **Hệ Thống Voucher Khuyến Mãi (US18):** Quản lý mã giảm giá (cố định/phần trăm), tích hợp popup chọn mã (`VoucherModal.jsx`) ngay tại bước thanh toán.
+  - 💸 **Quy Trình Hủy Vé & Hoàn Tiền (US08):** Gửi yêu cầu hoàn tiền online, ban quản trị xem xét & duyệt/từ chối hoàn tiền (`RefundManagement.jsx`), tra cứu tiến độ (`RefundStatusPage.jsx`).
+  - 💬 **Đánh Giá & Phản Ánh Dịch Vụ (US24):** Gửi đánh giá sao, nhận xét về xe và tài xế (`FeedbackPage.jsx`), ban quản trị tiếp nhận & giải quyết phản ánh.
+  - 🛡️ **Nhật Ký Kiểm Toán (Audit Logs US17):** Ghi nhận chi tiết mọi hành vi soát vé, thanh toán, phân quyền và xuất dữ liệu.
+  - 👑 **Mô Hình Phân Quyền 4 Actors Hoàn Chỉnh (RBAC):** Phân quyền độc lập 4 vai trò (**Hành khách**, **Tài xế**, **Phụ xe**, **Quản trị viên**) kèm chuyển đổi tài khoản demo 1-click tiện lợi trên giao diện.
 
 ---
 
