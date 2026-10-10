@@ -14,6 +14,7 @@ import TicketCancellation from './pages/TicketCancellation';
 import MonthlyPassPage from './pages/MonthlyPassPage';
 import AdminDashboard from './pages/AdminDashboard';
 import './App.css';
+import RefundManagement from './components/RefundManagement'; 
 
 function App() {
   return (
@@ -38,6 +39,7 @@ function App() {
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/admin/refunds" element={<RefundManagement />} />
           </Routes>
         </main>
 

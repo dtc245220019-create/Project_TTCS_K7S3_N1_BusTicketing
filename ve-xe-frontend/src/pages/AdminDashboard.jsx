@@ -523,9 +523,7 @@ function AdminDashboard() {
           </div>
           <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '6px' }}>Học sinh, sinh viên, công sở</div>
         </div>
-      </div>
-
-      {/* giao diện tạo voucher */}
+        {/* giao diện tạo voucher */}
         <div 
           onClick={() => setIsModalOpen(true)}
           style={{ 
@@ -554,6 +552,35 @@ function AdminDashboard() {
         {isModalOpen && (
           <CreateVoucher onClose={() => setIsModalOpen(false)} />
         )}
+
+        {/* Nút chuyển sang trang Quản lý hoàn tiền */}
+        <div 
+          onClick={() => navigate('/admin/refunds')}
+          style={{ 
+            backgroundColor: 'white', 
+            padding: '20px', 
+            borderRadius: '12px', 
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)', 
+            cursor: 'pointer',
+            border: '1px solid #e2e8f0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            transition: 'all 0.2s',
+            marginBottom: '24px'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
+          <div style={{ fontSize: '24px', color: '#eab308' }}>💸</div>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#1e293b' }}>Quản Lý Hoàn Tiền</div>
+            <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>Xử lý yêu cầu hủy vé và hoàn tiền</div>
+          </div>
+        </div>
+      </div>
+
+      
       
 
       {/* Tab Navigation */}
