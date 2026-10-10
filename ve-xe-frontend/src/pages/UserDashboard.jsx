@@ -133,6 +133,9 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
   // Modal in vé & chi tiết
   const [selectedTicketDetail, setSelectedTicketDetail] = useState(null);
 
+  // Mở/đóng chi tiết hoàn tiền của vé đã hủy
+  const [expandedRefundId, setExpandedRefundId] = useState(null);
+
   // Modal ĐỔI VÉ
   const [exchangingTicket, setExchangingTicket] = useState(null);
   const [exchangeType, setExchangeType] = useState('seat'); // 'seat' hoặc 'trip'
@@ -1262,7 +1265,126 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>
                       Hủy lúc: {item.cancelledAt || 'Gần đây'}
                     </span>
+                   
                   </div>
+                     <button
+                      type="button"
+                      onClick={() => {
+                        const detailKey = item.id || item.ticketCode || item.ticket_code || idx;
+                        setExpandedRefundId(
+                          expandedRefundId === detailKey ? null : detailKey
+                        );
+                      }}
+                      style={{
+                        display: 'block',
+                        marginTop: '12px',
+                        marginLeft: 'auto',
+                        padding: '9px 14px',
+                        border: '1px solid #2563eb',
+                        borderRadius: '8px',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        fontWeight: 700,
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                      }}
+                      >
+                      {expandedRefundId ===
+                      (item.id || item.ticketCode || item.ticket_code || idx)
+                        ? 'Thu gọn'
+                        : 'Xem chi tiết'}
+                    </button>
+                {expandedRefundId ===
+                  (item.id || item.ticketCode || item.ticket_code || idx) && (
+                  <div
+                    style={{
+                      flexBasis: '100%',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '20px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                    }}
+                  >
+                    <h4 style={{ margin: '0 0 16px', color: '#0f172a' }}>
+                      Chi tiết vé và thông tin hoàn tiền
+                    </h4>
+
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                      gap: '16px',
+                    }}>
+                      <div>
+                        <div style={{ color: '#64748b', fontSize: '12px' }}>Mã vé</div>
+                        <b>{item.ticketCode || item.ticket_code || item.id || 'Chưa có'}</b>
+                      </div>
+
+                      <div>
+                        <div style={{ color: '#64748b', fontSize: '12px' }}>Hành trình</div>
+                        <b>{item.route || item.routeName || item.route_name || 'Chưa có'}</b>
+                      </div>
+
+                      <div>
+                        <div style={{ color: '#64748b', fontSize: '12px' }}>Xuất bến</div>
+                        <b>{item.departure || item.departureTime || item.departure_time || 'Chưa có'}</b>
+                      </div>
+
+                      <div>
+                        <div style={{ color: '#64748b', fontSize: '12px' }}>Ghế cũ</div>
+                        <b>{item.seat || item.seatNumber || 'Chưa có'}</b>
+                      </div>
+
+                      <div>
+                        <div style={{ color: '#64748b', fontSize: '12px' }}>Lý do hủy</div>
+                        <b>{item.reason || 'Chưa có thông tin'}</b>
+                      </div>
+
+                      <div>
+                        <div style={{ color: '#64748b', fontSize: '12px' }}>Hủy lúc</div>
+                        <b>{item.cancelledAt || 'Chưa có thông tin'}</b>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      marginTop: '20px',
+                      padding: '16px',
+                      borderRadius: '10px',
+                      border: '1px solid #bfdbfe',
+                      background: '#eff6ff',
+                    }}>
+                      <h4 style={{ margin: '0 0 14px', color: '#1d4ed8' }}>
+                        💳 Thông tin hoàn tiền
+                      </h4>
+
+                      <p>
+                        <b>Trạng thái:</b>{' '}
+                        {item.refundStatus || 'ĐANG XỬ LÝ'}
+                      </p>
+
+                      <p style={{ overflowWrap: 'anywhere' }}>
+                        <b>Nhận tiền qua:</b>{' '}
+                        {item.refundMethod || 'Chưa có thông tin'}
+                      </p>
+
+                      <div style={{ color: '#64748b', fontSize: '12px' }}>
+                        Số tiền hoàn dự kiến
+                      </div>
+                      <div style={{
+                        color: '#15803d',
+                        fontSize: '24px',
+                        fontWeight: 800,
+                        marginTop: '4px',
+                      }}>
+                        {typeof (item.refundAmount ?? item.price ?? item.total_amount) === 'number'
+                          ? `${(item.refundAmount ?? item.price ?? item.total_amount).toLocaleString('vi-VN')} VNĐ`
+                          : (item.refundAmount ?? item.price ?? item.total_amount ?? 'Chưa có thông tin')}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 </div>
               ))}
             </div>
