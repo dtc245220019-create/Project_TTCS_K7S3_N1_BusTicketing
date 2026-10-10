@@ -148,6 +148,12 @@ function Header() {
             <Link to="/dashboard" className={isActive('/dashboard') || isActive('/cancellation') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>🎟️</span> Vé của tôi
             </Link>
+            <Link to="/feedback" className={isActive('/feedback') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>💬</span> Đánh giá
+            </Link>
+            <Link to="/tra-cuu-hoan-tien" className={isActive('/tra-cuu-hoan-tien') || isActive('/refund-status') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>💸</span> Hoàn tiền
+            </Link>
           </>
         )}
 

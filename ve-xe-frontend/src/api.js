@@ -268,3 +268,93 @@ export function boardPassenger(ticketId, staffEmail = 'taixe.nguyen@smartbus.vn'
     body: JSON.stringify({ ticket_id: ticketId, staff_email: staffEmail }),
   });
 }
+
+// 16. Báo cáo Doanh thu & Tỷ lệ lấp đầy ghế & Xuất CSV (Sprint 3 - US17/Revenue)
+export function getAdminRevenue(groupBy = 'month', startDate = null, endDate = null) {
+  let url = `/api/v1/admin/revenue?group_by=${groupBy}`;
+  if (startDate) url += `&start_date=${startDate}`;
+  if (endDate) url += `&end_date=${endDate}`;
+  return fetchJson(url);
+}
+
+export function getAdminOccupancy() {
+  return fetchJson('/api/v1/admin/occupancy');
+}
+
+export function getRevenueExportUrl() {
+  return `${API_BASE_URL}/api/v1/admin/revenue/export`;
+}
+
+// 17. Duyệt hồ sơ ưu đãi sinh viên / linh hoạt (Sprint 3 - US23)
+export function getPendingDiscounts() {
+  return fetchJson('/api/v1/admin/discounts/pending');
+}
+
+export function approveDiscount(userId, approved = true, notes = '') {
+  return fetchJson(`/api/v1/admin/discounts/${userId}/approve`, {
+    method: 'PUT',
+    body: JSON.stringify({ approved, notes }),
+  });
+}
+
+// 18. Quản lý Vouchers (Sprint 3 - US18)
+export function createNewVoucher(voucherData) {
+  return fetchJson('/api/v1/vouchers', {
+    method: 'POST',
+    body: JSON.stringify(voucherData),
+  });
+}
+
+// 19. Quản lý Hủy vé & Hoàn tiền (Sprint 3 - US08)
+export function getAdminRefunds() {
+  return fetchJson('/api/v1/admin/refunds');
+}
+
+export function approveRefundRequest(id, note = '') {
+  return fetchJson(`/api/v1/admin/refunds/${id}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function rejectRefundRequest(id, note = '') {
+  return fetchJson(`/api/v1/admin/refunds/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ note }),
+  });
+}
+
+export function requestRefundTicket(payload) {
+  return fetchJson('/api/v1/refunds/request', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function checkRefundStatus(refundCode) {
+  return fetchJson(`/api/v1/refunds/status/${refundCode}`);
+}
+
+// 20. Quản lý Phản ánh & Đánh giá Feedbacks (Sprint 3 - US24)
+export function getFeedbacksList() {
+  return fetchJson('/api/v1/feedbacks');
+}
+
+export function updateFeedbackStatus(feedbackId, status) {
+  return fetchJson(`/api/v1/feedbacks/${feedbackId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function submitFeedbackForm(feedbackData) {
+  return fetchJson('/api/v1/feedbacks', {
+    method: 'POST',
+    body: JSON.stringify(feedbackData),
+  });
+}
+
+// 21. Audit Logs - Nhật ký hoạt động kiểm toán (Sprint 3 - US17)
+export function getAuditLogs(limit = 100) {
+  return fetchJson(`/api/v1/admin/audit-logs?limit=${limit}`);
+}

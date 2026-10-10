@@ -16,6 +16,11 @@ def seed_database(connection: sqlite3.Connection) -> None:
     """Repeatable test fixture seed matching unit test expectations."""
     connection.executescript(
         """
+        PRAGMA foreign_keys = OFF;
+        DELETE FROM refunds;
+        DELETE FROM audit_logs;
+        DELETE FROM feedbacks;
+        DELETE FROM notifications;
         DELETE FROM ticket_inspections;
         DELETE FROM demo_tickets;
         DELETE FROM tickets;
@@ -27,6 +32,7 @@ def seed_database(connection: sqlite3.Connection) -> None:
         DELETE FROM monthly_passes;
         DELETE FROM users;
         DELETE FROM sqlite_sequence;
+        PRAGMA foreign_keys = ON;
         """
     )
 
@@ -401,6 +407,64 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             p,
         )
+
+    # 12. Demo Vouchers Phong Phú (Sprint 3 - US18)
+    demo_vouchers = [
+        (1, "WELCOME10", "WELCOME10", "Giảm 10% khách hàng mới", "Ưu đãi chào mừng thành viên mới", "percent", 10.0, 10.0, 0.0, 50000.0, 50000, 1),
+        (2, "VIPBUS20", "VIPBUS20", "Giảm 20% chặng Hồ Chí Minh - Đà Lạt", "Áp dụng cho dòng xe Limousine cao cấp", "percent", 20.0, 20.0, 200000.0, 100000.0, 100000, 1),
+        (3, "HSSV50", "HSSV50", "Giảm 50K cho học sinh sinh viên", "Áp dụng khi đi học, về quê cuối tuần", "fixed", 50000.0, 0.0, 150000.0, 50000.0, 50000, 1),
+        (4, "HE2026", "HE2026", "Kỳ nghỉ vàng hè 2026", "Giảm 15% cho mọi chuyến xe", "percent", 15.0, 15.0, 0.0, 80000.0, 80000, 1),
+    ]
+    for v in demo_vouchers:
+        connection.execute(
+            """INSERT OR IGNORE INTO vouchers (id, code, voucher_code, name, description, discount_type, discount_value, discount_percent, min_order_value, max_discount, max_discount_amount, is_active)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            v,
+        )
+
+    # 13. Demo Audit Logs (Sprint 3 - US17)
+    demo_audit_logs = [
+        (1, 12, "DISPATCH_TRIP", "TRIP", 1, "Admin điều phối xe Limousine 51B-888.99 chạy tuyến HCM - Đà Lạt", "2026-10-09 08:30:00"),
+        (2, 12, "APPROVE_DISCOUNT", "USER_DISCOUNT", 10, "Duyệt hồ sơ thẻ sinh viên ưu đãi HSSV (-20%) cho Nguyễn Văn A", "2026-10-09 09:15:20"),
+        (3, 11, "CHECKIN_TICKET", "TICKET", 1, "Tài xế Trần Văn Tài quét mã QR soát vé thành công tại cửa xe", "2026-10-09 10:00:15"),
+        (4, 12, "CREATE_VOUCHER", "VOUCHER", 2, "Admin phát hành mã ưu đãi VIPBUS20 giảm 20%", "2026-10-09 14:22:45"),
+        (5, 12, "APPROVE_REFUND", "REFUND", 1, "Chấp thuận hoàn tiền 100% cho vé hủy trước 24h", "2026-10-10 16:45:10"),
+    ]
+    for al in demo_audit_logs:
+        connection.execute(
+            """INSERT OR IGNORE INTO audit_logs (id, user_id, action, entity_type, entity_id, details, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            al,
+        )
+
+    # 14. Demo Feedbacks (Sprint 3)
+    demo_feedbacks = [
+        (1, 1, 1, 5, 5, "Dịch vụ", "Xe chạy rất êm, bác tài lái cẩn thận, ghế massage sạch sẽ thơm tho!", "Xe chạy rất êm, bác tài lái cẩn thận, ghế massage sạch sẽ thơm tho!", "APPROVED", "2026-10-08 19:30:00"),
+        (2, 10, 1, 5, 5, "Thái độ phục vụ", "Phụ xe nhiệt tình, hỗ trợ mang hành lý lên xe chu đáo 10/10.", "Phụ xe nhiệt tình, hỗ trợ mang hành lý lên xe chu đáo 10/10.", "APPROVED", "2026-10-09 11:20:00"),
+        (3, 1, 2, 4, 4, "Chung", "Đúng giờ xuất bến, wifi trên xe mượt mà lướt web thoải mái.", "Đúng giờ xuất bến, wifi trên xe mượt mà lướt web thoải mái.", "PENDING", "2026-10-10 15:45:00"),
+    ]
+    for fb in demo_feedbacks:
+        connection.execute(
+            """INSERT OR IGNORE INTO feedbacks (id, user_id, trip_id, rating, rating_stars, category, comment, content, status, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            fb,
+        )
+
+    # 15. Demo Refunds (Sprint 3 - US08)
+    demo_refunds = [
+        (1, 1, 1, 1, "TKT-8892", 1, "Thay đổi kế hoạch cá nhân", 280000.0, 280000.0, "REFUNDED", "Vietcombank", "0123456789", "NGUYEN VAN A", "Đã chuyển khoản hoàn tất", "2026-10-08 10:00:00", "2026-10-08 11:30:00"),
+        (2, 2, 2, 2, "TKT-9901", 10, "Bận lịch thi đột xuất tại trường", 300000.0, 300000.0, "PENDING", "MB Bank", "9876543210", "NGUYEN VAN A", "Chờ kế toán xác nhận ủy nhiệm chi", "2026-10-10 14:15:00", None),
+    ]
+    for rf in demo_refunds:
+        connection.execute(
+            """INSERT OR IGNORE INTO refunds (id, booking_id, payment_id, ticket_id, ticket_code, user_id, reason, requested_amount, approved_amount, status, bank_name, bank_account, account_holder, note, created_at, processed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            rf,
+        )
+
+    # 16. Cập nhật discount_status cho người dùng chờ duyệt (US23)
+    connection.execute("UPDATE users SET discount_status = 'ChoDuyet' WHERE id IN (1, 3)")
+    connection.execute("UPDATE users SET discount_status = 'DaDuyet' WHERE id = 10")
 
     connection.commit()
 

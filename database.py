@@ -270,6 +270,49 @@ CREATE TABLE IF NOT EXISTS notifications (
     status TEXT NOT NULL DEFAULT 'SENT',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 17. ERD: AUDIT_LOGS (Sprint 3 - US17)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER,
+    details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 18. ERD: FEEDBACKS (Sprint 3)
+CREATE TABLE IF NOT EXISTS feedbacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    trip_id INTEGER,
+    rating INTEGER DEFAULT 5,
+    category TEXT DEFAULT 'Chung',
+    comment TEXT,
+    status TEXT DEFAULT 'PENDING',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 19. ERD: REFUNDS (Sprint 3 - US08)
+CREATE TABLE IF NOT EXISTS refunds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    booking_id INTEGER,
+    payment_id INTEGER,
+    ticket_id INTEGER,
+    ticket_code TEXT,
+    user_id INTEGER,
+    reason TEXT,
+    requested_amount REAL DEFAULT 0,
+    approved_amount REAL DEFAULT 0,
+    status TEXT DEFAULT 'PENDING',
+    bank_name TEXT,
+    bank_account TEXT,
+    account_holder TEXT,
+    note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP
+);
 """
 
 import unicodedata
@@ -334,6 +377,53 @@ def initialize_database(connection: sqlite3.Connection) -> None:
         for col_name, col_type in add_pass_cols:
             if col_name not in pass_cols:
                 connection.execute(f"ALTER TABLE monthly_passes ADD COLUMN {col_name} {col_type}")
+    except Exception:
+        pass
+
+    # Check and migrate missing columns in users for existing sqlite databases
+    try:
+        user_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
+                     for row in connection.execute("PRAGMA table_info(users)").fetchall()}
+        if "discount_status" not in user_cols:
+            connection.execute("ALTER TABLE users ADD COLUMN discount_status TEXT DEFAULT 'ChoDuyet'")
+    except Exception:
+        pass
+
+    # Check and migrate missing columns in refunds for existing sqlite databases
+    try:
+        refund_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
+                       for row in connection.execute("PRAGMA table_info(refunds)").fetchall()}
+        add_refund_cols = [
+            ("ticket_code", "TEXT"),
+            ("requested_amount", "REAL DEFAULT 0"),
+            ("approved_amount", "REAL DEFAULT 0"),
+            ("bank_name", "TEXT"),
+            ("bank_account", "TEXT"),
+            ("account_holder", "TEXT"),
+            ("note", "TEXT"),
+            ("processed_at", "TIMESTAMP"),
+        ]
+        for col_name, col_type in add_refund_cols:
+            if col_name not in refund_cols:
+                connection.execute(f"ALTER TABLE refunds ADD COLUMN {col_name} {col_type}")
+    except Exception:
+        pass
+
+    # Check and migrate missing columns in feedbacks for existing sqlite databases
+    try:
+        fb_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
+                   for row in connection.execute("PRAGMA table_info(feedbacks)").fetchall()}
+        add_fb_cols = [
+            ("rating", "INTEGER DEFAULT 5"),
+            ("comment", "TEXT"),
+            ("category", "TEXT DEFAULT 'Chung'"),
+            ("status", "TEXT DEFAULT 'PENDING'"),
+            ("rating_stars", "INTEGER DEFAULT 5"),
+            ("content", "TEXT"),
+        ]
+        for col_name, col_type in add_fb_cols:
+            if col_name not in fb_cols:
+                connection.execute(f"ALTER TABLE feedbacks ADD COLUMN {col_name} {col_type}")
     except Exception:
         pass
 
