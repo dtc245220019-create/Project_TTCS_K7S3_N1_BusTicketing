@@ -249,15 +249,6 @@ CREATE TABLE IF NOT EXISTS incident_reports (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS feedbacks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    trip_id INTEGER NOT NULL REFERENCES trips(id),
-    rating_stars INTEGER NOT NULL DEFAULT 5,
-    content TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 16. ERD: THONG_BAO & NOTIFICATIONS (Sprint 2 - US20)
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -285,11 +276,13 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- 18. ERD: FEEDBACKS (Sprint 3)
 CREATE TABLE IF NOT EXISTS feedbacks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    trip_id INTEGER,
+    user_id INTEGER REFERENCES users(id),
+    trip_id INTEGER REFERENCES trips(id),
     rating INTEGER DEFAULT 5,
+    rating_stars INTEGER DEFAULT 5,
     category TEXT DEFAULT 'Chung',
     comment TEXT,
+    content TEXT,
     status TEXT DEFAULT 'PENDING',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

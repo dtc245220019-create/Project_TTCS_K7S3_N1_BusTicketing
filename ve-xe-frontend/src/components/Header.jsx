@@ -25,7 +25,7 @@ function Header() {
           setNotifications(data);
           setUnreadCount(Math.min(data.length, 3));
         }
-      } catch (e) {
+      } catch (_e) {
         // Fallback demo notifications
         setNotifications([
           {
@@ -67,7 +67,7 @@ function Header() {
   };
 
   const handleActorSwitch = (targetRole) => {
-    let newUser = null;
+    let newUser;
     if (targetRole === 'HanhKhach') {
       newUser = {
         id: 1,

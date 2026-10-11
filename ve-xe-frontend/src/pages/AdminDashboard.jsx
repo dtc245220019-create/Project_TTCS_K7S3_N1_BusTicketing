@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   getCurrentUser,
   setCurrentUser,
@@ -23,12 +23,11 @@ import RefundManagement from '../components/RefundManagement';
 import './AdminDashboard.css';
 
 function AdminDashboard() {
-  const navigate = useNavigate();
   const [currentUser, setUser] = useState(getCurrentUser());
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [trips, setTrips] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   
   // Tab navigation
   const [activeTab, setActiveTab] = useState('users'); 
@@ -43,11 +42,11 @@ function AdminDashboard() {
   const [revenueData, setRevenueData] = useState(null);
   const [occupancyData, setOccupancyData] = useState(null);
   const [revenueGroupBy, setRevenueGroupBy] = useState('month');
-  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [_loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Discounts tab states
   const [pendingDiscounts, setPendingDiscounts] = useState([]);
-  const [loadingDiscounts, setLoadingDiscounts] = useState(false);
+  const [_loadingDiscounts, setLoadingDiscounts] = useState(false);
 
   // Vouchers tab states
   const [vouchers, setVouchers] = useState([]);

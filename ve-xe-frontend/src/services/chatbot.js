@@ -11,7 +11,7 @@ const MODEL = env.VITE_AI_MODEL || (PROVIDER === 'gemini' ? 'gemini-2.5-flash' :
 const BASE_URL = (env.VITE_AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 const MAX_TURNS = 10; // chỉ gửi 10 lượt gần nhất để tiết kiệm token
 
-export const isConfigured = () => Boolean(API_KEY);
+export const isConfigured = () => true;
 
 // Nút hành động bot có thể gắn vào câu trả lời (bot chèn [[TÊN]] ở cuối câu)
 export const ACTIONS = {
@@ -120,9 +120,38 @@ async function callOpenAI(system, turns) {
 export async function askBot(history) {
   const turns = normalize(history);
   if (!turns.length) return '';
-  const routes = await loadRouteContext();
-  const system = routes ? `${KNOWLEDGE}\n\nCác tuyến đang hoạt động (dữ liệu thật từ hệ thống):\n${routes}` : KNOWLEDGE;
-  return PROVIDER === 'openai' ? callOpenAI(system, turns) : callGemini(system, turns);
+
+  // 1. Nếu cấu hình API Key bên ngoài (Gemini/OpenAI), gọi dịch vụ AI đám mây
+  if (API_KEY) {
+    try {
+      const routes = await loadRouteContext();
+      const system = routes ? `${KNOWLEDGE}\n\nCác tuyến đang hoạt động (dữ liệu thật từ hệ thống):\n${routes}` : KNOWLEDGE;
+      return PROVIDER === 'openai' ? await callOpenAI(system, turns) : await callGemini(system, turns);
+    } catch (err) {
+      console.warn('Lỗi gọi AI cloud, tự động chuyển về SmartBus Backend AI:', err);
+    }
+  }
+
+  // 2. Tự động kết nối Backend API (/api/v1/chatbot/chat)
+  try {
+    const lastUserTurn = [...turns].reverse().find((t) => t.role === 'user');
+    const message = lastUserTurn ? lastUserTurn.text : '';
+    const res = await fetchJson('/api/v1/chatbot/chat', {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        conversation: turns,
+      }),
+    });
+    if (res && res.message) {
+      return res.message;
+    }
+  } catch (backendErr) {
+    console.error('Lỗi gọi SmartBus backend chatbot:', backendErr);
+  }
+
+  // 3. Phản hồi dự phòng khi không kết nối được
+  return 'Dạ SmartBus AI xin chào bạn! 👋 Bạn có thể vào mục **Chuyến xe** để xem lịch trình, chọn ghế và đặt vé trực tuyến nhé! [[TRIPS]]';
 }
 
 // Tách mã hành động [[...]] khỏi nội dung

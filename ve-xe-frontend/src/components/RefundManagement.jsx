@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { getAdminRefunds, approveRefundRequest, rejectRefundRequest } from '../api';
 
 function RefundManagement() {
@@ -52,7 +52,7 @@ function RefundManagement() {
       ));
       setFeedback({ text: `Đã ${actionName} thành công cho yêu cầu #${id}!`, type: 'success' });
       setTimeout(() => setFeedback({ text: '', type: 'success' }), 3500);
-    } catch (err) {
+    } catch (_err) {
       // Cập nhật optimistic nếu API offline
       setRefundRequests(prev => prev.map(req => 
         (req.id === id || req.refund_code === id) ? { ...req, status: newStatus } : req
@@ -107,6 +107,11 @@ function RefundManagement() {
         </div>
       )}
 
+      {loading ? (
+        <div style={{ backgroundColor: 'white', padding: '40px', textAlign: 'center', borderRadius: '12px', color: '#64748b' }}>
+          ⏳ Đang tải danh sách hoàn tiền...
+        </div>
+      ) : (
       <div style={{ backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
           <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
@@ -184,6 +189,7 @@ function RefundManagement() {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }

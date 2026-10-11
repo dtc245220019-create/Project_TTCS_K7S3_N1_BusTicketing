@@ -28,15 +28,13 @@ import database
 from database import DATABASE_PATH, get_connection, initialize_database
 from ticket_changes import TicketChangeError, cancel_ticket, change_seat
 from notification import send_email_confirmation, send_sms_confirmation
-from BE1_zalo_vnpay.app.config import (
+from payment_gateway import (
     VNPAY_TMN_CODE,
     VNPAY_HASH_SECRET,
     VNPAY_PAYMENT_URL,
     VNPAY_RETURN_URL,
     ZALOPAY_KEY1,
     ZALOPAY_KEY2,
-)
-from BE1_zalo_vnpay.app.payment_gateway import (
     create_vnpay_payment_url,
     verify_vnpay_signature,
     create_zalopay_mac,
@@ -2364,73 +2362,19 @@ class ChatbotAskRequest(BaseModel):
     conversation: Optional[list] = []
 
 
+from chatbot_engine import process_smart_chat
+
+
 @app.post("/api/v1/chatbot/chat", tags=["Sprint 3 - Chatbot AI"])
 @app.post("/api/v1/chatbot/ask", tags=["Sprint 3 - Chatbot AI"])
 def chatbot_chat_endpoint(req: ChatbotAskRequest):
-    q = (req.message or "").strip().lower()
     with get_connection() as conn:
-        trips = conn.execute(
-            """SELECT trip_code, origin, destination, departure_at, base_price, available_seats, status
-               FROM trips WHERE status != 'CANCELLED' ORDER BY departure_at LIMIT 10"""
-        ).fetchall()
-        trips_data = [dict(t) for t in trips]
-
-        vouchers = conn.execute(
-            """SELECT code, name, description, discount_percent, max_discount
-               FROM vouchers WHERE is_active = 1"""
-        ).fetchall()
-
-        user_tickets = []
-        if req.user_id:
-            user_tickets = conn.execute(
-                """SELECT t.ticket_code, t.seat_id, t.actual_price, t.status, tr.origin, tr.destination, tr.departure_at
-                   FROM tickets t
-                   LEFT JOIN trips tr ON tr.id = t.trip_id
-                   WHERE t.user_id = ? ORDER BY t.id DESC LIMIT 5""",
-                (req.user_id,),
-            ).fetchall()
-
-    actions = []
-    if any(k in q for k in ["chuyến", "xe", "giờ", "lịch", "đà lạt", "hồ chí minh"]):
-        actions.append("TRIPS")
-        lines = ["🚌 **Dưới đây là một số chuyến xe xuất bến gần nhất mà SmartBus đang mở bán:**"]
-        for t in trips_data[:5]:
-            lines.append(f"• **{t['trip_code']}**: {t['origin']} ➔ {t['destination']} | {t['departure_at'][:16]} | Giá: {int(t['base_price']):,}đ (Còn {t['available_seats']} chỗ)")
-        lines.append("\n👉 Bạn có thể vào mục **Chuyến xe** để chọn tầng trên/dưới và giữ ghế ngay nhé! [[TRIPS]]")
-        reply = "\n".join(lines)
-    elif any(k in q for k in ["giảm giá", "voucher", "khuyến mãi", "ưu đãi", "mã", "hssv"]):
-        lines = ["🎁 **Danh sách mã ưu đãi đặc biệt hôm nay:**"]
-        for v in vouchers:
-            lines.append(f"• **{v['code']}**: {v['name']} ({v['description'] or 'Ưu đãi đặt vé'}).")
-        lines.append("• **HSSV (-20%)**: Giảm ngay 20% khi chọn ưu đãi Học sinh - Sinh viên.")
-        lines.append("\n👉 Nhập mã khi thanh toán để được giảm tiền nhé! [[TRIPS]]")
-        reply = "\n".join(lines)
-    elif any(k in q for k in ["vé của tôi", "tra cứu vé", "đã đặt"]):
-        actions.append("TICKETS")
-        if user_tickets:
-            lines = ["🎫 **Vé gần nhất của bạn:**"]
-            for tk in user_tickets:
-                lines.append(f"• Mã: **{tk['ticket_code']}** ({tk['origin']} ➔ {tk['destination']}) - TT: **{tk['status']}**")
-            lines.append("\nXem chi tiết tại mục **Vé của tôi** nhé! [[TICKETS]]")
-            reply = "\n".join(lines)
-        else:
-            reply = "Bạn có thể vào mục **Vé của tôi** trên thanh điều hướng để xem mã QR và in vé bất kỳ lúc nào! [[TICKETS]]"
-    elif any(k in q for k in ["hủy vé", "hoàn tiền", "đổi vé", "trả vé"]):
-        reply = "Chính sách hủy vé & hoàn tiền của SmartBus:\n• Hủy trước 24 giờ: Hoàn tiền **100%** qua tài khoản ngân hàng hoặc ví điện tử.\n• Bạn có thể gửi yêu cầu hủy tại trang **Vé của tôi** hoặc tra cứu tiến độ tại mục **Tra cứu hoàn tiền**. [[FEEDBACK]]"
-        actions.append("FEEDBACK")
-    elif any(k in q for k in ["góp ý", "khiếu nại", "phản ánh", "đánh giá", "thái độ", "sự cố"]):
-        reply = "SmartBus luôn lắng nghe mọi đóng góp của bạn! Vui lòng gửi phản ánh hoặc đánh giá sao chuyến đi tại trang **Gửi phản ánh**. [[FEEDBACK]]"
-        actions.append("FEEDBACK")
-    else:
-        reply = "Dạ SmartBus AI xin chào bạn! 👋\nTôi có thể giúp bạn:\n1. 🔍 **Tra cứu chuyến xe & giá vé** (Hồ Chí Minh, Đà Lạt, Hà Nội...)\n2. 🎁 **Cung cấp mã giảm giá & ưu đãi HSSV**\n3. 🎟️ **Hướng dẫn đặt vé, thanh toán ZaloPay / VNPay**\n4. 🔄 **Chính sách đổi trả, hoàn tiền vé 100%**\n5. 📝 **Gửi phản ánh chất lượng chuyến đi**\n\nBạn cần hỗ trợ thông tin gì ạ? [[TRIPS]]"
-        actions.append("TRIPS")
-
-    return {
-        "success": True,
-        "message": reply,
-        "source": "SmartBus-AI-Assistant",
-        "actions": actions,
-    }
+        return process_smart_chat(
+            message=req.message,
+            conn=conn,
+            user_id=req.user_id,
+            conversation=req.conversation,
+        )
 
 
 if __name__ == "__main__":

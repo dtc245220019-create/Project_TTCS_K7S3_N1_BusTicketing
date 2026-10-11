@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import {
   getCurrentUser,
   setCurrentUser,
@@ -11,7 +11,6 @@ import {
 
 function TicketVerification() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [currentUser, setUser] = useState(getCurrentUser());
   const [activeTab, setActiveTab] = useState('scan'); // 'scan' | 'manifest'
   const [inputCode, setInputCode] = useState('');
@@ -22,7 +21,7 @@ function TicketVerification() {
   // Driver manifest state
   const [driverTrips, setDriverTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState(null);
-  const [manifestLoading, setManifestLoading] = useState(false);
+  const [_manifestLoading, setManifestLoading] = useState(false);
   const [boardFeedback, setBoardFeedback] = useState('');
 
   // Check authorization

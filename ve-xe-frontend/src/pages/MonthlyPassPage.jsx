@@ -7,7 +7,7 @@ function MonthlyPassPage() {
   const [plans, setPlans] = useState([]);
   const [userPasses, setUserPasses] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [pageLoading, setPageLoading] = useState(true);
+  const [_pageLoading, setPageLoading] = useState(true);
 
   // Form states
   const currentUser = getCurrentUser() || { id: 1, full_name: 'Nguyễn Văn A', email: 'customer@smartbus.vn', phone: '0901234567', discount_type: 'HSSV' };
