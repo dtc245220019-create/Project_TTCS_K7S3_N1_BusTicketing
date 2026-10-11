@@ -1480,3 +1480,248 @@ button, .btn {
     padding:7px 9px; 
   } 
 }
+
+.hero-visual {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.85);
+  box-shadow:
+    0 28px 65px rgba(27, 66, 116, .24),
+    0 5px 16px rgba(27, 66, 116, .10);
+}
+
+.smartbus-routes-section {
+  position: relative;
+  background: linear-gradient(
+    145deg,
+    #ffffff 0%,
+    #fafdff 100%
+  );
+  border: 1px solid #dce9f9;
+  border-radius: 26px;
+  box-shadow:
+    0 18px 48px rgba(30, 64, 110, .10),
+    0 3px 10px rgba(30, 64, 110, .05);
+}
+
+@keyframes smartbus-sidebar-in {
+  from {
+    transform: translateX(-18px);
+    opacity: .6;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.sidebar-toggle {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #d6e5f8;
+  border-radius: 12px;
+  background: #f2f7ff;
+  cursor: pointer;
+  transition: background .2s, transform .2s, box-shadow .2s;
+}
+
+.sidebar-toggle:hover { background: #e4f0ff; box-shadow: 0 5px 14px #1d65b51c; transform: translateY(-1px); }
+.sidebar-toggle span { width: 18px; height: 2px; border-radius: 2px; background: #087cff; }
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  border: 0;
+  background: rgba(8, 22, 43, .42);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+
+.smartbus-sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1001;
+  width: min(310px, 86vw);
+  box-sizing: border-box;
+  padding: 22px 16px;
+  overflow-y: auto;
+  background: #fff;
+  border-right: 1px solid #dbe8f8;
+  box-shadow: 18px 0 48px rgba(5, 25, 54, .18);
+  animation: smartbus-sidebar-in .22s ease-out;
+}
+
+/* ===== Inner pages: hamburger + slide-in vertical navigation ( siderbar) ===== */
+@keyframes smartbus-sidebar-in { from { transform: translateX(-18px); opacity: .6; } to { transform: translateX(0); opacity: 1; } }
+.sidebar-heading { 
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+  padding: 6px 4px 22px; 
+  border-bottom: 1px solid #edf2f9; 
+}
+
+.sidebar-bus-icon { 
+  display: grid; 
+  place-items: center; 
+  width: 44px; 
+  height: 44px; 
+  border-radius: 13px; 
+  color: white; 
+  background: linear-gradient(135deg, #087cff, #39a2ff); 
+  font-size: 23px; 
+  box-shadow: 0 6px 16px #087cff30; 
+}
+
+.sidebar-heading strong { 
+  display: block; 
+  color: #102344; 
+  font-size: 17px; 
+}
+
+.sidebar-heading small { 
+  display: block; 
+  margin-top: 3px; 
+  color: #71819a; 
+  font-size: 10px; 
+  letter-spacing: .6px; 
+  text-transform: uppercase; 
+}
+
+.sidebar-close { 
+  margin-left: auto; 
+  width: 32px; 
+  height: 32px; 
+  border: 0; 
+  border-radius: 9px; 
+  background: #f0f6ff; 
+  color: #38516f; 
+  font-size: 23px; 
+  cursor: pointer;
+ }
+
+.sidebar-section-label { 
+  margin: 22px 10px 10px; 
+  color: #8a9ab1; 
+  font-size: 10px; 
+  font-weight: 800; 
+  letter-spacing: 1.1px; 
+}
+
+.smartbus-sidebar .sidebar-link { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+  margin: 4px 0; 
+  padding: 12px 11px; 
+  border: 1px solid transparent; 
+  border-radius: 11px; 
+  color: #41536e; 
+  text-decoration: none; 
+  font-size: 13px; 
+  font-weight: 650; 
+  transition: background .18s, color .18s, border-color .18s; 
+}
+
+.smartbus-sidebar .sidebar-link:hover .smartbus-sidebar .sidebar-link.active { 
+  color: #0873ed; 
+  background: #edf6ff; 
+  border-color: #d9eaff; 
+}
+
+.sidebar-link-icon { 
+  display: grid; 
+  place-items: center; 
+  width: 30px; 
+  height: 30px; 
+  flex: 0 0 30px; 
+  border-radius: 9px; 
+  background: #f2f7ff; 
+  font-size: 16px; 
+}
+
+.sidebar-link.active .sidebar-link-icon { background: #dcecff; }
+
+.sidebar-chevron { 
+  margin-left: auto; 
+  color: #9aabc1; 
+  font-size: 20px; 
+}
+
+.sidebar-help-card { 
+  margin-top: 24px; 
+  padding: 16px; 
+  border: 1px solid #dceaff; 
+  border-radius: 14px; 
+  background: linear-gradient(140deg, #f1f7ff, #e6f2ff); 
+}
+
+.sidebar-help-card strong { 
+  color: #17395f; 
+  font-size: 12px; 
+}
+
+.sidebar-help-card p { 
+  margin: 6px 0 0; 
+  color: #627792; 
+  font-size: 11px; 
+  line-height: 1.6; 
+}
+
+@media (max-width: 640px) {
+  .smartbus-routes-section { 
+    margin: 32px 14px !important; 
+    padding: 24px 14px !important; 
+    border-radius: 20px; 
+  }
+
+  .navbar-inner-page { 
+    gap: 10px; 
+    padding: 10px 12px !important; 
+  }
+
+  .navbar-inner-page .logo span:last-child { font-size: 15px !important; }
+
+  .navbar-inner-page .auth-buttons { gap: 5px !important; }
+
+  .navbar-inner-page .auth-buttons select .navbar-inner-page .auth-buttons > div > span { display: none; }
+}
+
+.navbar-inner-page { backdrop-filter: none !important; }
+
+.nav-links-hidden-inner {
+  display: none !important;
+}
+
+/* Giữ nút menu và thương hiệu ở cạnh trái */
+.header-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* Logo và tên website nằm cùng hàng */
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Không cho tên website biến mất khi ẩn menu ngang */
+.brand-name {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 800;
+  font-size: 20px;
+}
+

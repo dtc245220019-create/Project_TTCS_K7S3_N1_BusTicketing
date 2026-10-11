@@ -134,9 +134,8 @@ function HomePage() {
       <div className="home-search-wrap"><SearchForm /></div>
 
 
-
       {/* CÁC ĐỊA ĐIỂM & CHẶNG ĐI HẤP DẪN (KÈM HÌNH ẢNH SỐNG ĐỘNG) */}
-      <section style={{ maxWidth: '1240px', margin: '48px auto', padding: '0 24px' }}>
+      <section className="smartbus-routes-section" style={{ maxWidth: '1240px', margin: '48px auto', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <span style={{ color: '#2563eb', fontWeight: '800', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase' }}>
