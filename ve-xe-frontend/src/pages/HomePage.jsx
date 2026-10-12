@@ -110,87 +110,32 @@ function HomePage() {
   );
 
   return (
-    <div>
-      <SearchForm />
-
-      {/* Banner Khám Phá Bản Đồ GPS Thông Minh */}
-      <section style={{ maxWidth: '1240px', margin: '36px auto', padding: '0 24px' }}>
-        <div
-          style={{
-            background: 'linear-gradient(135deg, #0b1329 0%, #1e3a8a 60%, #2563eb 100%)',
-            borderRadius: '20px',
-            padding: '32px 40px',
-            color: 'white',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.15)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            flexWrap: 'wrap',
-            gap: '24px',
-            position: 'relative',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{ maxWidth: '680px', zIndex: 1 }}>
-            <span
-              style={{
-                backgroundColor: 'rgba(255, 255, 255, 0.16)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '5px 14px',
-                borderRadius: '20px',
-                fontSize: '12px',
-                fontWeight: '800',
-                letterSpacing: '0.5px',
-                display: 'inline-block',
-                marginBottom: '12px',
-              }}
-            >
-              🌟 BẢN ĐỒ TƯƠNG TÁC THỜI GIAN THỰC
-            </span>
-            <h2 style={{ fontSize: '26px', fontWeight: '800', margin: '0 0 10px 0', letterSpacing: '-0.5px' }}>
-              Xem Lộ Trình & Toàn Bộ Trạm Dừng Xe Buýt Thông Minh
-            </h2>
-            <p style={{ margin: 0, opacity: 0.9, fontSize: '15px', lineHeight: '1.6', color: '#e2e8f0' }}>
-              Tra cứu tọa độ GPS chính xác của từng trạm đón/trả khách (TRAM_DUNG), khoảng cách chặng (CHI_TIET_TUYEN_TRAM) và theo dõi trực quan vị trí xe khách đang lưu thông trên bản đồ OpenStreetMap.
-            </p>
+    <div className="smartbus-home">
+      <section className="smartbus-hero">
+        <div className="hero-inner">
+          <div className="hero-copy">
+            <span className="hero-eyebrow">✧ &nbsp; Hành trình xanh. Trải nghiệm thông minh.</span>
+            <h1>Đi xe buýt<br />dễ dàng hơn<br />cùng <span>SmartBus.</span></h1>
+            <p>Đặt vé trực tuyến, lên xe bằng QR và theo dõi hành trình.<br className="desktop-break" /> Một trải nghiệm liền mạch, từ điểm đi đến điểm đến.</p>
+            <div className="hero-actions">
+              <button className="hero-primary" onClick={() => navigate('/buses')}>Tra cứu chuyến xe <span>→</span></button>
+              <button className="hero-secondary" onClick={() => navigate('/map')}>Theo dõi xe <span>→</span></button>
+            </div>
+            <div className="hero-benefits"><span>✓ &nbsp;Dễ sử dụng</span><span>✓ &nbsp;Vé điện tử tiện lợi</span><span>✓ &nbsp;Thông tin rõ ràng</span></div>
           </div>
-
-          <div style={{ zIndex: 1 }}>
-            <button
-              onClick={() => navigate('/map')}
-              style={{
-                backgroundColor: '#f59e0b',
-                color: '#0f172a',
-                border: '1px solid #fbbf24',
-                fontWeight: '800',
-                padding: '14px 28px',
-                borderRadius: '12px',
-                fontSize: '15px',
-                cursor: 'pointer',
-                boxShadow: '0 6px 18px rgba(245, 158, 11, 0.35)',
-                transition: 'all 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#fbbf24';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = '#f59e0b';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}
-            >
-              <span style={{ fontSize: '18px' }}>🗺️</span> Khám Phá Bản Đồ Ngay
-            </button>
+          <div className="hero-visual">
+            <div className="visual-label">01 - SMARTBUS</div>
+            <div className="bus-status"><span className="status-pulse"/><div><strong>Xe đến trong 5 phút</strong><small>Mô phỏng theo dõi tuyến 01</small></div></div>
+            <div className="bus-code">20A-123.45</div>
+            <div className="ticket-float"><span className="ticket-icon">▦</span><div><strong>Vé của bạn đã sẵn sàng</strong><small>Quét QR và lên xe thật dễ dàng</small></div><span className="demo-tag">Demo ✓</span></div>
           </div>
         </div>
       </section>
+      <div className="home-search-wrap"><SearchForm /></div>
+
 
       {/* CÁC ĐỊA ĐIỂM & CHẶNG ĐI HẤP DẪN (KÈM HÌNH ẢNH SỐNG ĐỘNG) */}
-      <section style={{ maxWidth: '1240px', margin: '48px auto', padding: '0 24px' }}>
+      <section className="smartbus-routes-section" style={{ maxWidth: '1240px', margin: '48px auto', padding: '0 24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <span style={{ color: '#2563eb', fontWeight: '800', fontSize: '13px', letterSpacing: '1px', textTransform: 'uppercase' }}>
@@ -399,25 +344,6 @@ function HomePage() {
               </div>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* 8 User Story Features Overview */}
-      <section className="features" style={{ maxWidth: '1240px', margin: '60px auto 40px auto', padding: '0 24px' }}>
-        <div className="feature-item" style={{ textAlign: 'left', padding: '26px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '10px' }}>⚡</div>
-          <h4>US01-US03: Giữ Ghế Tự Động</h4>
-          <p>Sơ đồ 2 tầng trực quan dãy A và B, tự động giữ chỗ 10 phút kèm đồng hồ đếm ngược và Cronjob giải phóng ghế hết hạn.</p>
-        </div>
-        <div className="feature-item" style={{ textAlign: 'left', padding: '26px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '10px' }}>💳</div>
-          <h4>US05-US06: Thanh Toán & Vé QR</h4>
-          <p>Cổng Sandbox tức thì MoMo, VNPay QR, ZaloPay, Thẻ ATM. Sinh vé điện tử thông minh và mã QR động bảo mật.</p>
-        </div>
-        <div className="feature-item" style={{ textAlign: 'left', padding: '26px' }}>
-          <div style={{ fontSize: '32px', marginBottom: '10px' }}>🛡️</div>
-          <h4>US07-US08: Quản Lý & Soát Vé</h4>
-          <p>Hành khách quản lý và hủy vé trực tuyến trước 24h. Tài xế quét mã QR đối soát thời gian thực chống vé trùng lặp/vé giả.</p>
         </div>
       </section>
     </div>
