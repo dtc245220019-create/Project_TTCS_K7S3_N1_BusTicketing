@@ -192,32 +192,50 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
     # Cập nhật alias staff@example.com cho user 2 nếu cần
     connection.execute("INSERT OR IGNORE INTO users (id, full_name, email, phone, role, password_hash) VALUES (200, 'Trần Thị B (Staff)', 'staff@example.com', '0907654322', 'PhuXe', '123456')")
 
-    # 6. Additional Trips for Demo (Đặc biệt 8 chuyến TP. Hồ Chí Minh -> Đà Lạt)
-    today = datetime.now().strftime("%Y-%m-%d")
-    tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    # 6. Additional Trips for Demo (Đặc biệt các chuyến TP. Hồ Chí Minh -> Đà Lạt)
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Tạo giờ xuất bến linh hoạt theo giờ thực tế để các chuyến trong ngày luôn sẵn sàng đặt vé
+    t_past = (now - timedelta(hours=2, minutes=30)).strftime("%Y-%m-%d %H:%M")
+    t_past_arr = (now + timedelta(hours=4)).strftime("%Y-%m-%d %H:%M")
+
+    t1_dep = (now + timedelta(hours=1, minutes=15)).strftime("%Y-%m-%d %H:%M")
+    t1_arr = (now + timedelta(hours=7, minutes=45)).strftime("%Y-%m-%d %H:%M")
+
+    t2_dep = (now + timedelta(hours=3, minutes=0)).strftime("%Y-%m-%d %H:%M")
+    t2_arr = (now + timedelta(hours=9, minutes=30)).strftime("%Y-%m-%d %H:%M")
+
+    t3_dep = (now + timedelta(hours=5, minutes=30)).strftime("%Y-%m-%d %H:%M")
+    t3_arr = (now + timedelta(hours=12)).strftime("%Y-%m-%d %H:%M")
+
+    t4_dep = (now + timedelta(hours=8)).strftime("%Y-%m-%d %H:%M")
+    t4_arr = (now + timedelta(hours=14, minutes=30)).strftime("%Y-%m-%d %H:%M")
 
     demo_trips = [
-        # 8 Chuyến Hồ Chí Minh -> Đà Lạt trải đều các khung giờ trong ngày
-        (10, "TRIP-HCM-DL-01", "Hồ Chí Minh", "Đà Lạt", f"{today} 06:00", f"{today} 12:30", 350000, "SCHEDULED", 1, 1, 11, 22),
-        (11, "TRIP-HCM-DL-02", "Hồ Chí Minh", "Đà Lạt", f"{today} 08:00", f"{today} 14:30", 280000, "SCHEDULED", 2, 1, 11, 36),
-        (12, "TRIP-HCM-DL-03", "Hồ Chí Minh", "Đà Lạt", f"{today} 10:15", f"{today} 16:45", 380000, "SCHEDULED", 4, 1, 11, 16),
-        (13, "TRIP-HCM-DL-04", "Hồ Chí Minh", "Đà Lạt", f"{today} 13:00", f"{today} 19:30", 300000, "SCHEDULED", 2, 1, 11, 36),
-        (14, "TRIP-HCM-DL-05", "Hồ Chí Minh", "Đà Lạt", f"{today} 15:30", f"{today} 22:00", 350000, "SCHEDULED", 1, 1, 11, 22),
-        (15, "TRIP-HCM-DL-06", "Hồ Chí Minh", "Đà Lạt", f"{today} 18:00", f"{tomorrow} 00:30", 320000, "SCHEDULED", 2, 1, 11, 36),
-        (16, "TRIP-HCM-DL-07", "Hồ Chí Minh", "Đà Lạt", f"{today} 21:00", f"{tomorrow} 04:30", 420000, "SCHEDULED", 1, 1, 11, 22),
-        (17, "TRIP-HCM-DL-08", "Hồ Chí Minh", "Đà Lạt", f"{today} 23:30", f"{tomorrow} 06:00", 300000, "SCHEDULED", 2, 1, 11, 36),
-        (18, "TRIP-HCM-DL-TOMORROW", "Hồ Chí Minh", "Đà Lạt", f"{tomorrow} 08:30", f"{tomorrow} 15:00", 350000, "SCHEDULED", 1, 1, 11, 22),
+        # Chuyến quá khứ (để kiểm tra hành vi chặn đặt vé quá giờ)
+        (10, "TRIP-HCM-DL-01-PAST", "Hồ Chí Minh", "Đà Lạt", t_past, t_past_arr, 350000, "DEPARTED", 1, 1, 11, 2, 0),
+        # Các chuyến trong ngày hôm nay ở tương lai
+        (11, "TRIP-HCM-DL-02", "Hồ Chí Minh", "Đà Lạt", t1_dep, t1_arr, 280000, "SCHEDULED", 2, 1, 11, 2, 36),
+        (12, "TRIP-HCM-DL-03", "Hồ Chí Minh", "Đà Lạt", t2_dep, t2_arr, 380000, "SCHEDULED", 4, 1, 11, 2, 16),
+        (13, "TRIP-HCM-DL-04", "Hồ Chí Minh", "Đà Lạt", t3_dep, t3_arr, 300000, "SCHEDULED", 2, 1, 11, 2, 36),
+        (14, "TRIP-HCM-DL-05", "Hồ Chí Minh", "Đà Lạt", t4_dep, t4_arr, 350000, "SCHEDULED", 1, 1, 11, 2, 22),
+        (15, "TRIP-HCM-DL-06", "Hồ Chí Minh", "Đà Lạt", f"{tomorrow} 06:00", f"{tomorrow} 12:30", 320000, "SCHEDULED", 2, 1, 11, 2, 36),
+        (16, "TRIP-HCM-DL-07", "Hồ Chí Minh", "Đà Lạt", f"{tomorrow} 13:00", f"{tomorrow} 19:30", 420000, "SCHEDULED", 1, 1, 11, 2, 22),
+        (17, "TRIP-HCM-DL-08", "Hồ Chí Minh", "Đà Lạt", f"{tomorrow} 20:00", f"{tomorrow} 02:30", 300000, "SCHEDULED", 2, 1, 11, 2, 36),
+        (18, "TRIP-HCM-DL-TOMORROW", "Hồ Chí Minh", "Đà Lạt", f"{tomorrow} 08:30", f"{tomorrow} 15:00", 350000, "SCHEDULED", 1, 1, 11, 2, 22),
         # Tuyến Hà Nội -> Thái Nguyên
-        (20, "TRIP-HN-TN-01", "Hà Nội", "Thái Nguyên", f"{today} 07:30", f"{today} 09:30", 120000, "SCHEDULED", 3, 2, 11, 29),
-        (21, "TRIP-HN-TN-02", "Hà Nội", "Thái Nguyên", f"{today} 14:00", f"{today} 16:00", 120000, "SCHEDULED", 3, 2, 11, 29),
+        (20, "TRIP-HN-TN-01", "Hà Nội", "Thái Nguyên", t1_dep, t1_arr, 120000, "SCHEDULED", 3, 2, 11, 2, 29),
+        (21, "TRIP-HN-TN-02", "Hà Nội", "Thái Nguyên", t3_dep, t3_arr, 120000, "SCHEDULED", 3, 2, 11, 2, 29),
         # Tuyến Đà Nẵng -> Huế
-        (30, "TRIP-DN-HUE-01", "Đà Nẵng", "Huế", f"{today} 09:00", f"{today} 11:30", 150000, "SCHEDULED", 4, 3, 11, 16),
+        (30, "TRIP-DN-HUE-01", "Đà Nẵng", "Huế", t2_dep, t2_arr, 150000, "SCHEDULED", 4, 3, 11, 2, 16),
     ]
 
     for t in demo_trips:
         connection.execute(
-            """INSERT OR REPLACE INTO trips (id, trip_code, origin, destination, departure_at, arrival_at, base_price, status, bus_id, route_id, driver_id, available_seats)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT OR REPLACE INTO trips (id, trip_code, origin, destination, departure_at, arrival_at, base_price, status, bus_id, route_id, driver_id, staff_id, available_seats)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             t,
         )
         trip_id = t[0]

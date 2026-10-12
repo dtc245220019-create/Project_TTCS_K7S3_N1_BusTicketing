@@ -358,3 +358,41 @@ export function submitFeedbackForm(feedbackData) {
 export function getAuditLogs(limit = 100) {
   return fetchJson(`/api/v1/admin/audit-logs?limit=${limit}`);
 }
+
+// 22. Quản lý Tuyến xe & Nhân sự Điều phối (Admin Operations)
+export function createAdminRoute(payload) {
+  return fetchJson('/api/v1/admin/routes', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getAdminRoutes() {
+  return fetchJson('/api/v1/admin/routes');
+}
+
+export function createAdminStaff(payload) {
+  return fetchJson('/api/v1/admin/staff', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getAdminStaff() {
+  return fetchJson('/api/v1/admin/staff');
+}
+
+export function createAdminTrip(payload) {
+  return fetchJson('/api/v1/admin/trips', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function assignTripStaff(tripId, payload) {
+  return fetchJson(`/api/v1/admin/trips/${tripId}/assign`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+

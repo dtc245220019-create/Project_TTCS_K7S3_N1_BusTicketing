@@ -247,18 +247,19 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
   }, []);
 
   // Kiểm tra chuyến xe đã khởi hành trong quá khứ chưa
-  const isPastDeparture = (timeStr) => {
-    if (!timeStr) return false;
+  const isPastDeparture = (timeStr, depAt) => {
+    const raw = depAt || timeStr;
+    if (!raw) return false;
     try {
-      const matchIso = timeStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+      const matchIso = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
       if (matchIso) {
-        const timePart = timeStr.match(/(\d{2}):(\d{2})/)?.[0] || '23:59';
+        const timePart = raw.match(/(\d{2}):(\d{2})/)?.[0] || '23:59';
         const d = new Date(`${matchIso[0]}T${timePart}:00`);
         return d < new Date();
       }
-      const matchVn = timeStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      const matchVn = raw.match(/(\d{2})\/(\d{2})\/(\d{4})/);
       if (matchVn) {
-        const timePart = timeStr.match(/(\d{2}):(\d{2})/)?.[0] || '23:59';
+        const timePart = raw.match(/(\d{2}):(\d{2})/)?.[0] || '23:59';
         const d = new Date(`${matchVn[3]}-${matchVn[2]}-${matchVn[1]}T${timePart}:00`);
         return d < new Date();
       }
@@ -269,21 +270,23 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
   };
 
   // Phân loại chính xác Vé sắp khởi hành và Lịch sử chuyến đi quá khứ
-  const upcomingTickets = tickets.filter(
-    (t) =>
-      (t.status === 'CONFIRMED' || t.status === 'PAID' || t.status === 'GiuCho') &&
-      !t.is_past &&
-      !isPastDeparture(t.departureTime || t.departure_time)
-  );
+  const upcomingTickets = tickets.filter((t) => {
+    const isConfirmedStatus = ['CONFIRMED', 'PAID', 'GiuCho', 'DaThanhToan'].includes(t.status);
+    const isUsedOrCancelled = ['COMPLETED', 'USED', 'DaSoat', 'CANCELLED', 'DaHuy'].includes(t.status);
+    if (isUsedOrCancelled) return false;
+    if (!isConfirmedStatus) return false;
 
-  const historyTickets = tickets.filter(
-    (t) =>
-      t.status === 'COMPLETED' ||
-      t.status === 'USED' ||
-      t.status === 'DaSoat' ||
-      Boolean(t.is_past) ||
-      isPastDeparture(t.departureTime || t.departure_time)
-  );
+    // Kiểm tra giờ xuất bến thực tế
+    const past = isPastDeparture(t.departureTime || t.departure_time, t.departure_at);
+    return !past;
+  });
+
+  const historyTickets = tickets.filter((t) => {
+    const isUsedOrCompleted = ['COMPLETED', 'USED', 'DaSoat'].includes(t.status);
+    const isConfirmed = ['CONFIRMED', 'PAID', 'GiuCho', 'DaThanhToan'].includes(t.status);
+    const past = isPastDeparture(t.departureTime || t.departure_time, t.departure_at);
+    return isUsedOrCompleted || (isConfirmed && past) || (Boolean(t.is_past) && isUsedOrCompleted);
+  });
 
   // =========================================================================
   // XỬ LÝ ĐỔI VÉ (EXCHANGE TICKET)

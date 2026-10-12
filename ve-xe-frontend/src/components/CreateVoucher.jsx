@@ -28,6 +28,13 @@ function CreateVoucher({ onClose, onCreated }) {
     setIsLoading(true);
     setMessage('');
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (formData.expiryDate && formData.expiryDate < todayStr) {
+      setIsLoading(false);
+      setMessage('❌ Ngày hết hạn không thể ở trong quá khứ! Vui lòng chọn từ hôm nay trở đi.');
+      return;
+    }
+
     try {
       const payload = {
         code: formData.code.trim().toUpperCase(),
@@ -120,7 +127,15 @@ function CreateVoucher({ onClose, onCreated }) {
           {/* Hàng 4: Thời hạn */}
           <div>
             <label style={labelStyle}>Ngày hết hạn</label>
-            <input name="expiryDate" type="date" value={formData.expiryDate} onChange={handleChange} required style={inputStyle} />
+            <input
+              name="expiryDate"
+              type="date"
+              min={new Date().toISOString().split('T')[0]}
+              value={formData.expiryDate}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            />
           </div>
 
           {/* Thông báo kết quả */}

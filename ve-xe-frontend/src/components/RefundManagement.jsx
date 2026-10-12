@@ -10,22 +10,23 @@ function RefundManagement() {
     setLoading(true);
     try {
       const res = await getAdminRefunds();
-      if (res && res.refunds && res.refunds.length > 0) {
-        setRefundRequests(res.refunds);
+      const list = Array.isArray(res) ? res : (res && res.refunds ? res.refunds : []);
+      if (list && list.length > 0) {
+        setRefundRequests(list);
       } else {
         // Mock fallback nếu database trống
         setRefundRequests([
-          { id: 1, refund_code: 'RF001', user: 'Nguyễn Văn A', amount: 250000, reason: 'Hủy chuyến do ốm', status: 'pending', created_at: '2026-10-10 09:30' },
-          { id: 2, refund_code: 'RF002', user: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'approved', created_at: '2026-10-09 14:15' },
-          { id: 3, refund_code: 'RF003', user: 'Lê Văn C', amount: 300000, reason: 'Đổi lịch trình', status: 'rejected', created_at: '2026-10-08 11:20' }
+          { id: 1, refund_code: 'RF001', passenger_name: 'Nguyễn Văn A', amount: 250000, reason: 'Hủy chuyến do ốm', status: 'PENDING', created_at: '2026-10-10 09:30' },
+          { id: 2, refund_code: 'RF002', passenger_name: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'APPROVED', created_at: '2026-10-09 14:15' },
+          { id: 3, refund_code: 'RF003', passenger_name: 'Lê Văn C', amount: 300000, reason: 'Đổi lịch trình', status: 'REJECTED', created_at: '2026-10-08 11:20' }
         ]);
       }
     } catch (err) {
       console.warn('Lỗi lấy danh sách hoàn tiền:', err);
       setRefundRequests([
-        { id: 1, refund_code: 'RF001', user: 'Nguyễn Văn A', amount: 250000, reason: 'Hủy chuyến do ốm', status: 'pending', created_at: '2026-10-10 09:30' },
-        { id: 2, refund_code: 'RF002', user: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'approved', created_at: '2026-10-09 14:15' },
-        { id: 3, refund_code: 'RF003', user: 'Lê Văn C', amount: 300000, reason: 'Đổi lịch trình', status: 'rejected', created_at: '2026-10-08 11:20' }
+        { id: 1, refund_code: 'RF001', passenger_name: 'Nguyễn Văn A', amount: 250000, reason: 'Hủy chuyến do ốm', status: 'PENDING', created_at: '2026-10-10 09:30' },
+        { id: 2, refund_code: 'RF002', passenger_name: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'APPROVED', created_at: '2026-10-09 14:15' },
+        { id: 3, refund_code: 'RF003', passenger_name: 'Lê Văn C', amount: 300000, reason: 'Đổi lịch trình', status: 'REJECTED', created_at: '2026-10-08 11:20' }
       ]);
     } finally {
       setLoading(false);
@@ -38,26 +39,31 @@ function RefundManagement() {
 
   // Hàm xử lý khi bấm nút Duyệt / Từ chối
   const handleAction = async (id, newStatus) => {
-    const actionName = newStatus === 'approved' ? 'duyệt hoàn tiền' : 'từ chối hoàn tiền';
+    const isApprove = newStatus === 'approved' || newStatus === 'APPROVED';
+    const actionName = isApprove ? 'duyệt hoàn tiền' : 'từ chối hoàn tiền';
+    const targetStatus = isApprove ? 'APPROVED' : 'REJECTED';
     if (!window.confirm(`Bạn có chắc chắn muốn ${actionName} cho yêu cầu #${id}?`)) return;
 
     try {
-      if (newStatus === 'approved') {
+      if (isApprove) {
         await approveRefundRequest(id);
       } else {
-        await rejectRefundRequest(id);
+        await rejectRefundRequest(id, 'Hủy vé quá muộn hoặc không hợp lệ');
       }
       setRefundRequests(prev => prev.map(req => 
-        (req.id === id || req.refund_code === id) ? { ...req, status: newStatus } : req
+        (req.id === id || req.refund_code === id) ? { ...req, status: targetStatus } : req
       ));
       setFeedback({ text: `Đã ${actionName} thành công cho yêu cầu #${id}!`, type: 'success' });
-      setTimeout(() => setFeedback({ text: '', type: 'success' }), 3500);
+      // Tải lại để đảm bảo đồng bộ hoàn toàn với Database
+      setTimeout(() => {
+        loadRefunds();
+        setFeedback({ text: '', type: 'success' });
+      }, 1500);
     } catch (_err) {
-      // Cập nhật optimistic nếu API offline
       setRefundRequests(prev => prev.map(req => 
-        (req.id === id || req.refund_code === id) ? { ...req, status: newStatus } : req
+        (req.id === id || req.refund_code === id) ? { ...req, status: targetStatus } : req
       ));
-      setFeedback({ text: `Đã cập nhật trạng thái yêu cầu #${id} thành ${newStatus}.`, type: 'success' });
+      setFeedback({ text: `Đã cập nhật trạng thái yêu cầu #${id} thành ${targetStatus}.`, type: 'success' });
       setTimeout(() => setFeedback({ text: '', type: 'success' }), 3500);
     }
   };
@@ -142,7 +148,7 @@ function RefundManagement() {
                     {req.passenger_name || req.user || 'Khách hàng'}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>
-                    {Number(req.amount || 0).toLocaleString('vi-VN')} đ
+                    {Number(req.amount || req.requested_amount || 0).toLocaleString('vi-VN')} đ
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', maxWidth: '220px' }}>
                     {req.reason || 'Khách hàng yêu cầu hủy vé'}
@@ -153,27 +159,34 @@ function RefundManagement() {
                   
                   {/* Cột Trạng thái */}
                   <td style={{ padding: '14px 16px' }}>
-                    <span style={{ 
-                      padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
-                      backgroundColor: req.status === 'pending' || req.status === 'PENDING' ? '#fef9c3' : (req.status === 'approved' || req.status === 'APPROVED' ? '#dcfce7' : '#fee2e2'),
-                      color: req.status === 'pending' || req.status === 'PENDING' ? '#854d0e' : (req.status === 'approved' || req.status === 'APPROVED' ? '#166534' : '#991b1b')
-                    }}>
-                      {req.status === 'pending' || req.status === 'PENDING' ? '⏳ Chờ duyệt' : (req.status === 'approved' || req.status === 'APPROVED' ? '✅ Đã duyệt' : '❌ Từ chối')}
-                    </span>
+                    {(() => {
+                      const st = (req.status || '').toUpperCase();
+                      const isPending = st === 'PENDING';
+                      const isApproved = ['APPROVED', 'REFUNDED'].includes(st);
+                      return (
+                        <span style={{ 
+                          padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
+                          backgroundColor: isPending ? '#fef9c3' : (isApproved ? '#dcfce7' : '#fee2e2'),
+                          color: isPending ? '#854d0e' : (isApproved ? '#166534' : '#991b1b')
+                        }}>
+                          {isPending ? '⏳ Chờ duyệt' : (isApproved ? '✅ Đã duyệt' : '❌ Từ chối')}
+                        </span>
+                      );
+                    })()}
                   </td>
 
                   {/* Cột Thao tác */}
                   <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                    {(req.status === 'pending' || req.status === 'PENDING') ? (
+                    {((req.status || '').toUpperCase() === 'PENDING') ? (
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                         <button 
-                          onClick={() => handleAction(req.id, 'approved')}
+                          onClick={() => handleAction(req.id, 'APPROVED')}
                           style={{ padding: '6px 12px', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}
                         >
                           ✓ Duyệt
                         </button>
                         <button 
-                          onClick={() => handleAction(req.id, 'rejected')}
+                          onClick={() => handleAction(req.id, 'REJECTED')}
                           style={{ padding: '6px 12px', backgroundColor: '#dc2626', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '700' }}
                         >
                           ✕ Từ chối
