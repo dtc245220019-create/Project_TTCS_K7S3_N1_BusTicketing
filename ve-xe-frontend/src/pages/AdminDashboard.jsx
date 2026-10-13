@@ -226,9 +226,8 @@ function AdminDashboard() {
   const loadVouchers = async () => {
     try {
       const res = await getVouchers();
-      if (res && res.vouchers) {
-        setVouchers(res.vouchers);
-      }
+      const list = Array.isArray(res) ? res : (res?.vouchers || []);
+      setVouchers(list);
     } catch (e) {
       console.warn('Lỗi tải danh sách vouchers:', e);
     }

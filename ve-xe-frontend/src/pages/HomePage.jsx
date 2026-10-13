@@ -1,10 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SearchForm from '../components/SearchForm';
+import { getRoutes } from '../api';
 
 function HomePage() {
   const navigate = useNavigate();
   const [filterRegion, setFilterRegion] = useState('ALL');
+  const [extraRoutes, setExtraRoutes] = useState([]);
+
+  useEffect(() => {
+    getRoutes()
+      .then((serverRoutes) => {
+        if (Array.isArray(serverRoutes)) {
+          const newRoutes = serverRoutes
+            .filter(
+              (sr) =>
+                !destinationRoutes.some(
+                  (dr) =>
+                    (dr.from?.toLowerCase() === sr.departure_city?.toLowerCase() &&
+                      dr.to?.toLowerCase() === sr.arrival_city?.toLowerCase()) ||
+                    dr.name?.toLowerCase().includes((sr.name || '').toLowerCase())
+                )
+            )
+            .map((sr) => ({
+              id: 1000 + sr.id,
+              name: sr.name || `${sr.departure_city} — ${sr.arrival_city}`,
+              region: 'SOUTH',
+              from: sr.departure_city,
+              to: sr.arrival_city,
+              price: `${Number(sr.base_price || 200000).toLocaleString('vi-VN')} VNĐ`,
+              duration: '4 tiếng',
+              distance: `${sr.distance_km || 120} km`,
+              tripsPerDay: 8,
+              busType: 'Limousine VIP cao cấp',
+              badge: '✨ TUYẾN MỚI MỞ',
+              badgeColor: '#10b981',
+              image:
+                'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?w=800&auto=format&fit=crop&q=80',
+              description: `Hành trình kết nối ${sr.departure_city} và ${sr.arrival_city} chất lượng cao do Ban quản trị vừa cập nhật.`,
+            }));
+          setExtraRoutes(newRoutes);
+        }
+      })
+      .catch((err) => console.warn('Lỗi tải tuyến đường mới:', err));
+  }, []);
 
   const destinationRoutes = [
     {
@@ -105,7 +144,8 @@ function HomePage() {
     },
   ];
 
-  const filteredRoutes = destinationRoutes.filter(
+  const allRoutes = [...destinationRoutes, ...extraRoutes];
+  const filteredRoutes = allRoutes.filter(
     (r) => filterRegion === 'ALL' || r.region === filterRegion
   );
 

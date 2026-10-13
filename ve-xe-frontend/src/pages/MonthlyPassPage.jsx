@@ -1,6 +1,21 @@
 import { useEffect, useState } from 'react';
 import { getCurrentUser, getMonthlyPassPlans, getMonthlyPasses, getRoutes, registerMonthlyPass } from '../api';
 
+const VIETNAM_BANKS = [
+  'MB Bank (Quân Đội)',
+  'Vietcombank (Ngoại thương)',
+  'Techcombank (Kỹ thương)',
+  'VietinBank (Công thương)',
+  'BIDV (Đầu tư & Phát triển)',
+  'VPBank (Việt Nam Thịnh Vượng)',
+  'ACB (Á Châu)',
+  'TPBank (Tiên Phong)',
+  'Agribank (Nông nghiệp)',
+  'Sacombank (Sài Gòn Thương Tín)',
+  'HDBank',
+  'MSB (Hàng Hải)',
+];
+
 function MonthlyPassPage() {
   const [activeTab, setActiveTab] = useState('register'); // 'register' | 'my-passes'
   const [routes, setRoutes] = useState([]);
@@ -17,15 +32,20 @@ function MonthlyPassPage() {
   const [passengerIdCard, setPassengerIdCard] = useState('001202012345');
   const [passengerPhone, setPassengerPhone] = useState(currentUser.phone || '0901234567');
   const [discountType, setDiscountType] = useState(currentUser.discount_type || 'HSSV');
-  const [paymentMethod, setPaymentMethod] = useState('MOMO');
+  const [paymentMethod, setPaymentMethod] = useState('VIETQR');
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Modals
+  // Modals & Payment
   const [showQrModal, setShowQrModal] = useState(null); // pass object
   const [renewingPass, setRenewingPass] = useState(null); // pass object
   const [renewMonths, setRenewMonths] = useState(1);
-  const [renewPaymentMethod, setRenewPaymentMethod] = useState('MOMO');
+  const [renewPaymentMethod, setRenewPaymentMethod] = useState('VIETQR');
+  const [checkoutData, setCheckoutData] = useState(null);
+  const [customerAccountNumber, setCustomerAccountNumber] = useState('');
+  const [customerBankName, setCustomerBankName] = useState('MB Bank (Quân Đội)');
+  const [customerAccountHolder, setCustomerAccountHolder] = useState(currentUser.full_name || '');
+  const [copiedField, setCopiedField] = useState('');
 
   // Load initial data
   useEffect(() => {
@@ -132,7 +152,15 @@ function MonthlyPassPage() {
     return afterTerm - studentOff;
   };
 
-  const handleRegisterSubmit = async (e) => {
+  const copyToClipboard = (text, fieldName) => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(text);
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(''), 2000);
+    }
+  };
+
+  const handleRegisterSubmit = (e) => {
     e.preventDefault();
     if (!passengerName.trim()) {
       alert('Vui lòng nhập họ và tên hành khách');
@@ -143,6 +171,55 @@ function MonthlyPassPage() {
       return;
     }
 
+    const cleanId = passengerIdCard.trim().replace(/[^a-zA-Z0-9]/g, '');
+    const shortCode = cleanId.slice(-6) || '999999';
+    setCheckoutData({
+      mode: 'NEW',
+      title: 'Thanh Toán Đăng Ký Thẻ Vé Tháng Mới',
+      route_id: Number(selectedRouteId),
+      routeName: `${selectedRoute.departure_city} - ${selectedRoute.arrival_city}`,
+      months: Number(selectedMonths),
+      passenger_name: passengerName.trim(),
+      passenger_id_card: passengerIdCard.trim(),
+      passenger_phone: passengerPhone.trim(),
+      price: finalTotalPrice,
+      payment_method: paymentMethod,
+      transferCode: `PASS M${selectedMonths} ${shortCode}`,
+    });
+    setCustomerAccountHolder(passengerName.trim());
+  };
+
+  const handleRenewNext = (e) => {
+    e.preventDefault();
+    if (!renewingPass) return;
+    const renewPrice = calculateRenewPrice(renewingPass, renewMonths);
+    const cleanCode = (renewingPass.ticket_code || `PASS${renewingPass.id}`).replace(/[^a-zA-Z0-9]/g, '');
+    setCheckoutData({
+      mode: 'RENEW',
+      title: 'Thanh Toán Gia Hạn Thẻ Vé Tháng',
+      pass_id: renewingPass.id,
+      route_id: renewingPass.route_id,
+      routeName: renewingPass.route_name || `${renewingPass.departure_city} - ${renewingPass.arrival_city}`,
+      months: Number(renewMonths),
+      passenger_name: renewingPass.passenger_name,
+      passenger_id_card: renewingPass.passenger_id_card,
+      price: renewPrice,
+      payment_method: renewPaymentMethod,
+      transferCode: `RENEW ${cleanCode} M${renewMonths}`,
+    });
+    setCustomerAccountHolder(renewingPass.passenger_name || currentUser.full_name || '');
+    setRenewingPass(null); // Đóng modal chọn tháng, mở modal thanh toán
+  };
+
+  const handleConfirmCheckout = async (e) => {
+    e.preventDefault();
+    if (!checkoutData) return;
+
+    if (!customerAccountNumber.trim()) {
+      alert('⚠️ Vui lòng nhập số tài khoản / số thẻ ngân hàng của bạn để hệ thống đối soát giao dịch!');
+      return;
+    }
+
     setLoading(true);
     setErrorMessage('');
     setSuccessMessage('');
@@ -150,58 +227,40 @@ function MonthlyPassPage() {
     try {
       const payload = {
         user_id: currentUser.id,
-        route_id: Number(selectedRouteId),
-        months: Number(selectedMonths),
-        passenger_name: passengerName.trim(),
-        passenger_id_card: passengerIdCard.trim(),
-        price: finalTotalPrice,
-        payment_method: paymentMethod,
-      };
-
-      const res = await registerMonthlyPass(payload);
-      const newPass = res.pass || res.pass_info;
-
-      // Update local storage copy
-      const local = JSON.parse(localStorage.getItem('smartbus_monthly_passes') || '[]');
-      const filtered = local.filter((p) => p.id !== newPass.id);
-      localStorage.setItem('smartbus_monthly_passes', JSON.stringify([newPass, ...filtered]));
-
-      setSuccessMessage(`🎉 Chúc mừng! Bạn đã đăng ký thẻ vé tháng thành công! Mã thẻ: ${newPass.ticket_code || 'PASS-' + newPass.id}`);
-      await reloadUserPasses();
-      setActiveTab('my-passes');
-      setShowQrModal(newPass);
-    } catch (err) {
-      console.error(err);
-      setErrorMessage(err.message || 'Có lỗi xảy ra khi đăng ký vé tháng. Vui lòng thử lại!');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRenewSubmit = async (e) => {
-    e.preventDefault();
-    if (!renewingPass) return;
-
-    setLoading(true);
-    try {
-      const renewPrice = calculateRenewPrice(renewingPass, renewMonths);
-      const payload = {
-        user_id: currentUser.id,
-        route_id: renewingPass.route_id,
-        months: Number(renewMonths),
-        pass_id: renewingPass.id,
-        price: renewPrice,
-        payment_method: renewPaymentMethod,
+        route_id: checkoutData.route_id,
+        months: Number(checkoutData.months),
+        passenger_name: checkoutData.passenger_name,
+        passenger_id_card: checkoutData.passenger_id_card,
+        price: checkoutData.price,
+        payment_method: checkoutData.payment_method,
+        pass_id: checkoutData.mode === 'RENEW' ? checkoutData.pass_id : undefined,
+        customer_account_number: customerAccountNumber.trim(),
+        customer_bank_name: customerBankName,
+        customer_account_holder: customerAccountHolder.trim() || checkoutData.passenger_name,
       };
 
       const res = await registerMonthlyPass(payload);
       const updatedPass = res.pass || res.pass_info;
 
-      alert(`✅ Gia hạn thành công thêm ${renewMonths * 30} ngày sử dụng! Hạn mới: ${updatedPass.end_date}`);
-      setRenewingPass(null);
+      // Cập nhật bản ghi local copy
+      const local = JSON.parse(localStorage.getItem('smartbus_monthly_passes') || '[]');
+      const filtered = local.filter((p) => p.id !== updatedPass.id);
+      localStorage.setItem('smartbus_monthly_passes', JSON.stringify([updatedPass, ...filtered]));
+
+      if (checkoutData.mode === 'RENEW') {
+        alert(`✅ Gia hạn thẻ thành công thêm ${checkoutData.months * 30} ngày sử dụng! Hạn mới: ${updatedPass.end_date}. Cước phí: ${checkoutData.price.toLocaleString('vi-VN')} đ.`);
+      } else {
+        setSuccessMessage(`🎉 Chúc mừng! Bạn đã đăng ký thẻ vé tháng thành công! Mã thẻ: ${updatedPass.ticket_code || 'PASS-' + updatedPass.id}`);
+        setShowQrModal(updatedPass);
+      }
+
+      setCheckoutData(null);
+      setCustomerAccountNumber('');
       await reloadUserPasses();
+      setActiveTab('my-passes');
     } catch (err) {
-      alert(`Lỗi gia hạn: ${err.message || 'Không thể gia hạn vé'}`);
+      console.error(err);
+      alert(`Lỗi thanh toán vé tháng: ${err.message || 'Không thể hoàn tất thanh toán'}`);
     } finally {
       setLoading(false);
     }
@@ -789,7 +848,7 @@ function MonthlyPassPage() {
               Gia hạn cho: <b>{renewingPass.passenger_name}</b> ({renewingPass.route_name})
             </p>
 
-            <form onSubmit={handleRenewSubmit}>
+            <form onSubmit={handleRenewNext}>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>
                   Chọn số tháng muốn gia hạn thêm:
@@ -842,32 +901,226 @@ function MonthlyPassPage() {
                 <select
                   value={renewPaymentMethod}
                   onChange={(e) => setRenewPaymentMethod(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '13px' }}
+                  style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '13px', background: '#ffffff', outline: 'none' }}
                 >
-                  <option value="MOMO">Ví MoMo Sandbox</option>
-                  <option value="VNPAY">Cổng VNPay Sandbox</option>
-                  <option value="ZALOPAY">Cổng ZaloPay Sandbox</option>
-                  <option value="VIETQR">Chuyển khoản VietQR</option>
+                  <option value="VIETQR">Chuyển khoản VietQR (Mọi ngân hàng)</option>
+                  <option value="MOMO">Ví MoMo</option>
+                  <option value="VNPAY">Cổng VNPay</option>
+                  <option value="ZALOPAY">Ví ZaloPay</option>
                 </select>
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
                 style={{
                   width: '100%',
-                  background: '#2563eb',
+                  background: 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)',
                   color: '#ffffff',
-                  padding: '12px',
+                  padding: '13px',
                   borderRadius: '12px',
                   border: 'none',
                   fontWeight: '800',
                   fontSize: '15px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
                 }}
               >
-                {loading ? 'Đang xử lý...' : 'Xác Nhận Gia Hạn Thẻ'}
+                Tiếp Tục Thanh Toán ({calculateRenewPrice(renewingPass, renewMonths).toLocaleString('vi-VN')} đ) ➔
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CHECKOUT & PAYMENT MODAL (Áp dụng cho cả Đăng Ký Mới & Gia Hạn Vé Tháng) */}
+      {checkoutData && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px', overflowY: 'auto' }}>
+          <div style={{ background: '#ffffff', borderRadius: '24px', padding: '28px', maxWidth: '620px', width: '100%', position: 'relative', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.35)', maxHeight: '92vh', overflowY: 'auto' }}>
+            <button
+              onClick={() => setCheckoutData(null)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: '#f1f5f9', border: 'none', width: '32px', height: '32px', borderRadius: '999px', fontSize: '16px', cursor: 'pointer', color: '#64748b' }}
+            >
+              ✕
+            </button>
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#eff6ff', color: '#2563eb', padding: '4px 12px', borderRadius: '999px', fontSize: '12px', fontWeight: '800', marginBottom: '10px' }}>
+              <span>🔒</span> CỔNG THANH TOÁN VÉ THÁNG SECURE CHECKOUT
+            </div>
+
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a', margin: '0 0 4px 0' }}>
+              {checkoutData.title}
+            </h3>
+            <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 16px 0' }}>
+              Tuyến: <b>{checkoutData.routeName}</b> • Kỳ hạn: <b>Gói {checkoutData.months} Tháng</b> • Khách hàng: <b>{checkoutData.passenger_name}</b>
+            </p>
+
+            <form onSubmit={handleConfirmCheckout}>
+              {/* Payment Info Box */}
+              <div style={{ background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '16px', padding: '16px', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#1e3a8a' }}>THÔNG TIN CHUYỂN KHOẢN SMARTBUS</div>
+                  <span style={{ background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '700' }}>
+                    Nhận diện tự động
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', alignItems: 'center' }}>
+                  {/* Dynamic VietQR */}
+                  <div style={{ textAlign: 'center' }}>
+                    <img
+                      src={`https://img.vietqr.io/image/970422-0398888999-compact2.png?amount=${checkoutData.price}&addInfo=${encodeURIComponent(checkoutData.transferCode)}&accountName=CONG%20TY%20CP%20XE%20KHACH%20THONG%20MINH%20SMARTBUS`}
+                      onError={(e) => {
+                        e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=vietqr:MB:0398888999:${checkoutData.price}:${encodeURIComponent(checkoutData.transferCode)}`;
+                      }}
+                      alt="VietQR Vé Tháng"
+                      style={{ width: '160px', height: '160px', borderRadius: '12px', border: '1px solid #cbd5e1', background: '#ffffff', padding: '4px', display: 'block', margin: '0 auto' }}
+                    />
+                    <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>Quét mã bằng App Ngân Hàng</div>
+                  </div>
+
+                  {/* Beneficiary details */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
+                    <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>Ngân hàng thụ hưởng:</div>
+                      <div style={{ fontWeight: '700', color: '#1e293b' }}>MB Bank (Quân Đội)</div>
+                    </div>
+
+                    <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>Số tài khoản:</div>
+                        <div style={{ fontWeight: '800', fontFamily: 'monospace', color: '#2563eb', fontSize: '14px' }}>0398 888 999</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard('0398888999', 'stk')}
+                        style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        {copiedField === 'stk' ? '✓ Đã chép' : 'Sao chép'}
+                      </button>
+                    </div>
+
+                    <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>Số tiền chính xác:</div>
+                        <div style={{ fontWeight: '800', color: '#dc2626', fontSize: '14px' }}>{checkoutData.price.toLocaleString('vi-VN')} đ</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(String(checkoutData.price), 'price')}
+                        style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        {copiedField === 'price' ? '✓ Đã chép' : 'Sao chép'}
+                      </button>
+                    </div>
+
+                    <div style={{ background: '#ffffff', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: '11px', color: '#64748b' }}>Nội dung chuyển khoản:</div>
+                        <div style={{ fontWeight: '800', fontFamily: 'monospace', color: '#16a34a', fontSize: '12px' }}>{checkoutData.transferCode}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(checkoutData.transferCode, 'syntax')}
+                        style={{ border: 'none', background: '#eff6ff', color: '#2563eb', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', cursor: 'pointer' }}
+                      >
+                        {copiedField === 'syntax' ? '✓ Đã chép' : 'Sao chép'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mandatory Customer Bank Account Input */}
+              <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '14px', padding: '16px', marginBottom: '18px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400e', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⚠️</span> THÔNG TIN TÀI KHOẢN THANH TOÁN CỦA KHÁCH HÀNG (BẮT BUỘC)
+                </div>
+                <div style={{ fontSize: '12px', color: '#78350f', marginBottom: '12px' }}>
+                  Vui lòng cung cấp số tài khoản hoặc số thẻ thanh toán của bạn để nhân viên và hệ thống tự động đối soát giao dịch vé tháng:
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                      Ngân hàng của bạn: *
+                    </label>
+                    <select
+                      value={customerBankName}
+                      onChange={(e) => setCustomerBankName(e.target.value)}
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', background: '#ffffff', outline: 'none' }}
+                    >
+                      {VIETNAM_BANKS.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                      Số tài khoản / Số thẻ của bạn: *
+                    </label>
+                    <input
+                      type="text"
+                      value={customerAccountNumber}
+                      onChange={(e) => setCustomerAccountNumber(e.target.value)}
+                      placeholder="VD: 190367891234..."
+                      required
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#ffffff', fontWeight: '600' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                    Tên chủ tài khoản thanh toán: *
+                  </label>
+                  <input
+                    type="text"
+                    value={customerAccountHolder}
+                    onChange={(e) => setCustomerAccountHolder(e.target.value)}
+                    placeholder="VD: NGUYEN VAN A"
+                    required
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', outline: 'none', background: '#ffffff', textTransform: 'uppercase', fontWeight: '600' }}
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutData(null)}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid #cbd5e1', background: '#f1f5f9', color: '#475569', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    flex: 2,
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: '#ffffff',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    fontWeight: '800',
+                    fontSize: '14px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(22, 163, 74, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  {loading ? 'Đang kích hoạt vé tháng...' : `✓ Xác Nhận Đã Chuyển Khoản & Kích Hoạt (${checkoutData.price.toLocaleString('vi-VN')} đ)`}
+                </button>
+              </div>
             </form>
           </div>
         </div>

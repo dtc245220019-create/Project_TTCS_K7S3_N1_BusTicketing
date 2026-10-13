@@ -1,11 +1,45 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getRoutes } from '../api';
 
 function SearchForm() {
   const [diemDi, setDiemDi] = useState('Hồ Chí Minh');
   const [diemDen, setDiemDen] = useState('Đà Lạt');
   const [ngayDi, setNgayDi] = useState(new Date().toISOString().split('T')[0]);
+  const [routesList, setRoutesList] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getRoutes()
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setRoutesList(data);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const departureCities = Array.from(
+    new Set([
+      'Hồ Chí Minh',
+      'Hà Nội',
+      'Đà Nẵng',
+      ...routesList.map((r) => r.departure_city).filter(Boolean),
+    ])
+  );
+
+  const arrivalCities = Array.from(
+    new Set([
+      'Đà Lạt',
+      'Thái Nguyên',
+      'Huế',
+      'Hải Phòng',
+      'Nha Trang',
+      'Cần Thơ',
+      'Vũng Tàu',
+      ...routesList.map((r) => r.arrival_city).filter(Boolean),
+    ])
+  );
 
   const handleSearch = () => {
     navigate(`/buses?origin=${encodeURIComponent(diemDi)}&destination=${encodeURIComponent(diemDen)}&date=${ngayDi}`);
@@ -35,10 +69,16 @@ function SearchForm() {
           <label>ĐIỂM ĐI</label>
           <input
             type="text"
+            list="departure-cities-list"
             value={diemDi}
             onChange={(e) => setDiemDi(e.target.value)}
             placeholder="VD: Hồ Chí Minh, Hà Nội..."
           />
+          <datalist id="departure-cities-list">
+            {departureCities.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </div>
 
         <div
@@ -54,10 +94,16 @@ function SearchForm() {
           <label>ĐIỂM ĐẾN</label>
           <input
             type="text"
+            list="arrival-cities-list"
             value={diemDen}
             onChange={(e) => setDiemDen(e.target.value)}
             placeholder="VD: Đà Lạt, Thái Nguyên..."
           />
+          <datalist id="arrival-cities-list">
+            {arrivalCities.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
         </div>
 
         <div className="field">

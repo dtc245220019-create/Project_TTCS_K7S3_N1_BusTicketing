@@ -665,7 +665,7 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
       </div>
 
       {/* 2. Quick Stats Grid - Thống kê cân đối */}
-      <div className="dashboard-stats-grid no-print" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+      <div className="dashboard-stats-grid no-print">
         <div className="dashboard-stat-card" onClick={() => setActiveTab('upcoming')}>
           <div className="stat-icon-wrapper" style={{ background: '#eff6ff', color: '#2563eb' }}>
             🎫

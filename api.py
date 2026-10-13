@@ -23,11 +23,12 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, s
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import threading
 
 import database
 from database import DATABASE_PATH, get_connection, initialize_database
 from ticket_changes import TicketChangeError, cancel_ticket, change_seat
-from notification import send_email_confirmation, send_sms_confirmation
+from notification import send_email_confirmation, send_sms_confirmation, send_registration_confirmation
 from payment_gateway import (
     VNPAY_TMN_CODE,
     VNPAY_HASH_SECRET,
@@ -354,7 +355,8 @@ def search_trips(
             else:
                 duration_str = "8 tiếng"
 
-            dep_str = str(r["departure_at"] or "")
+            dep_str = str(r["departure_at"] or "").replace("T", " ")
+            arr_str = str(r["arrival_at"] or "").replace("T", " ")
             is_departed = False
             try:
                 if len(dep_str) >= 16:
@@ -363,6 +365,10 @@ def search_trips(
                         is_departed = True
             except Exception:
                 pass
+
+            dep_time = dep_str.split(" ")[-1][:5] if " " in dep_str else dep_str[:5]
+            arr_time = arr_str.split(" ")[-1][:5] if " " in arr_str else arr_str[:5]
+            dep_date = dep_str.split(" ")[0] if " " in dep_str else ""
 
             effective_status = "DEPARTED" if is_departed else r["status"]
             results.append({
@@ -373,13 +379,14 @@ def search_trips(
                 "license_plate": r["license_plate"] or "51B-888.88",
                 "from": r["origin"],
                 "to": r["destination"],
-                "departure_at": r["departure_at"],
-                "departureTime": r["departure_at"].split(" ")[-1] if " " in r["departure_at"] else r["departure_at"],
-                "arrivalTime": r["arrival_at"].split(" ")[-1] if " " in r["arrival_at"] else r["arrival_at"],
-                "departure_date": r["departure_at"].split(" ")[0] if " " in r["departure_at"] else "",
+                "departure_at": dep_str,
+                "arrival_at": arr_str,
+                "departureTime": dep_time,
+                "arrivalTime": arr_time,
+                "departure_date": dep_date,
                 "duration": duration_str,
                 "price": r["base_price"],
-                "availableSeatsCount": r["available_seats"] or 18,
+                "availableSeatsCount": r["available_seats"] if r["available_seats"] is not None else 28,
                 "status": effective_status,
                 "is_departed": is_departed,
                 "can_book": not is_departed and r["status"] == "SCHEDULED",
@@ -545,7 +552,41 @@ def register_user(payload: RegisterRequest):
             ),
         )
         user_id = cursor.lastrowid
+
+        # Ghi nhận thông báo vào bảng notifications
+        try:
+            connection.execute(
+                """INSERT INTO notifications (user_id, type, recipient, title, message, status)
+                   VALUES (?, 'EMAIL', ?, ?, ?, 'SENT')""",
+                (
+                    user_id,
+                    payload.email.strip().lower(),
+                    f"[SmartBus] Chào mừng {payload.full_name.strip()}!",
+                    f"Đăng ký tài khoản SmartBus thành công với vai trò {payload.role or 'HanhKhach'}.",
+                ),
+            )
+        except Exception as notif_err:
+            print(f"[REGISTER NOTIF ERROR]: {notif_err}")
+
         connection.commit()
+
+        # Gửi email chào mừng thật qua Gmail SMTP bằng background thread
+        try:
+            threading.Thread(
+                target=send_registration_confirmation,
+                args=(
+                    payload.email.strip().lower(),
+                    {
+                        "full_name": payload.full_name.strip(),
+                        "email": payload.email.strip().lower(),
+                        "phone": payload.phone.strip(),
+                        "role": payload.role or "HanhKhach",
+                    },
+                ),
+                daemon=True,
+            ).start()
+        except Exception as email_err:
+            print(f"[REGISTER EMAIL THREAD ERROR]: {email_err}")
 
         return {
             "id": user_id,
@@ -1273,7 +1314,7 @@ def verify_ticket(payload: InspectionRequest):
 @app.get("/api/v1/routes", summary="Danh sách tuyến xe bus")
 def get_routes():
     with get_connection() as connection:
-        rows = connection.execute("SELECT * FROM routes WHERE status = 'HoatDong'").fetchall()
+        rows = connection.execute("SELECT * FROM routes WHERE status IN ('HoatDong', 'ACTIVE') OR status IS NULL ORDER BY id ASC").fetchall()
         return [dict(r) for r in rows]
 
 
@@ -1583,6 +1624,9 @@ class RegisterPassRequest(BaseModel):
     passenger_id_card: Optional[str] = None
     price: Optional[float] = None
     payment_method: Optional[str] = "SANDBOX"
+    customer_account_number: Optional[str] = None
+    customer_bank_name: Optional[str] = None
+    customer_account_holder: Optional[str] = None
 
 
 def _pass_price(base_price: int, months: int, discount_type: Optional[str]) -> dict[str, int]:
@@ -2021,10 +2065,19 @@ def create_admin_trip(payload: CreateAdminTripRequest):
         price = payload.base_price if payload.base_price is not None else route["base_price"]
         trip_code = f"TRIP-R{payload.route_id}-{uuid4().hex[:6].upper()}"
 
+        dep_at = str(payload.departure_at or "").strip().replace("T", " ")
+        arr_at = str(payload.arrival_at or "").strip().replace("T", " ")
+        if len(dep_at) == 16:
+            dep_at += ":00"
+        if arr_at and len(arr_at) == 16:
+            arr_at += ":00"
+        if not arr_at:
+            arr_at = dep_at
+
         cursor = conn.execute(
             """INSERT INTO trips (trip_code, origin, destination, departure_at, arrival_at, base_price, status, bus_id, route_id, driver_id, staff_id, available_seats)
                VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?)""",
-            (trip_code, route["departure_city"], route["arrival_city"], payload.departure_at, payload.arrival_at, price, payload.bus_id, payload.route_id, payload.driver_id, payload.staff_id, total_seats),
+            (trip_code, route["departure_city"], route["arrival_city"], dep_at, arr_at, price, payload.bus_id, payload.route_id, payload.driver_id, payload.staff_id, total_seats),
         )
         trip_id = cursor.lastrowid
 
@@ -2087,20 +2140,27 @@ def assign_trip_staff(trip_id: int, payload: AssignTripRequest):
         return {"success": True, "message": "Đã phân công tài xế và phụ xe thành công!", "trip": dict(updated)}
 
 
-@app.get("/api/v1/driver/trips", summary="Lịch trình và danh sách phân công của Tài xế")
-def get_driver_trips(driver_id: Optional[int] = Query(None)):
+@app.get("/api/v1/driver/trips", summary="Lịch trình và danh sách phân công của Tài xế & Phụ xe")
+def get_driver_trips(
+    driver_id: Optional[int] = Query(None),
+    staff_id: Optional[int] = Query(None),
+    user_id: Optional[int] = Query(None),
+):
+    target_id = user_id or driver_id or staff_id
     with get_connection() as connection:
         query = """
-            SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type, u.full_name as driver_name
+            SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type,
+                   u.full_name as driver_name, staff.full_name as staff_name
             FROM trips tr
             LEFT JOIN routes r ON r.id = tr.route_id
             LEFT JOIN buses b ON b.id = tr.bus_id
             LEFT JOIN users u ON u.id = tr.driver_id
+            LEFT JOIN users staff ON staff.id = tr.staff_id
         """
         params = []
-        if driver_id:
-            query += " WHERE tr.driver_id = ?"
-            params.append(driver_id)
+        if target_id:
+            query += " WHERE (tr.driver_id = ? OR tr.staff_id = ?)"
+            params.extend([target_id, target_id])
         query += " ORDER BY tr.departure_at ASC"
         rows = connection.execute(query, params).fetchall()
 
@@ -2133,6 +2193,7 @@ def get_driver_trips(driver_id: Optional[int] = Query(None)):
                 "license_plate": r["license_plate"] or "29B-123.45",
                 "bus_type": r["bus_type"] or "Giường nằm cao cấp",
                 "driver_name": r["driver_name"] or "Trần Văn Tài",
+                "staff_name": r["staff_name"] or "Chưa phân công",
                 "passengers": [
                     {
                         "ticket_id": p["ticket_id"],

@@ -50,7 +50,7 @@ function TicketVerification() {
   const loadManifestTrips = async () => {
     setManifestLoading(true);
     try {
-      const data = await getDriverTrips();
+      const data = await getDriverTrips(currentUser?.id);
       const tripsList = data.trips || data || [];
       setDriverTrips(tripsList);
       if (tripsList.length > 0 && !selectedTripId) {
@@ -739,7 +739,7 @@ function TicketVerification() {
               >
                 {driverTrips.map((t) => (
                   <option key={t.id} value={t.id}>
-                    Chuyến #{t.id}: {t.origin} ➔ {t.destination} ({t.departure_time?.slice(11, 16) || '06:00'})
+                    Chuyến #{t.id}: {t.origin} ➔ {t.destination} ({t.departure_time?.slice(11, 16) || t.departure_at?.slice(11, 16) || '08:00'}) - Xe {t.license_plate || '51B-888.99'}
                   </option>
                 ))}
               </select>
@@ -767,7 +767,7 @@ function TicketVerification() {
                   🚌 Tuyến: {selectedTrip.origin} ➔ {selectedTrip.destination}
                 </div>
                 <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-                  🕒 Giờ khởi hành: <b>{selectedTrip.departure_time?.slice(11, 16) || '06:00'}</b> | Biển số: <b>{selectedTrip.license_plate || '51B-888.99'}</b>
+                  🕒 Giờ khởi hành: <b>{selectedTrip.departure_time?.slice(11, 16) || selectedTrip.departure_at?.slice(11, 16) || '08:00'}</b> | Biển số: <b>{selectedTrip.license_plate || '51B-888.99'}</b> | 🚍 Tài xế: <b>{selectedTrip.driver_name || 'Đã phân công'}</b> | 🎫 Phụ xe: <b>{selectedTrip.staff_name || 'Đã phân công'}</b>
                 </div>
               </div>
 
