@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createOrder, getCurrentUser, applyVoucher } from '../api';
+import { createOrder, getCurrentUser, applyVoucher, getVouchers } from '../api';
 import PrintableTicket from './PrintableTicket';
+import VoucherModal from './VoucherModal';
 
 const AVAILABLE_VOUCHERS = {
   CHAO20: { type: 'percentage', value: 20 },
@@ -21,6 +22,30 @@ function PaymentForm({ bookingData }) {
   const [voucherCode, setVoucherCode] = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null);
   const [voucherMessage, setVoucherMessage] = useState('');
+  const [isVoucherModalOpen, setIsVoucherModalOpen] = useState(false);
+  const [voucherList, setVoucherList] = useState([
+    { id: 'CHAO20', title: 'Giảm 20% chào mừng khách hàng mới', minOrder: 100000 },
+    { id: 'BUS50', title: 'Giảm ngay 50.000 VNĐ cho tuyến đường dài', minOrder: 150000 },
+    { id: 'GIAM10K', title: 'Ưu đãi 10.000 VNĐ cho mọi chuyến xe', minOrder: 50000 },
+    { id: 'VIP15', title: 'Khách hàng thân thiết VIP giảm 15%', minOrder: 200000 }
+  ]);
+
+  useEffect(() => {
+    // Tải danh sách voucher từ server nếu có
+    getVouchers()
+      .then((res) => {
+        const list = Array.isArray(res) ? res : (res?.vouchers || []);
+        if (list.length > 0) {
+          const formatted = list.map((v) => ({
+            id: v.code || v.voucher_code || v.id,
+            title: v.name || v.title || `Giảm ${v.discount_value || v.discount_percent || 10}${v.discount_type === 'percentage' || v.discount_type === 'percent' ? '%' : ' đ'}`,
+            minOrder: v.min_order_value || v.min_order || 0,
+          }));
+          setVoucherList(formatted);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const currentUser = getCurrentUser() || bookingData.user || {
     id: 1,
@@ -44,9 +69,20 @@ function PaymentForm({ bookingData }) {
     : 0;
   const finalPrice = Math.max(0, priceAfterUserDiscount - voucherDiscountAmount);
 
+<<<<<<< HEAD
  
 const handleApplyVoucher = async () => {
   const code = voucherCode.trim().toUpperCase();
+=======
+  const handleApplyVoucher = async (customCode = null) => {
+    const code = (typeof customCode === 'string' ? customCode : voucherCode).trim().toUpperCase();
+    if (!code) {
+      setAppliedVoucher(null);
+      setVoucherMessage('Vui lòng nhập mã giảm giá.');
+      return;
+    }
+    setVoucherCode(code);
+>>>>>>> origin/develop
 
   if (!code) {
     setAppliedVoucher(null);
@@ -567,7 +603,16 @@ const handleApplyVoucher = async () => {
                 </div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: '14px 0', padding: '12px', border: '1px dashed #cbd5e1', borderRadius: '8px' }}>
-                <label htmlFor="voucher-code" style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>Mã giảm giá</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label htmlFor="voucher-code" style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>Mã giảm giá</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsVoucherModalOpen(true)}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '12px', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                  >
+                    🎟️ Chọn voucher có sẵn
+                  </button>
+                </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <input
                     id="voucher-code"
@@ -587,7 +632,7 @@ const handleApplyVoucher = async () => {
                   />
                   <button
                     type="button"
-                    onClick={handleApplyVoucher}
+                    onClick={() => handleApplyVoucher()}
                     style={{ padding: '0 14px', border: 'none', borderRadius: '6px', backgroundColor: '#1e293b', color: 'white', fontWeight: '700', cursor: 'pointer' }}
                   >
                     Áp dụng
@@ -597,6 +642,17 @@ const handleApplyVoucher = async () => {
                   {voucherMessage || 'Mã thử nghiệm: CHAO20 hoặc BUS50.'}
                 </p>
               </div>
+
+              {/* Popup Modal Chọn Voucher */}
+              <VoucherModal
+                isOpen={isVoucherModalOpen}
+                onClose={() => setIsVoucherModalOpen(false)}
+                onSelect={(code) => {
+                  setIsVoucherModalOpen(false);
+                  handleApplyVoucher(code);
+                }}
+                vouchers={voucherList}
+              />
               {appliedVoucher && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '14px', color: '#16a34a', fontWeight: '600' }}>
                   <span>Voucher {appliedVoucher.code}:</span>
