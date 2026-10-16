@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   getCurrentUser,
   setCurrentUser,
@@ -17,18 +17,23 @@ import {
   getFeedbacksList,
   updateFeedbackStatus,
   getAuditLogs,
+  getAdminRoutes,
+  createAdminRoute,
+  getAdminStaff,
+  createAdminStaff,
+  createAdminTrip,
+  assignTripStaff,
 } from '../api';
 import CreateVoucher from '../components/CreateVoucher';
 import RefundManagement from '../components/RefundManagement';
 import './AdminDashboard.css';
 
 function AdminDashboard() {
-  const navigate = useNavigate();
   const [currentUser, setUser] = useState(getCurrentUser());
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [trips, setTrips] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   
   // Tab navigation
   const [activeTab, setActiveTab] = useState('users'); 
@@ -43,11 +48,11 @@ function AdminDashboard() {
   const [revenueData, setRevenueData] = useState(null);
   const [occupancyData, setOccupancyData] = useState(null);
   const [revenueGroupBy, setRevenueGroupBy] = useState('month');
-  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [_loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Discounts tab states
   const [pendingDiscounts, setPendingDiscounts] = useState([]);
-  const [loadingDiscounts, setLoadingDiscounts] = useState(false);
+  const [_loadingDiscounts, setLoadingDiscounts] = useState(false);
 
   // Vouchers tab states
   const [vouchers, setVouchers] = useState([]);
@@ -60,6 +65,45 @@ function AdminDashboard() {
   // Audit tab states
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditActionFilter, setAuditActionFilter] = useState('ALL');
+
+  // Admin Operations State (US - Quản Trị Viên)
+  const [routes, setRoutes] = useState([]);
+  const [staffList, setStaffList] = useState([]);
+  const [showCreateRouteModal, setShowCreateRouteModal] = useState(false);
+  const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
+  const [showCreateTripModal, setShowCreateTripModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assigningTrip, setAssigningTrip] = useState(null);
+
+  const [routeForm, setRouteForm] = useState({
+    name: '',
+    departure_city: '',
+    arrival_city: '',
+    base_price: 150000,
+    distance_km: 100,
+  });
+
+  const [staffForm, setStaffForm] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    role: 'TaiXe',
+    password: '123456',
+  });
+
+  const [tripForm, setTripForm] = useState({
+    route_id: '',
+    departure_at: '',
+    arrival_at: '',
+    driver_id: '',
+    staff_id: '',
+    base_price: '',
+  });
+
+  const [assignForm, setAssignForm] = useState({
+    driver_id: '',
+    staff_id: '',
+  });
 
   // Notification feedback
   const [feedbackMsg, setFeedbackMsg] = useState({ text: '', type: 'success' });
@@ -83,7 +127,9 @@ function AdminDashboard() {
   // Tải dữ liệu bổ sung khi chuyển tab
   useEffect(() => {
     if (!isAdmin) return;
-    if (activeTab === 'revenue') {
+    if (activeTab === 'trips') {
+      loadRoutesAndStaff();
+    } else if (activeTab === 'revenue') {
       loadRevenueAndOccupancy();
     } else if (activeTab === 'discounts') {
       loadPendingDiscounts();
@@ -99,6 +145,20 @@ function AdminDashboard() {
   const showToast = (text, type = 'success') => {
     setFeedbackMsg({ text, type });
     setTimeout(() => setFeedbackMsg({ text: '', type: 'success' }), 4000);
+  };
+
+  const loadRoutesAndStaff = async () => {
+    try {
+      const [rRes, sRes] = await Promise.allSettled([getAdminRoutes(), getAdminStaff()]);
+      if (rRes.status === 'fulfilled' && Array.isArray(rRes.value)) {
+        setRoutes(rRes.value);
+      }
+      if (sRes.status === 'fulfilled' && Array.isArray(sRes.value)) {
+        setStaffList(sRes.value);
+      }
+    } catch (e) {
+      console.warn('Lỗi tải tuyến xe / nhân sự:', e);
+    }
   };
 
   const loadAdminData = async () => {
@@ -119,6 +179,7 @@ function AdminDashboard() {
       if (tripsRes.status === 'fulfilled' && tripsRes.value) {
         setTrips(tripsRes.value.trips || tripsRes.value || []);
       }
+      loadRoutesAndStaff();
     } catch (err) {
       console.error('Lỗi khi tải dữ liệu admin:', err);
     } finally {
@@ -165,9 +226,8 @@ function AdminDashboard() {
   const loadVouchers = async () => {
     try {
       const res = await getVouchers();
-      if (res && res.vouchers) {
-        setVouchers(res.vouchers);
-      }
+      const list = Array.isArray(res) ? res : (res?.vouchers || []);
+      setVouchers(list);
     } catch (e) {
       console.warn('Lỗi tải danh sách vouchers:', e);
     }
@@ -219,6 +279,81 @@ function AdminDashboard() {
       showToast(`Đã cập nhật trạng thái chuyến #${tripId} thành "${newStatus}".`);
     } catch (err) {
       showToast(`Lỗi đổi trạng thái chuyến: ${err.message || 'Không thể lưu'}`, 'error');
+    }
+  };
+
+  const handleCreateRoute = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await createAdminRoute(routeForm);
+      showToast(res?.message || 'Tạo tuyến xe mới thành công!');
+      setShowCreateRouteModal(false);
+      setRouteForm({ name: '', departure_city: '', arrival_city: '', base_price: 150000, distance_km: 100 });
+      loadRoutesAndStaff();
+    } catch (err) {
+      showToast(err.message || 'Lỗi tạo tuyến xe', 'error');
+    }
+  };
+
+  const handleCreateStaff = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await createAdminStaff(staffForm);
+      showToast(res?.message || 'Thêm nhân sự mới thành công!');
+      setShowCreateStaffModal(false);
+      setStaffForm({ full_name: '', email: '', phone: '', role: 'TaiXe', password: '123456' });
+      loadRoutesAndStaff();
+    } catch (err) {
+      showToast(err.message || 'Lỗi thêm nhân sự', 'error');
+    }
+  };
+
+  const handleCreateTrip = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        route_id: Number(tripForm.route_id),
+        departure_at: tripForm.departure_at,
+        arrival_at: tripForm.arrival_at,
+        driver_id: tripForm.driver_id ? Number(tripForm.driver_id) : undefined,
+        staff_id: tripForm.staff_id ? Number(tripForm.staff_id) : undefined,
+        base_price: tripForm.base_price ? Number(tripForm.base_price) : undefined,
+      };
+      const res = await createAdminTrip(payload);
+      showToast(res?.message || 'Tạo chuyến xe thành công và đã cấp sơ đồ ghế!');
+      setShowCreateTripModal(false);
+      setTripForm({ route_id: '', departure_at: '', arrival_at: '', driver_id: '', staff_id: '', base_price: '' });
+      loadAdminData();
+    } catch (err) {
+      showToast(err.message || 'Lỗi tạo chuyến xe', 'error');
+    }
+  };
+
+  const openAssignModal = (trip) => {
+    setAssigningTrip(trip);
+    setAssignForm({
+      driver_id: trip.driver_id || '',
+      staff_id: trip.staff_id || '',
+    });
+    loadRoutesAndStaff();
+    setShowAssignModal(true);
+  };
+
+  const handleAssignSubmit = async (e) => {
+    e.preventDefault();
+    if (!assigningTrip) return;
+    try {
+      const payload = {
+        driver_id: assignForm.driver_id ? Number(assignForm.driver_id) : null,
+        staff_id: assignForm.staff_id ? Number(assignForm.staff_id) : null,
+      };
+      const res = await assignTripStaff(assigningTrip.id, payload);
+      showToast(res?.message || 'Phân công nhân sự thành công!');
+      setShowAssignModal(false);
+      setAssigningTrip(null);
+      loadAdminData();
+    } catch (err) {
+      showToast(err.message || 'Lỗi phân công chuyến', 'error');
     }
   };
 
@@ -709,23 +844,65 @@ function AdminDashboard() {
       {/* ========================================================================= */}
       {/* TAB 2: TRIP DISPATCHING & MANAGEMENT */}
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
+      {/* TAB 2: TRIP DISPATCHING & OPERATIONS (ADMIN MANAGEMENT) */}
+      {/* ========================================================================= */}
       {activeTab === 'trips' && (
         <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>
-                🚌 Danh Sách Chuyến Xe & Điều Phối Tuyến (8 Chuyến HCM ➔ Đà Lạt)
+                🚌 Điều Phối Tuyến, Chuyến Xe & Phân Công Nhân Sự
               </h2>
               <p style={{ color: '#64748b', fontSize: '12px', margin: '4px 0 0 0' }}>
-                Hỗ trợ cập nhật trạng thái vận hành theo thời gian thực (Đúng lịch, Đón khách, Đang chạy, Đã đến)
+                Hỗ trợ tạo tuyến xe, bổ sung tài xế/phụ xe và phân công trực tiếp vào từng chuyến xe vận hành
               </p>
             </div>
-            <Link
-              to="/buses?origin=Hồ%20Chí%20Minh&destination=Đà%20Lạt"
-              style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '7px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', textDecoration: 'none' }}
-            >
-              🔍 Xem trang đặt vé HCM ➔ Đà Lạt
-            </Link>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowCreateRouteModal(true)}
+                className="hover-lift"
+                style={{ backgroundColor: '#10b981', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                ➕ Tạo Tuyến Xe
+              </button>
+              <button
+                onClick={() => setShowCreateStaffModal(true)}
+                className="hover-lift"
+                style={{ backgroundColor: '#059669', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                👤 Thêm Tài Xế / Phụ Xe
+              </button>
+              <button
+                onClick={() => setShowCreateTripModal(true)}
+                className="hover-lift"
+                style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                🚍 Tạo Chuyến Xe
+              </button>
+              <Link
+                to="/buses?origin=Hồ%20Chí%20Minh&destination=Đà%20Lạt"
+                style={{ backgroundColor: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold', textDecoration: 'none' }}
+              >
+                🔍 Xem Đặt Vé Demo
+              </Link>
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '20px' }}>
+            <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px 16px' }}>
+              <div style={{ fontSize: '11px', color: '#166534', fontWeight: '700' }}>TỔNG TUYẾN XE</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#15803d' }}>{routes.length || 4} tuyến</div>
+            </div>
+            <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '12px 16px' }}>
+              <div style={{ fontSize: '11px', color: '#1e40af', fontWeight: '700' }}>ĐỘI NGŨ NHÂN SỰ</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#1d4ed8' }}>{staffList.length || 2} tài xế & phụ xe</div>
+            </div>
+            <div style={{ backgroundColor: '#fefce8', border: '1px solid #fef08a', borderRadius: '10px', padding: '12px 16px' }}>
+              <div style={{ fontSize: '11px', color: '#854d0e', fontWeight: '700' }}>CHUYẾN ĐIỀU PHỐI</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: '#a16207' }}>{trips.length} chuyến</div>
+            </div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -739,13 +916,15 @@ function AdminDashboard() {
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Giá Vé</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Ghế Trống</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Tài Xế</th>
+                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>Phụ Xe</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Trạng Thái</th>
+                  <th style={{ padding: '10px 12px', fontWeight: '700', textAlign: 'center' }}>Thao Tác</th>
                 </tr>
               </thead>
               <tbody>
                 {trips.length === 0 ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '28px', color: '#94a3b8' }}>
+                    <td colSpan="10" style={{ textAlign: 'center', padding: '28px', color: '#94a3b8' }}>
                       Chưa có chuyến xe nào được ghi nhận.
                     </td>
                   </tr>
@@ -753,23 +932,39 @@ function AdminDashboard() {
                   trips.map((t) => (
                     <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                       <td style={{ padding: '10px 12px', fontWeight: 'bold', color: '#64748b' }}>#{t.id}</td>
-                      <td style={{ padding: '10px 12px', fontWeight: '700', color: '#1e293b' }}>{t.origin} ➔ {t.destination}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: '700', color: '#1e293b' }}>
+                        <div>{t.origin} ➔ {t.destination}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '500' }}>{t.trip_code}</div>
+                      </td>
                       <td style={{ padding: '10px 12px', color: '#2563eb', fontWeight: '600' }}>
-                        🕒 {t.departure_time?.slice(11, 16) || t.departure_time || '08:00'} ({t.departure_time?.slice(0, 10)})
+                        🕒 {t.departure_time?.slice(11, 16) || t.departure_at?.slice(11, 16) || t.departure_time || '08:00'} ({t.departure_time?.slice(0, 10) || t.departure_at?.slice(0, 10) || 'Hôm nay'})
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         <div style={{ fontWeight: 'bold', color: '#334155' }}>{t.license_plate || '51B-888.99'}</div>
                         <div style={{ fontSize: '11px', color: '#94a3b8' }}>{t.bus_type || 'Limousine 34 Phòng'}</div>
                       </td>
                       <td style={{ padding: '10px 12px', fontWeight: '700', color: '#059669' }}>
-                        {Number(t.price || 0).toLocaleString('vi-VN')} đ
+                        {Number(t.price || t.base_price || 0).toLocaleString('vi-VN')} đ
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ backgroundColor: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold' }}>
                           {t.available_seats ?? 28} chỗ
                         </span>
                       </td>
-                      <td style={{ padding: '10px 12px', color: '#475569' }}>{t.driver_name || 'Trần Văn Tài (Tài Xế)'}</td>
+                      <td style={{ padding: '10px 12px', color: '#1e293b', fontWeight: '600' }}>
+                        {t.driver_name ? (
+                          <span>🚍 {t.driver_name}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa gán</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#1e293b', fontWeight: '600' }}>
+                        {t.staff_name ? (
+                          <span>🎫 {t.staff_name}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Chưa gán</span>
+                        )}
+                      </td>
                       <td style={{ padding: '10px 12px' }}>
                         <select
                           value={t.status || 'SCHEDULED'}
@@ -794,6 +989,23 @@ function AdminDashboard() {
                           <option value="COMPLETED">🏁 Đã Đến</option>
                           <option value="CANCELLED">❌ Hủy Chuyến</option>
                         </select>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => openAssignModal(t)}
+                          style={{
+                            backgroundColor: '#eff6ff',
+                            color: '#2563eb',
+                            border: '1px solid #bfdbfe',
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          🔀 Gán Nhân Sự
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -901,10 +1113,11 @@ function AdminDashboard() {
                 </thead>
                 <tbody>
                   {(occupancyData?.trips || trips).map((t, idx) => {
-                    const totalSeats = t.total_seats || 34;
-                    const available = t.available_seats !== undefined ? t.available_seats : (28 - (idx % 5));
-                    const booked = totalSeats - available;
-                    const rate = t.occupancy_rate || Math.round((booked / totalSeats) * 100);
+                    const totalSeats = t.total_seats || 36;
+                    const booked = t.sold_seats !== undefined
+                      ? Math.max(0, t.sold_seats)
+                      : Math.max(0, totalSeats - (t.available_seats !== undefined ? t.available_seats : totalSeats));
+                    const rate = Math.max(0, Math.min(100, t.occupancy_rate !== undefined ? t.occupancy_rate : Math.round((booked / totalSeats) * 100)));
                     const rev = t.estimated_revenue || (booked * (t.price || 280000));
                     return (
                       <tr key={t.id || idx}>
@@ -922,7 +1135,7 @@ function AdminDashboard() {
                             <div className="admin-occupancy-track">
                               <span style={{ width: `${Math.min(100, Math.max(0, rate))}%` }}></span>
                             </div>
-                            <strong>{rate}%</strong>
+                            <strong>{Math.max(0, rate)}%</strong>
                           </div>
                         </td>
                         <td style={{ fontWeight: '700', color: '#059669' }}>
@@ -1360,6 +1573,414 @@ function AdminDashboard() {
               <li>Xem xét và phê duyệt hoàn tiền vé (US08)</li>
               <li>Quản lý góp ý đánh giá (US24) & Giám sát Audit Logs (US17)</li>
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 1: TẠO TUYẾN XE MỚI */}
+      {/* ========================================================================= */}
+      {showCreateRouteModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '520px', maxWidth: '100%', backgroundColor: 'white', borderRadius: '16px', padding: '28px', boxShadow: '0 20px 45px rgba(0,0,0,0.18)', border: '1px solid #e2e8f0', position: 'relative' }}>
+            <button
+              onClick={() => setShowCreateRouteModal(false)}
+              style={{ position: 'absolute', top: '18px', right: '18px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+            >
+              ✖
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '24px', backgroundColor: '#ecfdf5', padding: '8px', borderRadius: '10px' }}>🛣️</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#065f46' }}>Tạo Tuyến Xe Mới</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Thêm tuyến đường vận hành cho hệ thống xe khách</p>
+              </div>
+            </div>
+            <form onSubmit={handleCreateRoute} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Tên Tuyến Xe *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: TP. Hồ Chí Minh - Vũng Tàu"
+                  value={routeForm.name}
+                  onChange={(e) => setRouteForm({ ...routeForm, name: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Tỉnh / Thành Đi *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Hồ Chí Minh"
+                    value={routeForm.departure_city}
+                    onChange={(e) => setRouteForm({ ...routeForm, departure_city: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Tỉnh / Thành Đến *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Vũng Tàu"
+                    value={routeForm.arrival_city}
+                    onChange={(e) => setRouteForm({ ...routeForm, arrival_city: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Giá Vé Tiêu Chuẩn (VNĐ) *</label>
+                  <input
+                    type="number"
+                    required
+                    min="10000"
+                    step="5000"
+                    placeholder="150000"
+                    value={routeForm.base_price}
+                    onChange={(e) => setRouteForm({ ...routeForm, base_price: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Khoảng Cách (km)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="100"
+                    value={routeForm.distance_km}
+                    onChange={(e) => setRouteForm({ ...routeForm, distance_km: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateRouteModal(false)}
+                  style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#475569', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="hover-lift"
+                  style={{ padding: '9px 20px', borderRadius: '8px', border: 'none', backgroundColor: '#10b981', color: 'white', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
+                >
+                  ✓ Thêm Tuyến Mới
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: THÊM TÀI XẾ / PHỤ XE MỚI */}
+      {/* ========================================================================= */}
+      {showCreateStaffModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '520px', maxWidth: '100%', backgroundColor: 'white', borderRadius: '16px', padding: '28px', boxShadow: '0 20px 45px rgba(0,0,0,0.18)', border: '1px solid #e2e8f0', position: 'relative' }}>
+            <button
+              onClick={() => setShowCreateStaffModal(false)}
+              style={{ position: 'absolute', top: '18px', right: '18px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+            >
+              ✖
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '24px', backgroundColor: '#ecfdf5', padding: '8px', borderRadius: '10px' }}>👨‍✈️</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#065f46' }}>Thêm Tài Xế / Phụ Xe Mới</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Cấp tài khoản vận hành vào hệ thống điều phối</p>
+              </div>
+            </div>
+            <form onSubmit={handleCreateStaff} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Họ Và Tên Nhân Sự *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: Nguyễn Văn Tài (Tài xế)"
+                  value={staffForm.full_name}
+                  onChange={(e) => setStaffForm({ ...staffForm, full_name: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Email Đăng Nhập *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="taixe.nguyen@smartbus.vn"
+                    value={staffForm.email}
+                    onChange={(e) => setStaffForm({ ...staffForm, email: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Số Điện Thoại *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="0912345678"
+                    value={staffForm.phone}
+                    onChange={(e) => setStaffForm({ ...staffForm, phone: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Vai Trò Vận Hành *</label>
+                  <select
+                    value={staffForm.role}
+                    onChange={(e) => setStaffForm({ ...staffForm, role: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                  >
+                    <option value="TaiXe">🚌 Tài Xế (TaiXe)</option>
+                    <option value="PhuXe">🎫 Phụ Xe / Quầy Soát Vé (PhuXe)</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Mật Khẩu Ban Đầu</label>
+                  <input
+                    type="password"
+                    placeholder="123456"
+                    value={staffForm.password}
+                    onChange={(e) => setStaffForm({ ...staffForm, password: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateStaffModal(false)}
+                  style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#475569', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="hover-lift"
+                  style={{ padding: '9px 20px', borderRadius: '8px', border: 'none', backgroundColor: '#059669', color: 'white', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)' }}
+                >
+                  ✓ Thêm Nhân Sự
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: TẠO CHUYẾN XE MỚI */}
+      {/* ========================================================================= */}
+      {showCreateTripModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '560px', maxWidth: '100%', backgroundColor: 'white', borderRadius: '16px', padding: '28px', boxShadow: '0 20px 45px rgba(0,0,0,0.18)', border: '1px solid #e2e8f0', position: 'relative' }}>
+            <button
+              onClick={() => setShowCreateTripModal(false)}
+              style={{ position: 'absolute', top: '18px', right: '18px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+            >
+              ✖
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ fontSize: '24px', backgroundColor: '#eff6ff', padding: '8px', borderRadius: '10px' }}>🚍</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1e40af' }}>Tạo Chuyến Xe Mới</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>Khởi tạo chuyến xe và tự động sinh sơ đồ 28 ghế tiêu chuẩn</p>
+              </div>
+            </div>
+            <form onSubmit={handleCreateTrip} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Chọn Tuyến Đường *</label>
+                <select
+                  required
+                  value={tripForm.route_id}
+                  onChange={(e) => setTripForm({ ...tripForm, route_id: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                >
+                  <option value="">-- Chọn tuyến xe vận hành --</option>
+                  {(routes.length > 0 ? routes : [
+                    { id: 1, name: 'TP. Hồ Chí Minh - Đà Lạt', base_price: 320000 },
+                    { id: 2, name: 'TP. Hồ Chí Minh - Nha Trang', base_price: 280000 },
+                    { id: 3, name: 'TP. Hồ Chí Minh - Cần Thơ', base_price: 180000 },
+                    { id: 4, name: 'Hà Nội - Sa Pa', base_price: 350000 },
+                  ]).map((r) => (
+                    <option key={r.id} value={r.id}>
+                      #{r.id} - {r.name || `${r.departure_city} ➔ ${r.arrival_city}`} ({Number(r.base_price || 0).toLocaleString('vi-VN')} đ)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Giờ Xuất Bến *</label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={tripForm.departure_at}
+                    onChange={(e) => setTripForm({ ...tripForm, departure_at: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Giờ Đến Nơi Dự Kiến</label>
+                  <input
+                    type="datetime-local"
+                    value={tripForm.arrival_at}
+                    onChange={(e) => setTripForm({ ...tripForm, arrival_at: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Gán Tài Xế Phụ Trách</label>
+                  <select
+                    value={tripForm.driver_id}
+                    onChange={(e) => setTripForm({ ...tripForm, driver_id: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                  >
+                    <option value="">-- Chưa gán tài xế --</option>
+                    {(staffList.filter(s => s.role === 'TaiXe').length > 0 ? staffList.filter(s => s.role === 'TaiXe') : users.filter(u => u.role === 'TaiXe')).map((d) => (
+                      <option key={d.id} value={d.id}>
+                        🚍 {d.full_name} ({d.phone || d.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Gán Phụ Xe Phụ Trách</label>
+                  <select
+                    value={tripForm.staff_id}
+                    onChange={(e) => setTripForm({ ...tripForm, staff_id: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                  >
+                    <option value="">-- Chưa gán phụ xe --</option>
+                    {(staffList.filter(s => s.role === 'PhuXe').length > 0 ? staffList.filter(s => s.role === 'PhuXe') : users.filter(u => u.role === 'PhuXe')).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        🎫 {p.full_name} ({p.phone || p.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Giá Vé Riêng Chuyến (VNĐ, để trống sẽ lấy theo tuyến)</label>
+                <input
+                  type="number"
+                  min="10000"
+                  step="5000"
+                  placeholder="Để trống sẽ áp dụng giá cơ bản tuyến"
+                  value={tripForm.base_price}
+                  onChange={(e) => setTripForm({ ...tripForm, base_price: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCreateTripModal(false)}
+                  style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#475569', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="hover-lift"
+                  style={{ padding: '9px 20px', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: 'white', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}
+                >
+                  ✓ Khởi Tạo Chuyến Xe
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: GÁN NHÂN SỰ CHO CHUYẾN XE */}
+      {/* ========================================================================= */}
+      {showAssignModal && assigningTrip && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ width: '500px', maxWidth: '100%', backgroundColor: 'white', borderRadius: '16px', padding: '28px', boxShadow: '0 20px 45px rgba(0,0,0,0.18)', border: '1px solid #e2e8f0', position: 'relative' }}>
+            <button
+              onClick={() => { setShowAssignModal(false); setAssigningTrip(null); }}
+              style={{ position: 'absolute', top: '18px', right: '18px', background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748b' }}
+            >
+              ✖
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '24px', backgroundColor: '#eff6ff', padding: '8px', borderRadius: '10px' }}>🔀</div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '800', color: '#1e40af' }}>Phân Công Nhân Sự Vận Hành</h3>
+                <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>
+                  Chuyến #{assigningTrip.id} ({assigningTrip.origin} ➔ {assigningTrip.destination})
+                </p>
+              </div>
+            </div>
+
+            <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '12px', color: '#475569' }}>
+              <div><b>Mã chuyến:</b> {assigningTrip.trip_code || `#${assigningTrip.id}`}</div>
+              <div><b>Khởi hành:</b> {assigningTrip.departure_time?.slice(11, 16) || assigningTrip.departure_at?.slice(11, 16)} ({assigningTrip.departure_time?.slice(0, 10) || assigningTrip.departure_at?.slice(0, 10)})</div>
+              <div><b>Xe:</b> {assigningTrip.license_plate || '51B-888.99'} ({assigningTrip.bus_type || '34 Phòng'})</div>
+            </div>
+
+            <form onSubmit={handleAssignSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Tài Xế Phụ Trách Lái Xe</label>
+                <select
+                  value={assignForm.driver_id}
+                  onChange={(e) => setAssignForm({ ...assignForm, driver_id: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                >
+                  <option value="">-- Bỏ phân công tài xế --</option>
+                  {(staffList.filter(s => s.role === 'TaiXe').length > 0 ? staffList.filter(s => s.role === 'TaiXe') : users.filter(u => u.role === 'TaiXe')).map((d) => (
+                    <option key={d.id} value={d.id}>
+                      🚍 {d.full_name} ({d.phone || d.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>Phụ Xe / Nhân Viên Soát Vé</label>
+                <select
+                  value={assignForm.staff_id}
+                  onChange={(e) => setAssignForm({ ...assignForm, staff_id: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '13px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                >
+                  <option value="">-- Bỏ phân công phụ xe --</option>
+                  {(staffList.filter(s => s.role === 'PhuXe').length > 0 ? staffList.filter(s => s.role === 'PhuXe') : users.filter(u => u.role === 'PhuXe')).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      🎫 {p.full_name} ({p.phone || p.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowAssignModal(false); setAssigningTrip(null); }}
+                  style={{ padding: '9px 16px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', color: '#475569', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  Hủy Bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="hover-lift"
+                  style={{ padding: '9px 20px', borderRadius: '8px', border: 'none', backgroundColor: '#2563eb', color: 'white', fontSize: '13px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)' }}
+                >
+                  ✓ Lưu Phân Công
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

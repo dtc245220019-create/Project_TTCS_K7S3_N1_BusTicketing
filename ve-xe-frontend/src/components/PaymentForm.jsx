@@ -34,11 +34,12 @@ function PaymentForm({ bookingData }) {
     // Tải danh sách voucher từ server nếu có
     getVouchers()
       .then((res) => {
-        if (res && res.vouchers && res.vouchers.length > 0) {
-          const formatted = res.vouchers.map(v => ({
-            id: v.code || v.id,
-            title: v.title || `Giảm ${v.discount_value}${v.discount_type === 'percentage' ? '%' : ' đ'}`,
-            minOrder: v.min_order_value || v.min_order || 0
+        const list = Array.isArray(res) ? res : (res?.vouchers || []);
+        if (list.length > 0) {
+          const formatted = list.map((v) => ({
+            id: v.code || v.voucher_code || v.id,
+            title: v.name || v.title || `Giảm ${v.discount_value || v.discount_percent || 10}${v.discount_type === 'percentage' || v.discount_type === 'percent' ? '%' : ' đ'}`,
+            minOrder: v.min_order_value || v.min_order || 0,
           }));
           setVoucherList(formatted);
         }

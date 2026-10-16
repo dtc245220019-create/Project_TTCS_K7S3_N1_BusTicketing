@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS trips (
     bus_id INTEGER REFERENCES buses(id),
     route_id INTEGER REFERENCES routes(id),
     driver_id INTEGER REFERENCES users(id),
+    staff_id INTEGER REFERENCES users(id),
     available_seats INTEGER DEFAULT 36
 );
 
@@ -249,15 +250,6 @@ CREATE TABLE IF NOT EXISTS incident_reports (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS feedbacks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL REFERENCES users(id),
-    trip_id INTEGER NOT NULL REFERENCES trips(id),
-    rating_stars INTEGER NOT NULL DEFAULT 5,
-    content TEXT,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 -- 16. ERD: THONG_BAO & NOTIFICATIONS (Sprint 2 - US20)
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -285,11 +277,13 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 -- 18. ERD: FEEDBACKS (Sprint 3)
 CREATE TABLE IF NOT EXISTS feedbacks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    trip_id INTEGER,
+    user_id INTEGER REFERENCES users(id),
+    trip_id INTEGER REFERENCES trips(id),
     rating INTEGER DEFAULT 5,
+    rating_stars INTEGER DEFAULT 5,
     category TEXT DEFAULT 'Chung',
     comment TEXT,
+    content TEXT,
     status TEXT DEFAULT 'PENDING',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -424,6 +418,15 @@ def initialize_database(connection: sqlite3.Connection) -> None:
         for col_name, col_type in add_fb_cols:
             if col_name not in fb_cols:
                 connection.execute(f"ALTER TABLE feedbacks ADD COLUMN {col_name} {col_type}")
+    except Exception:
+        pass
+
+    # Check and migrate missing columns in trips for existing sqlite databases
+    try:
+        trip_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
+                     for row in connection.execute("PRAGMA table_info(trips)").fetchall()}
+        if "staff_id" not in trip_cols:
+            connection.execute("ALTER TABLE trips ADD COLUMN staff_id INTEGER REFERENCES users(id)")
     except Exception:
         pass
 

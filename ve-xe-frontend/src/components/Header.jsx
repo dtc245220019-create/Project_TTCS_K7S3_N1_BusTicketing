@@ -27,7 +27,7 @@ function Header() {
           setNotifications(data);
           setUnreadCount(Math.min(data.length, 3));
         }
-      } catch (e) {
+      } catch (_e) {
         // Fallback demo notifications
         setNotifications([
           {
@@ -69,7 +69,7 @@ function Header() {
   };
 
   const handleActorSwitch = (targetRole) => {
-    let newUser = null;
+    let newUser;
     if (targetRole === 'HanhKhach') {
       newUser = {
         id: 1,
@@ -500,15 +500,15 @@ function Header() {
             </div>
             <div className="sidebar-section-label">MENU CHÍNH</div>
             {[
-              ['/', '⌂', 'Trang chủ'],
+              ['/', '🏠', 'Trang chủ'],
               ['/buses', '🚌', user && (user.role === 'Admin' || user.role === 'QuanTriVien') ? 'Điều phối chuyến' : user?.role === 'TaiXe' ? 'Lịch trình xe' : 'Tra cứu chuyến xe'],
-              ['/map', '⌖', 'Bản đồ & theo dõi xe'],
+              ['/map', '🗺️', 'Bản đồ & theo dõi xe'],
               ['/monthly-pass', '🎫', 'Vé tháng'],
-              ['/dashboard', '▣', user?.role === 'TaiXe' ? 'Lịch sử chuyến' : 'Vé của tôi'],
-              ['/feedback', '✉', 'Đánh giá & góp ý'],
-              ['/tra-cuu-hoan-tien', '↺', 'Tra cứu hoàn tiền'],
-              ['/verify-ticket', '▦', 'Soát vé QR'],
-              ['/admin', '⚙', 'Quản trị hệ thống'],
+              ['/dashboard', '🎟️', user?.role === 'TaiXe' ? 'Lịch sử chuyến' : 'Vé của tôi'],
+              ['/feedback', '💌', 'Đánh giá & góp ý'],
+              ['/tra-cuu-hoan-tien', '💸', 'Tra cứu hoàn tiền'],
+              ['/verify-ticket', '📱', 'Soát vé QR'],
+              ['/admin', '⚙️', 'Quản trị hệ thống'],
             ].map(([path, icon, label]) => (
               <Link key={path} to={path} onClick={() => setShowSidebar(false)} className={`sidebar-link ${location.pathname === path ? 'active' : ''}`}>
                 <span className="sidebar-link-icon">{icon}</span><span>{label}</span><span className="sidebar-chevron">›</span>

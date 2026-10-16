@@ -36,6 +36,7 @@ function App() {
             <Route path="/dashboard" element={<UserDashboard />} />
             <Route path="/cancellation" element={<UserDashboard defaultTab="exchange-cancel" />} />
             <Route path="/cancel-ticket" element={<UserDashboard defaultTab="exchange-cancel" />} />
+            <Route path="/ticket-cancellation" element={<TicketCancellation />} />
             <Route path="/verify-ticket" element={<TicketVerification />} />
             <Route path="/verify" element={<TicketVerification />} />
             <Route path="/admin" element={<AdminDashboard />} />

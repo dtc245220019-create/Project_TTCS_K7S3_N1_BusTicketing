@@ -684,9 +684,15 @@ button, .btn {
 /* Stats Row */
 .dashboard-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 24px;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
 }
 
 .dashboard-stat-card {
@@ -736,53 +742,64 @@ button, .btn {
 /* Nav Tabs */
 .dashboard-tabs-bar {
   display: flex;
-  flex-wrap: nowrap;
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 6px;
+  border-radius: 16px;
+  padding: 8px;
   margin-bottom: 24px;
-  gap: 4px;
+  gap: 10px;
   overflow-x: auto;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  scrollbar-width: thin;
+  align-items: center;
 }
 
 .dashboard-tab-btn {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: 10px 10px;
-  border: none;
-  background: transparent;
-  border-radius: 10px;
-  font-size: 13px;
+  flex: 0 0 auto;
+  padding: 12px 20px;
+  border: 1.5px solid transparent;
+  background: #f8fafc;
+  border-radius: 12px;
+  font-size: 14px;
   font-weight: 700;
-  color: #64748b;
+  color: #475569;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 8px;
   transition: all 0.2s ease;
   white-space: nowrap;
 }
 
 .dashboard-tab-btn:hover {
-  color: #1e3a8a;
-  background: #f1f5f9;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  transform: translateY(-1px);
 }
 
 .dashboard-tab-btn.active {
-  background: #2563eb;
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  border-color: #1d4ed8;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  transform: translateY(-1px);
 }
 
 .tab-badge {
   font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.08);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 4px;
 }
 
 .dashboard-tab-btn.active .tab-badge {

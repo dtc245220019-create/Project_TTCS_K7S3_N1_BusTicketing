@@ -23,20 +23,19 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, s
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+import threading
 
 import database
 from database import DATABASE_PATH, get_connection, initialize_database
 from ticket_changes import TicketChangeError, cancel_ticket, change_seat
-from notification import send_email_confirmation, send_sms_confirmation
-from BE1_zalo_vnpay.app.config import (
+from notification import send_email_confirmation, send_sms_confirmation, send_registration_confirmation
+from payment_gateway import (
     VNPAY_TMN_CODE,
     VNPAY_HASH_SECRET,
     VNPAY_PAYMENT_URL,
     VNPAY_RETURN_URL,
     ZALOPAY_KEY1,
     ZALOPAY_KEY2,
-)
-from BE1_zalo_vnpay.app.payment_gateway import (
     create_vnpay_payment_url,
     verify_vnpay_signature,
     create_zalopay_mac,
@@ -60,6 +59,18 @@ app.add_middleware(
 def startup() -> None:
     with get_connection() as connection:
         initialize_database(connection)
+
+
+def log_audit(connection, user_id: int, action: str, entity_type: str, entity_id: int, details: str = ""):
+    """Helper ghi nhật ký thao tác hệ thống (Audit Logs)"""
+    try:
+        connection.execute(
+            """INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (user_id, action, entity_type, entity_id, details, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+        )
+    except Exception as e:
+        print(f"Log audit error: {e}")
 
 
 # =============================================================================
@@ -175,6 +186,11 @@ def _serialize_ticket(row: Any) -> dict[str, Any]:
         ui_status = "COMPLETED"
     elif raw_st in ("CANCELLED", "DaHuy"):
         ui_status = "CANCELLED"
+    elif raw_st in ("PAID", "CONFIRMED", "GiuCho", "DaThanhToan"):
+        ui_status = "CONFIRMED"
+        # Vé đã thanh toán của chuyến sắp tới hoặc hôm nay được giữ trạng thái hợp lệ
+        if not is_past:
+            is_past = False
     elif is_past:
         ui_status = "COMPLETED"
     else:
@@ -193,8 +209,11 @@ def _serialize_ticket(row: Any) -> dict[str, Any]:
         "booking_code": row["booking_code"],
         "routeName": row["route_name"] or "Tuyến xe liên tỉnh",
         "route_name": row["route_name"] or "Tuyến xe liên tỉnh",
+        "from": row["departure_city"] or "Hà Nội",
+        "to": row["arrival_city"] or "Thái Nguyên",
         "departure_city": row["departure_city"] or "Hà Nội",
         "arrival_city": row["arrival_city"] or "Thái Nguyên",
+        "departure_at": row["departure_time"],
         "departureTime": row["departure_time"] or "08:00 - Hôm nay",
         "departure_time": row["departure_time"] or "08:00 - Hôm nay",
         "arrival_time": row["arrival_time"] or "16:00 - Hôm nay",
@@ -336,6 +355,22 @@ def search_trips(
             else:
                 duration_str = "8 tiếng"
 
+            dep_str = str(r["departure_at"] or "").replace("T", " ")
+            arr_str = str(r["arrival_at"] or "").replace("T", " ")
+            is_departed = False
+            try:
+                if len(dep_str) >= 16:
+                    dep_dt = datetime.strptime(dep_str[:16], "%Y-%m-%d %H:%M")
+                    if dep_dt <= datetime.now():
+                        is_departed = True
+            except Exception:
+                pass
+
+            dep_time = dep_str.split(" ")[-1][:5] if " " in dep_str else dep_str[:5]
+            arr_time = arr_str.split(" ")[-1][:5] if " " in arr_str else arr_str[:5]
+            dep_date = dep_str.split(" ")[0] if " " in dep_str else ""
+
+            effective_status = "DEPARTED" if is_departed else r["status"]
             results.append({
                 "id": r["id"],
                 "trip_code": r["trip_code"],
@@ -344,13 +379,17 @@ def search_trips(
                 "license_plate": r["license_plate"] or "51B-888.88",
                 "from": r["origin"],
                 "to": r["destination"],
-                "departureTime": r["departure_at"].split(" ")[-1] if " " in r["departure_at"] else r["departure_at"],
-                "arrivalTime": r["arrival_at"].split(" ")[-1] if " " in r["arrival_at"] else r["arrival_at"],
-                "departure_date": r["departure_at"].split(" ")[0] if " " in r["departure_at"] else "",
+                "departure_at": dep_str,
+                "arrival_at": arr_str,
+                "departureTime": dep_time,
+                "arrivalTime": arr_time,
+                "departure_date": dep_date,
                 "duration": duration_str,
                 "price": r["base_price"],
-                "availableSeatsCount": r["available_seats"] or 18,
-                "status": r["status"],
+                "availableSeatsCount": r["available_seats"] if r["available_seats"] is not None else 28,
+                "status": effective_status,
+                "is_departed": is_departed,
+                "can_book": not is_departed and r["status"] == "SCHEDULED",
             })
         return results
 
@@ -434,6 +473,21 @@ def hold_seats_endpoint(trip_id: int, payload: HoldSeatRequest):
         raise HTTPException(status_code=400, detail="Vui lòng chọn ít nhất 1 ghế")
 
     with get_connection() as connection:
+        trip = connection.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")
+
+        dep_str = str(trip["departure_at"] or "")
+        try:
+            if len(dep_str) >= 16:
+                dep_dt = datetime.strptime(dep_str[:16], "%Y-%m-%d %H:%M")
+                if dep_dt <= datetime.now():
+                    raise HTTPException(status_code=400, detail="Chuyến xe này đã khởi hành (quá giờ đặt vé), không thể giữ chỗ!")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
         placeholders = ",".join("?" for _ in payload.seat_ids)
         seats = connection.execute(
             f"SELECT * FROM seats WHERE trip_id = ? AND id IN ({placeholders})",
@@ -498,7 +552,41 @@ def register_user(payload: RegisterRequest):
             ),
         )
         user_id = cursor.lastrowid
+
+        # Ghi nhận thông báo vào bảng notifications
+        try:
+            connection.execute(
+                """INSERT INTO notifications (user_id, type, recipient, title, message, status)
+                   VALUES (?, 'EMAIL', ?, ?, ?, 'SENT')""",
+                (
+                    user_id,
+                    payload.email.strip().lower(),
+                    f"[SmartBus] Chào mừng {payload.full_name.strip()}!",
+                    f"Đăng ký tài khoản SmartBus thành công với vai trò {payload.role or 'HanhKhach'}.",
+                ),
+            )
+        except Exception as notif_err:
+            print(f"[REGISTER NOTIF ERROR]: {notif_err}")
+
         connection.commit()
+
+        # Gửi email chào mừng thật qua Gmail SMTP bằng background thread
+        try:
+            threading.Thread(
+                target=send_registration_confirmation,
+                args=(
+                    payload.email.strip().lower(),
+                    {
+                        "full_name": payload.full_name.strip(),
+                        "email": payload.email.strip().lower(),
+                        "phone": payload.phone.strip(),
+                        "role": payload.role or "HanhKhach",
+                    },
+                ),
+                daemon=True,
+            ).start()
+        except Exception as email_err:
+            print(f"[REGISTER EMAIL THREAD ERROR]: {email_err}")
 
         return {
             "id": user_id,
@@ -816,6 +904,21 @@ def create_order(payload: CreateOrderRequest):
     txn_code = f"TXN-{payload.payment_method.upper()}-{uuid4().hex[:8].upper()}"
 
     with get_connection() as connection:
+        trip = connection.execute("SELECT * FROM trips WHERE id = ?", (payload.trip_id,)).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")
+
+        dep_str = str(trip["departure_at"] or "")
+        try:
+            if len(dep_str) >= 16:
+                dep_dt = datetime.strptime(dep_str[:16], "%Y-%m-%d %H:%M")
+                if dep_dt <= datetime.now():
+                    raise HTTPException(status_code=400, detail="Chuyến xe này đã khởi hành (quá giờ đặt vé), không thể đặt vé!")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+
         # Tạo Booking
         cursor = connection.execute(
             """INSERT INTO bookings (booking_code, user_id, trip_id, total_amount, status)
@@ -1211,7 +1314,7 @@ def verify_ticket(payload: InspectionRequest):
 @app.get("/api/v1/routes", summary="Danh sách tuyến xe bus")
 def get_routes():
     with get_connection() as connection:
-        rows = connection.execute("SELECT * FROM routes WHERE status = 'HoatDong'").fetchall()
+        rows = connection.execute("SELECT * FROM routes WHERE status IN ('HoatDong', 'ACTIVE') OR status IS NULL ORDER BY id ASC").fetchall()
         return [dict(r) for r in rows]
 
 
@@ -1296,6 +1399,7 @@ class FeeCalculateRequest(BaseModel):
 class CreateVoucherRequest(BaseModel):
     code: str
     name: Optional[str] = ""
+    title: Optional[str] = None
     description: Optional[str] = None
     discount_type: str = "percent"  # percent or fixed
     discount_value: float = Field(default=10.0, ge=0)
@@ -1304,6 +1408,7 @@ class CreateVoucherRequest(BaseModel):
     max_discount: Optional[float] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    expiry_date: Optional[str] = None
 
 
 class CreateFeeRequest(BaseModel):
@@ -1325,7 +1430,13 @@ def create_voucher(payload: CreateVoucherRequest):
     code = payload.code.strip().upper()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     start = payload.start_date or now_str
-    end = payload.end_date or "2027-12-31 23:59:59"
+    end = payload.end_date or payload.expiry_date or "2027-12-31 23:59:59"
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if end[:10] < today_str:
+        raise HTTPException(status_code=400, detail="Ngày hết hạn của mã giảm giá không thể ở trong quá khứ")
+
+    name = payload.title or payload.name or code
     disc_val = payload.discount_value or (payload.discount_percent or 10.0)
     disc_pct = payload.discount_percent if payload.discount_type == "percent" else (payload.discount_value or 0.0)
     max_disc = payload.max_discount or (payload.discount_value if payload.discount_type == "fixed" else 100000.0)
@@ -1341,7 +1452,7 @@ def create_voucher(payload: CreateVoucherRequest):
             """INSERT INTO vouchers 
                (code, voucher_code, name, description, discount_type, discount_value, discount_percent, min_order_value, max_discount, max_discount_amount, start_date, end_date, expires_at, is_active, status)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE')""",
-            (code, code, payload.name or code, payload.description or "", payload.discount_type, disc_val,
+            (code, code, name, payload.description or "", payload.discount_type, disc_val,
              disc_pct, payload.min_order_value, max_disc, int(max_disc), start, end, end),
         )
         connection.commit()
@@ -1513,6 +1624,9 @@ class RegisterPassRequest(BaseModel):
     passenger_id_card: Optional[str] = None
     price: Optional[float] = None
     payment_method: Optional[str] = "SANDBOX"
+    customer_account_number: Optional[str] = None
+    customer_bank_name: Optional[str] = None
+    customer_account_holder: Optional[str] = None
 
 
 def _pass_price(base_price: int, months: int, discount_type: Optional[str]) -> dict[str, int]:
@@ -1783,11 +1897,13 @@ def get_admin_stats():
 def list_admin_trips():
     with get_connection() as connection:
         rows = connection.execute(
-            """SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type, u.full_name as driver_name
+            """SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type,
+                      u.full_name as driver_name, staff.full_name as staff_name
                FROM trips tr
                LEFT JOIN routes r ON r.id = tr.route_id
                LEFT JOIN buses b ON b.id = tr.bus_id
                LEFT JOIN users u ON u.id = tr.driver_id
+               LEFT JOIN users staff ON staff.id = tr.staff_id
                ORDER BY tr.departure_at ASC"""
         ).fetchall()
         return [dict(r) for r in rows]
@@ -1796,6 +1912,8 @@ def list_admin_trips():
 class UpdateTripStatusRequest(BaseModel):
     status: Optional[str] = None
     driver_id: Optional[int] = None
+    staff_id: Optional[int] = None
+    bus_id: Optional[int] = None
 
 
 @app.put("/api/v1/admin/trips/{trip_id}/status", summary="Cập nhật trạng thái chuyến xe (Admin)")
@@ -1813,6 +1931,12 @@ def update_trip_status(trip_id: int, payload: UpdateTripStatusRequest):
         if payload.driver_id is not None:
             updates.append("driver_id = ?")
             params.append(payload.driver_id)
+        if payload.staff_id is not None:
+            updates.append("staff_id = ?")
+            params.append(payload.staff_id)
+        if payload.bus_id is not None:
+            updates.append("bus_id = ?")
+            params.append(payload.bus_id)
 
         if updates:
             params.append(trip_id)
@@ -1823,20 +1947,220 @@ def update_trip_status(trip_id: int, payload: UpdateTripStatusRequest):
         return {"success": True, "trip": dict(updated)}
 
 
-@app.get("/api/v1/driver/trips", summary="Lịch trình và danh sách phân công của Tài xế")
-def get_driver_trips(driver_id: Optional[int] = Query(None)):
+# =============================================================================
+# ADMIN OPERATIONS: ROUTE CREATION, STAFF CREATION & TRIP ASSIGNMENT
+# =============================================================================
+
+class CreateRouteRequest(BaseModel):
+    name: str
+    departure_city: str
+    arrival_city: str
+    base_price: int = Field(default=150000, ge=0)
+    distance_km: float = Field(default=100.0, ge=0)
+    status: str = "HoatDong"
+
+
+@app.post("/api/v1/admin/routes", status_code=status.HTTP_201_CREATED, summary="Tạo mới tuyến xe (Admin)")
+def create_admin_route(payload: CreateRouteRequest):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Tên tuyến xe không được để trống")
+    with get_connection() as conn:
+        existing = conn.execute("SELECT id FROM routes WHERE LOWER(name) = LOWER(?)", (name,)).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail="Tuyến xe với tên này đã tồn tại trên hệ thống")
+        cursor = conn.execute(
+            """INSERT INTO routes (name, departure_city, arrival_city, base_price, distance_km, status)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (name, payload.departure_city.strip(), payload.arrival_city.strip(), payload.base_price, payload.distance_km, payload.status),
+        )
+        route_id = cursor.lastrowid
+        log_audit(conn, 12, "CREATE_ROUTE", "ROUTE", route_id, f"Tạo tuyến xe mới: {name}")
+        conn.commit()
+        row = conn.execute("SELECT * FROM routes WHERE id = ?", (route_id,)).fetchone()
+        return {"success": True, "message": "Tạo tuyến xe mới thành công!", "route": dict(row)}
+
+
+@app.get("/api/v1/admin/routes", summary="Danh sách tuyến xe chi tiết (Admin)")
+def list_admin_routes():
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT r.*,
+                      (SELECT COUNT(*) FROM trips t WHERE t.route_id = r.id) AS total_trips
+               FROM routes r
+               ORDER BY r.id ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+class CreateStaffRequest(BaseModel):
+    full_name: str
+    email: str
+    phone: str = "0900000000"
+    role: str = "TaiXe"  # TaiXe | PhuXe
+    password: str = "123456"
+
+
+@app.post("/api/v1/admin/staff", status_code=status.HTTP_201_CREATED, summary="Thêm mới tài xế / phụ xe (Admin)")
+def create_admin_staff(payload: CreateStaffRequest):
+    allowed_roles = {"TaiXe", "PhuXe", "DRIVER", "CONDUCTOR", "STAFF"}
+    if payload.role not in allowed_roles:
+        raise HTTPException(status_code=400, detail="Vai trò nhân sự phải là Tài Xế (TaiXe) hoặc Phụ Xe (PhuXe)")
+
+    email = payload.email.strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email không được để trống")
+
+    with get_connection() as conn:
+        existing = conn.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,)).fetchone()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email này đã được sử dụng bởi một tài khoản khác")
+
+        cursor = conn.execute(
+            """INSERT INTO users (full_name, email, phone, role, discount_type, discount_status, password_hash)
+               VALUES (?, ?, ?, ?, 'Khong', 'DaDuyet', ?)""",
+            (payload.full_name.strip(), email, payload.phone.strip(), payload.role, payload.password.strip()),
+        )
+        user_id = cursor.lastrowid
+        role_label = "Tài xế" if payload.role in ("TaiXe", "DRIVER") else "Phụ xe"
+        log_audit(conn, 12, "CREATE_STAFF", "USER", user_id, f"Thêm nhân sự {role_label}: {payload.full_name} ({email})")
+        conn.commit()
+        row = conn.execute("SELECT id, full_name, email, phone, role, created_at FROM users WHERE id = ?", (user_id,)).fetchone()
+        return {"success": True, "message": f"Thêm {role_label} thành công!", "staff": dict(row)}
+
+
+@app.get("/api/v1/admin/staff", summary="Danh sách tài xế và phụ xe (Admin)")
+def list_admin_staff():
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT u.id, u.full_name, u.email, u.phone, u.role, u.created_at,
+                      (SELECT COUNT(*) FROM trips t WHERE t.driver_id = u.id OR t.staff_id = u.id) AS assigned_trips
+               FROM users u
+               WHERE u.role IN ('TaiXe', 'PhuXe', 'DRIVER', 'CONDUCTOR', 'STAFF')
+               ORDER BY u.role DESC, u.id ASC"""
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+class CreateAdminTripRequest(BaseModel):
+    route_id: int
+    departure_at: str  # YYYY-MM-DD HH:MM
+    arrival_at: str    # YYYY-MM-DD HH:MM
+    bus_id: Optional[int] = 1
+    driver_id: Optional[int] = 11
+    staff_id: Optional[int] = 2
+    base_price: Optional[int] = None
+
+
+@app.post("/api/v1/admin/trips", status_code=status.HTTP_201_CREATED, summary="Tạo chuyến xe mới theo tuyến (Admin)")
+def create_admin_trip(payload: CreateAdminTripRequest):
+    with get_connection() as conn:
+        route = conn.execute("SELECT * FROM routes WHERE id = ?", (payload.route_id,)).fetchone()
+        if not route:
+            raise HTTPException(status_code=404, detail="Không tìm thấy tuyến xe")
+
+        bus = conn.execute("SELECT * FROM buses WHERE id = ?", (payload.bus_id,)).fetchone() if payload.bus_id else None
+        total_seats = bus["total_seats"] if bus else 36
+
+        price = payload.base_price if payload.base_price is not None else route["base_price"]
+        trip_code = f"TRIP-R{payload.route_id}-{uuid4().hex[:6].upper()}"
+
+        dep_at = str(payload.departure_at or "").strip().replace("T", " ")
+        arr_at = str(payload.arrival_at or "").strip().replace("T", " ")
+        if len(dep_at) == 16:
+            dep_at += ":00"
+        if arr_at and len(arr_at) == 16:
+            arr_at += ":00"
+        if not arr_at:
+            arr_at = dep_at
+
+        cursor = conn.execute(
+            """INSERT INTO trips (trip_code, origin, destination, departure_at, arrival_at, base_price, status, bus_id, route_id, driver_id, staff_id, available_seats)
+               VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?, ?, ?, ?)""",
+            (trip_code, route["departure_city"], route["arrival_city"], dep_at, arr_at, price, payload.bus_id, payload.route_id, payload.driver_id, payload.staff_id, total_seats),
+        )
+        trip_id = cursor.lastrowid
+
+        # Tự động tạo sơ đồ 2 tầng (Dãy A và Dãy B)
+        deck_lower = [f"A{i:02d}" for i in range(1, 19)]
+        deck_upper = [f"B{i:02d}" for i in range(1, 19)]
+        for s in deck_lower:
+            conn.execute("INSERT OR IGNORE INTO seats (trip_id, seat_number, deck_or_row, status) VALUES (?, ?, 'TangDuoi', 'AVAILABLE')", (trip_id, s))
+        for s in deck_upper:
+            conn.execute("INSERT OR IGNORE INTO seats (trip_id, seat_number, deck_or_row, status) VALUES (?, ?, 'TangTren', 'AVAILABLE')", (trip_id, s))
+
+        log_audit(conn, 12, "CREATE_TRIP", "TRIP", trip_id, f"Tạo chuyến mới {trip_code} cho tuyến {route['name']}")
+        conn.commit()
+        new_trip = conn.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        return {"success": True, "message": "Tạo chuyến xe thành công và đã sinh đủ sơ đồ ghế!", "trip": dict(new_trip)}
+
+
+class AssignTripRequest(BaseModel):
+    driver_id: Optional[int] = None
+    staff_id: Optional[int] = None
+    bus_id: Optional[int] = None
+
+
+@app.put("/api/v1/admin/trips/{trip_id}/assign", summary="Gán tài xế & phụ xe cho chuyến xe (Admin)")
+def assign_trip_staff(trip_id: int, payload: AssignTripRequest):
+    with get_connection() as conn:
+        trip = conn.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")
+
+        updates = []
+        params = []
+        if payload.driver_id is not None:
+            updates.append("driver_id = ?")
+            params.append(payload.driver_id)
+        if payload.staff_id is not None:
+            updates.append("staff_id = ?")
+            params.append(payload.staff_id)
+        if payload.bus_id is not None:
+            updates.append("bus_id = ?")
+            params.append(payload.bus_id)
+
+        if updates:
+            params.append(trip_id)
+            conn.execute(f"UPDATE trips SET {', '.join(updates)} WHERE id = ?", params)
+            log_audit(conn, 12, "ASSIGN_STAFF", "TRIP", trip_id, f"Phân công tài xế/phụ xe cho chuyến #{trip_id}")
+            conn.commit()
+
+        updated = conn.execute(
+            """SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type,
+                      u.full_name AS driver_name, staff.full_name AS staff_name
+               FROM trips tr
+               LEFT JOIN routes r ON r.id = tr.route_id
+               LEFT JOIN buses b ON b.id = tr.bus_id
+               LEFT JOIN users u ON u.id = tr.driver_id
+               LEFT JOIN users staff ON staff.id = tr.staff_id
+               WHERE tr.id = ?""",
+            (trip_id,),
+        ).fetchone()
+        return {"success": True, "message": "Đã phân công tài xế và phụ xe thành công!", "trip": dict(updated)}
+
+
+@app.get("/api/v1/driver/trips", summary="Lịch trình và danh sách phân công của Tài xế & Phụ xe")
+def get_driver_trips(
+    driver_id: Optional[int] = Query(None),
+    staff_id: Optional[int] = Query(None),
+    user_id: Optional[int] = Query(None),
+):
+    target_id = user_id or driver_id or staff_id
     with get_connection() as connection:
         query = """
-            SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type, u.full_name as driver_name
+            SELECT tr.*, r.name AS route_name, b.license_plate, b.bus_type,
+                   u.full_name as driver_name, staff.full_name as staff_name
             FROM trips tr
             LEFT JOIN routes r ON r.id = tr.route_id
             LEFT JOIN buses b ON b.id = tr.bus_id
             LEFT JOIN users u ON u.id = tr.driver_id
+            LEFT JOIN users staff ON staff.id = tr.staff_id
         """
         params = []
-        if driver_id:
-            query += " WHERE tr.driver_id = ?"
-            params.append(driver_id)
+        if target_id:
+            query += " WHERE (tr.driver_id = ? OR tr.staff_id = ?)"
+            params.extend([target_id, target_id])
         query += " ORDER BY tr.departure_at ASC"
         rows = connection.execute(query, params).fetchall()
 
@@ -1869,6 +2193,7 @@ def get_driver_trips(driver_id: Optional[int] = Query(None)):
                 "license_plate": r["license_plate"] or "29B-123.45",
                 "bus_type": r["bus_type"] or "Giường nằm cao cấp",
                 "driver_name": r["driver_name"] or "Trần Văn Tài",
+                "staff_name": r["staff_name"] or "Chưa phân công",
                 "passengers": [
                     {
                         "ticket_id": p["ticket_id"],
@@ -2142,7 +2467,7 @@ def admin_occupancy_report(
             dict(r)
             for r in c.execute(
                 """SELECT tr.id, tr.trip_code, tr.route_id, tr.origin, tr.destination,
-                          tr.departure_at, tr.status,
+                          tr.departure_at, tr.status, tr.available_seats,
                           COALESCE(b.total_seats, 36) AS total_seats,
                           (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = tr.id AND tk.status IN ('PAID','USED','DaThanhToan','DaSoat')) AS sold_seats
                    FROM trips tr
@@ -2151,10 +2476,12 @@ def admin_occupancy_report(
             ).fetchall()
         ]
     for r in rows:
-        total = r.get("total_seats") or 36
-        sold = r.get("sold_seats") or 0
-        r["occupancy_rate"] = round((sold / total) * 100, 1) if total else 0.0
-    return {"count": len(rows), "trips": rows}
+        total = max(1, r.get("total_seats") or 36)
+        sold = max(0, r.get("sold_seats") or 0)
+        rate = round((sold / total) * 100, 1)
+        r["occupancy_rate"] = max(0.0, min(100.0, rate))
+    avg_occ = round(sum(r["occupancy_rate"] for r in rows) / len(rows), 1) if rows else 0.0
+    return {"count": len(rows), "trips": rows, "overall": {"average_occupancy_rate": avg_occ}}
 
 
 @app.get("/api/v1/admin/occupancy/trips/{trip_id}", tags=["Sprint 3 - Doanh Thu & Báo Cáo"])
@@ -2162,7 +2489,7 @@ def admin_trip_occupancy(trip_id: int):
     with get_connection() as c:
         row = c.execute(
             """SELECT tr.id, tr.trip_code, tr.route_id, tr.origin, tr.destination,
-                      tr.departure_at, tr.status,
+                      tr.departure_at, tr.status, tr.available_seats,
                       COALESCE(b.total_seats, 36) AS total_seats,
                       (SELECT COUNT(*) FROM tickets tk WHERE tk.trip_id = tr.id AND tk.status IN ('PAID','USED','DaThanhToan','DaSoat')) AS sold_seats
                FROM trips tr
@@ -2173,9 +2500,10 @@ def admin_trip_occupancy(trip_id: int):
         if not row:
             raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")
         res = dict(row)
-        total = res.get("total_seats") or 36
-        sold = res.get("sold_seats") or 0
-        res["occupancy_rate"] = round((sold / total) * 100, 1) if total else 0.0
+        total = max(1, res.get("total_seats") or 36)
+        sold = max(0, res.get("sold_seats") or 0)
+        rate = round((sold / total) * 100, 1)
+        res["occupancy_rate"] = max(0.0, min(100.0, rate))
         return res
 
 
@@ -2314,12 +2642,13 @@ def get_refund_status(ticket_code: str):
 def admin_get_refunds():
     with get_connection() as conn:
         rows = conn.execute(
-            """SELECT rf.*, COALESCE(u.full_name, 'Hành khách') as passenger_name, COALESCE(u.phone, '---') as phone
+            """SELECT rf.*, rf.requested_amount AS amount, COALESCE(u.full_name, 'Hành khách') as passenger_name, COALESCE(u.phone, '---') as phone
                FROM refunds rf
                LEFT JOIN users u ON u.id = rf.user_id
                ORDER BY rf.created_at DESC"""
         ).fetchall()
-        return [dict(r) for r in rows]
+        refunds_list = [dict(r) for r in rows]
+        return {"refunds": refunds_list, "count": len(refunds_list)}
 
 
 @app.post("/api/v1/admin/refunds/{refund_id}/approve", tags=["Sprint 3 - Refunds"])
@@ -2331,19 +2660,25 @@ def admin_approve_refund(refund_id: int):
         amt = rf["requested_amount"]
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         conn.execute(
-            """UPDATE refunds SET status = 'REFUNDED', approved_amount = ?, processed_at = ?, note = 'Đã hoàn tiền thành công vào tài khoản'
+            """UPDATE refunds SET status = 'APPROVED', approved_amount = ?, processed_at = ?, note = 'Đã hoàn tiền thành công vào tài khoản'
                WHERE id = ?""",
             (amt, now_str, refund_id),
         )
+        if rf["ticket_code"]:
+            conn.execute("UPDATE tickets SET status = 'CANCELLED' WHERE ticket_code = ?", (rf["ticket_code"],))
         log_audit(conn, 12, "APPROVE_REFUND", "REFUND", refund_id, f"Hoàn tiền {int(amt):,}đ cho vé {rf['ticket_code']}")
         conn.commit()
-        return {"success": True, "message": "Đã phê duyệt và hoàn tiền thành công!", "status": "REFUNDED"}
+        return {"success": True, "message": "Đã phê duyệt và hoàn tiền thành công!", "status": "APPROVED"}
 
 
 @app.post("/api/v1/admin/refunds/{refund_id}/reject", tags=["Sprint 3 - Refunds"])
-def admin_reject_refund(refund_id: int, payload: dict):
+def admin_reject_refund(refund_id: int, payload: Optional[dict] = None):
+    payload = payload or {}
     reason = payload.get("reason", "Hủy vé quá muộn so với giờ quy định")
     with get_connection() as conn:
+        rf = conn.execute("SELECT * FROM refunds WHERE id = ?", (refund_id,)).fetchone()
+        if not rf:
+            raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu hoàn tiền")
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         conn.execute(
             """UPDATE refunds SET status = 'REJECTED', processed_at = ?, note = ?
@@ -2364,73 +2699,19 @@ class ChatbotAskRequest(BaseModel):
     conversation: Optional[list] = []
 
 
+from chatbot_engine import process_smart_chat
+
+
 @app.post("/api/v1/chatbot/chat", tags=["Sprint 3 - Chatbot AI"])
 @app.post("/api/v1/chatbot/ask", tags=["Sprint 3 - Chatbot AI"])
 def chatbot_chat_endpoint(req: ChatbotAskRequest):
-    q = (req.message or "").strip().lower()
     with get_connection() as conn:
-        trips = conn.execute(
-            """SELECT trip_code, origin, destination, departure_at, base_price, available_seats, status
-               FROM trips WHERE status != 'CANCELLED' ORDER BY departure_at LIMIT 10"""
-        ).fetchall()
-        trips_data = [dict(t) for t in trips]
-
-        vouchers = conn.execute(
-            """SELECT code, name, description, discount_percent, max_discount
-               FROM vouchers WHERE is_active = 1"""
-        ).fetchall()
-
-        user_tickets = []
-        if req.user_id:
-            user_tickets = conn.execute(
-                """SELECT t.ticket_code, t.seat_id, t.actual_price, t.status, tr.origin, tr.destination, tr.departure_at
-                   FROM tickets t
-                   LEFT JOIN trips tr ON tr.id = t.trip_id
-                   WHERE t.user_id = ? ORDER BY t.id DESC LIMIT 5""",
-                (req.user_id,),
-            ).fetchall()
-
-    actions = []
-    if any(k in q for k in ["chuyến", "xe", "giờ", "lịch", "đà lạt", "hồ chí minh"]):
-        actions.append("TRIPS")
-        lines = ["🚌 **Dưới đây là một số chuyến xe xuất bến gần nhất mà SmartBus đang mở bán:**"]
-        for t in trips_data[:5]:
-            lines.append(f"• **{t['trip_code']}**: {t['origin']} ➔ {t['destination']} | {t['departure_at'][:16]} | Giá: {int(t['base_price']):,}đ (Còn {t['available_seats']} chỗ)")
-        lines.append("\n👉 Bạn có thể vào mục **Chuyến xe** để chọn tầng trên/dưới và giữ ghế ngay nhé! [[TRIPS]]")
-        reply = "\n".join(lines)
-    elif any(k in q for k in ["giảm giá", "voucher", "khuyến mãi", "ưu đãi", "mã", "hssv"]):
-        lines = ["🎁 **Danh sách mã ưu đãi đặc biệt hôm nay:**"]
-        for v in vouchers:
-            lines.append(f"• **{v['code']}**: {v['name']} ({v['description'] or 'Ưu đãi đặt vé'}).")
-        lines.append("• **HSSV (-20%)**: Giảm ngay 20% khi chọn ưu đãi Học sinh - Sinh viên.")
-        lines.append("\n👉 Nhập mã khi thanh toán để được giảm tiền nhé! [[TRIPS]]")
-        reply = "\n".join(lines)
-    elif any(k in q for k in ["vé của tôi", "tra cứu vé", "đã đặt"]):
-        actions.append("TICKETS")
-        if user_tickets:
-            lines = ["🎫 **Vé gần nhất của bạn:**"]
-            for tk in user_tickets:
-                lines.append(f"• Mã: **{tk['ticket_code']}** ({tk['origin']} ➔ {tk['destination']}) - TT: **{tk['status']}**")
-            lines.append("\nXem chi tiết tại mục **Vé của tôi** nhé! [[TICKETS]]")
-            reply = "\n".join(lines)
-        else:
-            reply = "Bạn có thể vào mục **Vé của tôi** trên thanh điều hướng để xem mã QR và in vé bất kỳ lúc nào! [[TICKETS]]"
-    elif any(k in q for k in ["hủy vé", "hoàn tiền", "đổi vé", "trả vé"]):
-        reply = "Chính sách hủy vé & hoàn tiền của SmartBus:\n• Hủy trước 24 giờ: Hoàn tiền **100%** qua tài khoản ngân hàng hoặc ví điện tử.\n• Bạn có thể gửi yêu cầu hủy tại trang **Vé của tôi** hoặc tra cứu tiến độ tại mục **Tra cứu hoàn tiền**. [[FEEDBACK]]"
-        actions.append("FEEDBACK")
-    elif any(k in q for k in ["góp ý", "khiếu nại", "phản ánh", "đánh giá", "thái độ", "sự cố"]):
-        reply = "SmartBus luôn lắng nghe mọi đóng góp của bạn! Vui lòng gửi phản ánh hoặc đánh giá sao chuyến đi tại trang **Gửi phản ánh**. [[FEEDBACK]]"
-        actions.append("FEEDBACK")
-    else:
-        reply = "Dạ SmartBus AI xin chào bạn! 👋\nTôi có thể giúp bạn:\n1. 🔍 **Tra cứu chuyến xe & giá vé** (Hồ Chí Minh, Đà Lạt, Hà Nội...)\n2. 🎁 **Cung cấp mã giảm giá & ưu đãi HSSV**\n3. 🎟️ **Hướng dẫn đặt vé, thanh toán ZaloPay / VNPay**\n4. 🔄 **Chính sách đổi trả, hoàn tiền vé 100%**\n5. 📝 **Gửi phản ánh chất lượng chuyến đi**\n\nBạn cần hỗ trợ thông tin gì ạ? [[TRIPS]]"
-        actions.append("TRIPS")
-
-    return {
-        "success": True,
-        "message": reply,
-        "source": "SmartBus-AI-Assistant",
-        "actions": actions,
-    }
+        return process_smart_chat(
+            message=req.message,
+            conn=conn,
+            user_id=req.user_id,
+            conversation=req.conversation,
+        )
 
 
 if __name__ == "__main__":
