@@ -1,0 +1,342 @@
+.admin-analytics {
+  display: grid;
+  gap: 20px;
+}
+
+.admin-analytics-heading,
+.admin-analytics-panel-heading,
+.admin-analytics-subheading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-analytics-heading {
+  padding: 4px 0;
+}
+
+.admin-analytics-heading h2,
+.admin-analytics-panel-heading h3 {
+  color: #0f172a;
+  margin: 0;
+}
+
+.admin-analytics-heading p,
+.admin-analytics-panel-heading p,
+.admin-analytics-subheading p {
+  color: #64748b;
+  font-size: 13px;
+  margin: 4px 0 0;
+}
+
+.admin-analytics-refresh {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  color: #334155;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 14px;
+}
+
+.admin-analytics-refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.admin-analytics-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.035);
+  min-width: 0;
+  padding: 22px;
+}
+
+.admin-analytics-panel-heading {
+  margin-bottom: 18px;
+}
+
+.admin-analytics-eyebrow {
+  color: #2563eb;
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+
+.admin-analytics-source {
+  background: #f1f5f9;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.admin-revenue-summary {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 2fr 1fr 1fr;
+  margin-bottom: 24px;
+}
+
+.admin-revenue-summary article {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 16px;
+}
+
+.admin-revenue-primary {
+  background: linear-gradient(135deg, #eff6ff, #f0fdf4);
+}
+
+.admin-revenue-summary article > span {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-revenue-summary article strong {
+  color: #0f172a;
+  font-size: clamp(20px, 2.2vw, 27px);
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+
+.admin-revenue-primary strong {
+  color: #047857 !important;
+}
+
+.admin-revenue-summary article small {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.admin-analytics-subheading {
+  margin-bottom: 10px;
+}
+
+.admin-analytics-subheading h4 {
+  color: #1e293b;
+  font-size: 14px;
+  margin: 0;
+}
+
+.admin-analytics-table-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.admin-analytics-table {
+  border-collapse: collapse;
+  min-width: 700px;
+  width: 100%;
+}
+
+.admin-analytics-table th {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-analytics-table th,
+.admin-analytics-table td {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 12px 14px;
+}
+
+.admin-analytics-table td {
+  color: #475569;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.admin-analytics-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-analytics-strong {
+  color: #1e293b !important;
+  font-weight: 700;
+}
+
+.admin-analytics-empty {
+  color: #94a3b8 !important;
+  padding: 28px !important;
+  text-align: center;
+}
+
+.admin-analytics-route {
+  color: #94a3b8;
+  display: block;
+  font-size: 11px;
+  margin-top: 3px;
+}
+
+.admin-analytics-alert {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  font-size: 12px;
+  padding: 12px 16px;
+}
+
+.admin-analytics-alert ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.admin-occupancy-summary {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.admin-occupancy-summary strong {
+  color: #047857;
+  font-size: 23px;
+}
+
+.admin-occupancy-summary span,
+.admin-analytics-footnote {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.admin-occupancy-cell {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  min-width: 120px;
+}
+
+.admin-occupancy-cell strong {
+  color: #334155;
+  font-size: 11px;
+  min-width: 32px;
+}
+
+.admin-occupancy-track {
+  background: #e2e8f0;
+  border-radius: 999px;
+  height: 7px;
+  overflow: hidden;
+  width: 84px;
+}
+
+.admin-occupancy-track span {
+  background: linear-gradient(90deg, #34d399, #059669);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+}
+
+.admin-analytics-row-error {
+  color: #b91c1c !important;
+}
+
+.admin-analytics-footnote {
+  margin: 10px 2px 0;
+}
+
+.admin-audit-filter {
+  align-items: center;
+  color: #64748b;
+  display: flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 8px;
+}
+
+.admin-audit-filter select {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 12px;
+  padding: 7px 9px;
+}
+
+.admin-status-badge {
+  background: #f1f5f9;
+  border-radius: 999px;
+  color: #475569;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+
+.admin-status-badge.status-paid,
+.admin-status-badge.status-success,
+.admin-status-badge.audit-valid {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.admin-status-badge.status-pending,
+.admin-status-badge.audit-unpaid {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.admin-status-badge.status-cancelled,
+.admin-status-badge.audit-cancelled,
+.admin-status-badge.audit-invalid,
+.admin-status-badge.audit-already_used {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+@media (max-width: 760px) {
+  .admin-analytics-heading,
+  .admin-analytics-panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-revenue-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .admin-revenue-primary {
+    grid-column: 1 / -1;
+  }
+
+  .admin-audit-filter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 460px) {
+  .admin-analytics-panel {
+    padding: 16px;
+  }
+
+  .admin-revenue-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-revenue-primary {
+    grid-column: auto;
+  }
+}
