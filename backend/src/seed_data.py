@@ -234,8 +234,14 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
 
     for t in demo_trips:
         connection.execute(
-            """INSERT OR REPLACE INTO trips (id, trip_code, origin, destination, departure_at, arrival_at, base_price, status, bus_id, route_id, driver_id, staff_id, available_seats)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO trips (id, trip_code, origin, destination, departure_at, arrival_at, base_price, status, bus_id, route_id, driver_id, staff_id, available_seats)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                departure_at=excluded.departure_at,
+                arrival_at=excluded.arrival_at,
+                status=excluded.status,
+                base_price=excluded.base_price,
+                available_seats=excluded.available_seats""",
             t,
         )
         trip_id = t[0]
