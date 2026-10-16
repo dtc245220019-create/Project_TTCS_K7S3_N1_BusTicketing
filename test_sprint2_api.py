@@ -9,8 +9,13 @@ from fastapi.testclient import TestClient
 import database
 from api import app
 from seed_data import seed_database, seed_rich_demo_data
-from BE1_zalo_vnpay.app.config import VNPAY_HASH_SECRET, ZALOPAY_KEY1, ZALOPAY_KEY2
-from BE1_zalo_vnpay.app.payment_gateway import _vnpay_sign_data, create_zalopay_mac
+from payment_gateway import (
+    VNPAY_HASH_SECRET,
+    ZALOPAY_KEY1,
+    ZALOPAY_KEY2,
+    _vnpay_sign_data,
+    create_zalopay_mac,
+)
 import hashlib
 import hmac
 
