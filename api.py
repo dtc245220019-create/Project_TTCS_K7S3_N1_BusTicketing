@@ -1,18 +1,11 @@
 """Unified API Module for Smart Bus Ticketing System.
 
-Brings together:
-- US01: Tra cứu chuyến xe
-- US02 & US03: Sơ đồ ghế & Tạm giữ ghế
-- US04: Đăng ký & Đăng nhập
-- US05: Thanh toán trực tuyến (Sandbox Momo, VNPay, ZaloPay, Bank)
-- US06: Xuất vé điện tử kèm mã QR
-- US07: Lịch sử vé, Hủy vé trực tuyến
-- US08: Soát vé dành cho Tài xế / Phụ xe
-- Smart Map: Lộ trình tuyến & Trạm dừng GPS
+Proxies to backend/api/ package for backwards compatibility.
 """
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 import io
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Union
@@ -41,18 +34,40 @@ from BE1_zalo_vnpay.app.payment_gateway import (
     verify_zalopay_callback,
 )
 from boarding_api import BoardingRequest, board_ticket, normalize_code, resolve_staff
+=======
+import os
+import sys
 
-app = FastAPI(title="Smart Bus Ticketing API - Unified System", version="1.0.0")
+_curr_dir = os.path.dirname(os.path.abspath(__file__))
+_backend_dir = os.path.join(_curr_dir, "backend")
+_src_dir = os.path.join(_backend_dir, "src")
+_api_dir = os.path.join(_backend_dir, "api")
 
-# CORS middleware for React / Vite frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+for _p in [_curr_dir, _backend_dir, _src_dir, _api_dir]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+>>>>>>> develop
+
+from backend.api import app, startup
+from backend.api import (
+    log_audit,
+    _ticket_query,
+    _serialize_ticket,
+    _find_ticket,
+    _send_and_record_notification,
+    PaymentRequest,
+    CallbackRequest,
+    InspectionRequest,
+    CancelRequest,
+    ChangeSeatRequest,
+    ChangeTripRequest,
+    HoldSeatRequest,
+    RegisterRequest,
+    LoginRequest,
+    CreateOrderRequest,
 )
 
+<<<<<<< HEAD
 
 @app.on_event("startup")
 def startup() -> None:
@@ -1918,3 +1933,24 @@ def driver_board_passenger(payload: BoardPassengerRequest):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)
+=======
+__all__ = [
+    "app",
+    "startup",
+    "log_audit",
+    "_ticket_query",
+    "_serialize_ticket",
+    "_find_ticket",
+    "_send_and_record_notification",
+    "PaymentRequest",
+    "CallbackRequest",
+    "InspectionRequest",
+    "CancelRequest",
+    "ChangeSeatRequest",
+    "ChangeTripRequest",
+    "HoldSeatRequest",
+    "RegisterRequest",
+    "LoginRequest",
+    "CreateOrderRequest",
+]
+>>>>>>> develop
