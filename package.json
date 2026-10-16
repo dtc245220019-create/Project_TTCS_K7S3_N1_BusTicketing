@@ -1,5 +1,15 @@
 {
-  "dependencies": {
-    "react-router-dom": "^7.18.4"
+  "name": "project-bus-ticketing-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Smart Bus Ticketing System - Unified Root Launcher",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "lint": "npm --prefix frontend run lint",
+    "preview": "npm --prefix frontend run preview",
+    "install:frontend": "npm --prefix frontend install",
+    "postinstall": "npm --prefix frontend install"
+
   }
 }
