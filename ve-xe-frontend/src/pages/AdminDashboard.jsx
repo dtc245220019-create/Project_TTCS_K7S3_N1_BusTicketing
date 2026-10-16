@@ -30,43 +30,6 @@ import CreateVoucher from '../components/CreateVoucher';
 import RefundManagement from '../components/RefundManagement';
 import './AdminDashboard.css';
 
-const downloadCsvFile = (filename, headers, rows) => {
-  if (!rows.length) return false;
-
-  const escapeCsvCell = (value) => {
-    let text = value == null ? '' : String(value);
-
-    // Tránh nội dung CSV bị hiểu nhầm thành công thức Excel.
-    if (/^[\t\r=+\-@]/.test(text)) {
-      text = `'${text}`;
-    }
-
-    return `"${text.replace(/"/g, '""')}"`;
-  };
-
-  const csvContent = [headers, ...rows]
-    .map((row) => row.map(escapeCsvCell).join(','))
-    .join('\r\n');
-
-  // BOM giúp Excel nhận diện UTF-8 và hiển thị tiếng Việt.
-  const blob = new Blob(['\uFEFF', csvContent], {
-    type: 'text/csv;charset=utf-8;',
-  });
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-
-  return true;
-};
-
 function AdminDashboard() {
   const [currentUser, setUser] = useState(getCurrentUser());
   const [stats, setStats] = useState(null);
@@ -495,69 +458,6 @@ function AdminDashboard() {
       showToast(`Lỗi cập nhật góp ý: ${err.message || 'Không thể lưu'}`, 'error');
     }
   };
-  
-  const handleExportUsers = () => {
-    const rows = filteredUsers.map((u) => [
-      u.id,
-      u.full_name,
-      u.email,
-      u.phone,
-      u.discount_type,
-      u.role,
-    ]);
-
-    const success = downloadCsvFile(
-      'danh-sach-nguoi-dung.csv',
-      ['ID', 'Họ và tên', 'Email', 'Số điện thoại', 'Loại ưu đãi', 'Vai trò'],
-      rows
-    );
-
-    setFeedbackMsg({
-      text: success
-        ? `Đã xuất ${rows.length} người dùng ra file CSV.`
-        : 'Không có người dùng để xuất.',
-      type: success ? 'success' : 'error',
-    });
-  };
-
-  const handleExportTrips = () => {
-    const rows = trips.map((t) => [
-      t.id,
-      t.origin,
-      t.destination,
-      t.departure_time,
-      t.license_plate,
-      t.bus_type,
-      t.price,
-      t.available_seats,
-      t.driver_name,
-      t.status,
-    ]);
-
-    const success = downloadCsvFile(
-      'danh-sach-chuyen-xe.csv',
-      [
-        'ID',
-        'Điểm đi',
-        'Điểm đến',
-        'Thời gian khởi hành',
-        'Biển số xe',
-        'Loại xe',
-        'Giá vé',
-        'Số ghế trống',
-        'Tài xế',
-        'Trạng thái',
-      ],
-      rows
-    );
-
-    setFeedbackMsg({
-      text: success
-        ? `Đã xuất ${rows.length} chuyến xe ra file CSV.`
-        : 'Không có chuyến xe để xuất.',
-      type: success ? 'success' : 'error',
-    });
-  };
 
   const switchToAdminDemo = () => {
     const adminUser = {
@@ -950,6 +850,7 @@ function AdminDashboard() {
               ))}
             </div>
           </div>
+
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
