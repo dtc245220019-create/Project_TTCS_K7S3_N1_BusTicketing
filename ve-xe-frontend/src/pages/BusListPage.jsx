@@ -382,9 +382,14 @@ function BusListPage() {
                             </div>
                           </div>
 
-                          <div style={{ marginTop: '8px', fontSize: '12px', color: '#16a34a', fontWeight: '700' }}>
-                            🟢 Còn {trip.availableSeatsCount} vị trí ghế trống
-                          </div>
+                          {(() => {
+                            const isDeparted = trip.is_departed || trip.status === 'DEPARTED';
+                            return (
+                              <div style={{ marginTop: '8px', fontSize: '12px', color: isDeparted ? '#64748b' : '#16a34a', fontWeight: '700' }}>
+                                {isDeparted ? '⚫ Chuyến xe đã khởi hành (quá giờ đặt vé)' : `🟢 Còn ${trip.availableSeatsCount} vị trí ghế trống`}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -394,27 +399,54 @@ function BusListPage() {
                         <div style={{ fontSize: '24px', fontWeight: '800', color: '#dc2626', marginBottom: '10px' }}>
                           {trip.price.toLocaleString('vi-VN')} VNĐ
                         </div>
-                        <button
-                          onClick={() => toggleTripSeats(trip.id)}
-                          style={{
-                            backgroundColor: isExpanded ? '#334155' : '#2563eb',
-                            color: 'white',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            fontWeight: '700',
-                            padding: '10px 20px',
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            fontSize: '13.5px',
-                            whiteSpace: 'nowrap',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.15s ease',
-                            boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
-                          }}
-                        >
-                          {isExpanded ? 'Đóng sơ đồ ghế ▲' : 'Chọn chỗ & Đặt vé ▼'}
-                        </button>
+                        {(() => {
+                          const isDeparted = trip.is_departed || trip.status === 'DEPARTED';
+                          if (isDeparted) {
+                            return (
+                              <button
+                                disabled
+                                style={{
+                                  backgroundColor: '#94a3b8',
+                                  color: 'white',
+                                  border: 'none',
+                                  fontWeight: '700',
+                                  padding: '10px 20px',
+                                  borderRadius: '10px',
+                                  cursor: 'not-allowed',
+                                  fontSize: '13.5px',
+                                  whiteSpace: 'nowrap',
+                                  opacity: 0.8,
+                                }}
+                              >
+                                Đã khởi hành
+                              </button>
+                            );
+                          }
+                          return (
+                            <button
+                              onClick={() => toggleTripSeats(trip.id)}
+                              className="hover-lift"
+                              style={{
+                                backgroundColor: isExpanded ? '#334155' : '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                fontWeight: '700',
+                                padding: '10px 20px',
+                                borderRadius: '10px',
+                                cursor: 'pointer',
+                                fontSize: '13.5px',
+                                whiteSpace: 'nowrap',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.15s ease',
+                                boxShadow: '0 2px 8px rgba(16,185,129,0.3)',
+                              }}
+                            >
+                              {isExpanded ? 'Đóng sơ đồ ghế ▲' : 'Chọn chỗ & Đặt vé ▼'}
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
 

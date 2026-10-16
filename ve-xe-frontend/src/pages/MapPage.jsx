@@ -27,7 +27,7 @@ function MapPage() {
   const [mapData, setMapData] = useState({ routes: [], buses: [] });
   const [selectedRouteId, setSelectedRouteId] = useState(1);
   const [selectedStop, setSelectedStop] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
 
   useEffect(() => {
     getMapOverview()
