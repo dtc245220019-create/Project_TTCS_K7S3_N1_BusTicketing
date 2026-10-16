@@ -37,8 +37,11 @@ ve-xe-frontend/venv/
 
 # Node & Frontend
 node_modules/
-ve-xe-frontend/node_modules/
-ve-xe-frontend/dist/
+frontend/node_modules/
+frontend/dist/
+frontend/venv/
+ve-xe-frontend/
+ve-xe-frontend
 
 # Scratch & temporary
 doc_content.txt
@@ -46,4 +49,5 @@ Project_TTCS_K7S3_N1_BusTicketing/
 
 # Environment variables
 .env
-BE4_Voucher_Fee/.env
+.env.local
+*.env
