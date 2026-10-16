@@ -1,6 +1,7 @@
 function Footer() {
   return (
     <footer
+      className="footer no-print"
       style={{
         backgroundColor: '#0b1329',
         color: '#94a3b8',

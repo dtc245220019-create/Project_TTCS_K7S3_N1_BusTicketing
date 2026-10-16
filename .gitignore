@@ -27,6 +27,9 @@ ve-xe-frontend/venv/
 # Visual Studio / VS Code
 .vs/
 .vscode/
+*.pyproj
+*.sln
+*.slnx
 
 # SQLite Database
 *.db
@@ -40,3 +43,8 @@ ve-xe-frontend/dist/
 # Scratch & temporary
 doc_content.txt
 Project_TTCS_K7S3_N1_BusTicketing/
+
+# Environment variables
+.env
+.env.local
+*.env
