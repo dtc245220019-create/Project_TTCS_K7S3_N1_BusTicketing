@@ -4,15 +4,12 @@ echo =====================================================================
 echo    KHOI DONG HE THONG SMART BUS TICKETING - UNIFIED ECOSYSTEM
 echo =====================================================================
 echo.
-<<<<<<< HEAD
-=======
 
 if not exist "frontend\node_modules\" (
     echo [!] Phat hien chua cai dat thu vien Frontend, dang chay npm install...
     cd frontend && call npm install && cd ..
 )
 
->>>>>>> develop
 echo [1/2] Dang khoi chay Backend Server FastAPI (Port 8000)...
 start "SmartBus - Backend (FastAPI)" cmd /k "python backend/main.py"
 
