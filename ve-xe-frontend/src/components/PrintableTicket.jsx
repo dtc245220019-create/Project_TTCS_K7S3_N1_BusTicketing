@@ -1,5 +1,3 @@
-import React from 'react';
-
 /**
  * Tra cứu địa chỉ bến xe chuẩn hóa theo tỉnh/thành phố
  */
@@ -142,7 +140,7 @@ function PrintableTicket({
   discountAmount = '24.000 VNĐ',
   finalPrice = '96.000 VNĐ',
   paymentMethod = 'VietQR / VNPAY',
-  status = 'CONFIRMED',
+  status: _status = 'CONFIRMED',
   qrCodeUrl = '',
   showStub = true,
   className = '',
