@@ -27,6 +27,9 @@ ve-xe-frontend/venv/
 # Visual Studio / VS Code
 .vs/
 .vscode/
+*.pyproj
+*.sln
+*.slnx
 
 # SQLite Database
 *.db
@@ -43,4 +46,5 @@ Project_TTCS_K7S3_N1_BusTicketing/
 
 # Environment variables
 .env
-BE4_Voucher_Fee/.env
+.env.local
+*.env

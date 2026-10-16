@@ -6,3 +6,5 @@ sqlalchemy>=2.0,<3
 pymysql>=1.1,<2
 cryptography>=42.0,<50
 apscheduler>=3.10,<4
+python-dotenv>=1.0,<2
+pytest>=8.0,<10
