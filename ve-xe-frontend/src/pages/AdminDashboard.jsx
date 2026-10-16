@@ -7,6 +7,8 @@ import {
   updateUserRole,
   getAdminStats,
   getAdminTrips,
+  getTripSeats,
+  getRecentInspections,
   updateTripStatus,
   getAdminRevenue,
   getAdminOccupancy,
@@ -49,6 +51,9 @@ function AdminDashboard() {
   const [occupancyData, setOccupancyData] = useState(null);
   const [revenueGroupBy, setRevenueGroupBy] = useState('month');
   const [_loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [seatOccupancyDetails, setSeatOccupancyDetails] = useState([]);
+  const [seatOccupancyLoading, setSeatOccupancyLoading] = useState(false);
+  const [seatOccupancyError, setSeatOccupancyError] = useState('');
 
   // Discounts tab states
   const [pendingDiscounts, setPendingDiscounts] = useState([]);
@@ -65,6 +70,10 @@ function AdminDashboard() {
   // Audit tab states
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditActionFilter, setAuditActionFilter] = useState('ALL');
+  const [recentInspections, setRecentInspections] = useState([]);
+  const [inspectionFilter, setInspectionFilter] = useState('ALL');
+  const [inspectionLoading, setInspectionLoading] = useState(false);
+  const [inspectionError, setInspectionError] = useState('');
 
   // Admin Operations State (US - Quản Trị Viên)
   const [routes, setRoutes] = useState([]);
@@ -205,6 +214,7 @@ function AdminDashboard() {
     } finally {
       setLoadingAnalytics(false);
     }
+    loadSeatOccupancyDetails();
   };
 
   const loadPendingDiscounts = async () => {
@@ -252,6 +262,72 @@ function AdminDashboard() {
       }
     } catch (e) {
       console.warn('Lỗi tải audit logs:', e);
+    }
+    loadRecentInspections();
+  };
+
+  const loadSeatOccupancyDetails = async () => {
+    setSeatOccupancyLoading(true);
+    setSeatOccupancyError('');
+    try {
+      const response = await getAdminTrips();
+      const tripList = response?.trips || response || [];
+      if (!Array.isArray(tripList)) {
+        throw new Error('Dữ liệu danh sách chuyến không hợp lệ.');
+      }
+      setTrips(tripList);
+
+      const results = await Promise.allSettled(
+        tripList.map(async (trip) => {
+          const seatResponse = await getTripSeats(trip.id);
+          const seats = Array.isArray(seatResponse?.seats) ? seatResponse.seats : [];
+          const totalSeats = Number(seatResponse?.total_seats) || seats.length;
+          const bookedSeats = seats.filter((seat) => seat.status === 'BOOKED').length;
+          const heldSeats = seats.filter((seat) => seat.status === 'HELD').length;
+          return {
+            ...trip,
+            totalSeats,
+            bookedSeats,
+            heldSeats,
+            occupancyRate: totalSeats ? Math.round((bookedSeats / totalSeats) * 100) : 0,
+          };
+        })
+      );
+      const failures = [];
+      const rows = results.map((result, index) => {
+        if (result.status === 'fulfilled') return result.value;
+        failures.push(tripList[index]?.trip_code || `#${tripList[index]?.id}`);
+        return { ...tripList[index], error: true };
+      });
+      setSeatOccupancyDetails(rows);
+      if (failures.length > 0) {
+        setSeatOccupancyError(`Không tải được sơ đồ ghế cho chuyến: ${failures.join(', ')}.`);
+      }
+    } catch (error) {
+      console.error('Lỗi tải chi tiết ghế theo chuyến:', error);
+      setSeatOccupancyDetails([]);
+      setSeatOccupancyError(error.message || 'Không tải được dữ liệu ghế theo chuyến.');
+    } finally {
+      setSeatOccupancyLoading(false);
+    }
+  };
+
+  const loadRecentInspections = async () => {
+    setInspectionLoading(true);
+    setInspectionError('');
+    try {
+      const response = await getRecentInspections();
+      const inspections = response?.inspections || response;
+      if (!Array.isArray(inspections)) {
+        throw new Error('Dữ liệu lịch sử soát vé không hợp lệ.');
+      }
+      setRecentInspections(inspections);
+    } catch (error) {
+      console.error('Lỗi tải lịch sử soát vé:', error);
+      setRecentInspections([]);
+      setInspectionError(error.message || 'Không tải được lịch sử soát vé.');
+    } finally {
+      setInspectionLoading(false);
     }
   };
 
@@ -417,6 +493,10 @@ function AdminDashboard() {
     if (auditActionFilter === 'ALL') return true;
     return (log.action || '').toUpperCase().includes(auditActionFilter.toUpperCase());
   });
+  const filteredInspections =
+    inspectionFilter === 'ALL'
+      ? recentInspections
+      : recentInspections.filter((inspection) => inspection.result === inspectionFilter);
 
   const getRoleBadge = (role) => {
     switch (role) {
@@ -1148,6 +1228,73 @@ function AdminDashboard() {
               </table>
             </div>
           </div>
+
+          <div className="admin-analytics-panel">
+            <div className="admin-analytics-panel-heading">
+              <div>
+                <span className="admin-analytics-eyebrow">CHI TIẾT GHẾ</span>
+                <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Ghế đã đặt và đang giữ theo chuyến</h3>
+                <p>Ghế HELD được thống kê riêng, không tính là vé đã bán.</p>
+              </div>
+              <button
+                className="admin-analytics-refresh"
+                type="button"
+                onClick={loadSeatOccupancyDetails}
+                disabled={seatOccupancyLoading}
+              >
+                {seatOccupancyLoading ? 'Đang tải…' : '↻ Làm mới ghế'}
+              </button>
+            </div>
+            {seatOccupancyError && (
+              <div className="admin-analytics-alert" role="alert">{seatOccupancyError}</div>
+            )}
+            <div className="admin-analytics-table-wrap">
+              <table className="admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Chuyến xe</th>
+                    <th>Khởi hành</th>
+                    <th>Ghế đã đặt</th>
+                    <th>Đang giữ</th>
+                    <th>Tỷ lệ lấp đầy</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {seatOccupancyDetails.length === 0 ? (
+                    <tr>
+                      <td className="admin-analytics-empty" colSpan="5">
+                        {seatOccupancyLoading ? 'Đang tải trạng thái ghế…' : 'Chưa có dữ liệu chuyến xe.'}
+                      </td>
+                    </tr>
+                  ) : seatOccupancyDetails.map((trip) => (
+                    <tr key={trip.id}>
+                      <td>
+                        <span className="admin-analytics-strong">{trip.trip_code || `Chuyến #${trip.id}`}</span>
+                        <small className="admin-analytics-route">{trip.origin} → {trip.destination}</small>
+                      </td>
+                      <td>{trip.departure_at || trip.departure_time || '—'}</td>
+                      {trip.error ? (
+                        <td className="admin-analytics-row-error" colSpan="3">Không tải được trạng thái ghế.</td>
+                      ) : (
+                        <>
+                          <td>{trip.bookedSeats}/{trip.totalSeats}</td>
+                          <td>{trip.heldSeats}</td>
+                          <td>
+                            <div className="admin-occupancy-cell">
+                              <div className="admin-occupancy-track" aria-label={`${trip.occupancyRate}% lấp đầy`}>
+                                <span style={{ width: `${trip.occupancyRate}%` }} />
+                              </div>
+                              <strong>{trip.occupancyRate}%</strong>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1516,6 +1663,83 @@ function AdminDashboard() {
               </tbody>
             </table>
           </div>
+          <section className="admin-analytics-panel" style={{ marginTop: '20px' }}>
+            <div className="admin-analytics-panel-heading">
+              <div>
+                <span className="admin-analytics-eyebrow">SOÁT VÉ</span>
+                <h3>Lịch sử kiểm tra vé gần đây</h3>
+                <p>Kết quả xác minh vé từ nhân viên vận hành.</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <label className="admin-audit-filter">
+                  <span>Lọc kết quả</span>
+                  <select value={inspectionFilter} onChange={(event) => setInspectionFilter(event.target.value)}>
+                    <option value="ALL">Tất cả</option>
+                    <option value="VALID">Hợp lệ</option>
+                    <option value="ALREADY_USED">Đã sử dụng</option>
+                    <option value="CANCELLED">Đã hủy</option>
+                    <option value="INVALID">Không hợp lệ</option>
+                    <option value="UNPAID">Chưa thanh toán</option>
+                  </select>
+                </label>
+                <button
+                  className="admin-analytics-refresh"
+                  type="button"
+                  onClick={loadRecentInspections}
+                  disabled={inspectionLoading}
+                >
+                  {inspectionLoading ? 'Đang tải…' : '↻ Làm mới'}
+                </button>
+              </div>
+            </div>
+            {inspectionError && (
+              <div className="admin-analytics-alert" role="alert">{inspectionError}</div>
+            )}
+            <div className="admin-analytics-table-wrap">
+              <table className="admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Mã vé</th>
+                    <th>Nhân viên</th>
+                    <th>Kết quả</th>
+                    <th>Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInspections.length === 0 ? (
+                    <tr>
+                      <td className="admin-analytics-empty" colSpan="5">
+                        {inspectionLoading ? 'Đang tải lịch sử soát vé…' : 'Không có bản ghi phù hợp.'}
+                      </td>
+                    </tr>
+                  ) : filteredInspections.map((inspection) => (
+                    <tr key={inspection.id}>
+                      <td>
+                        {inspection.inspected_at
+                          ? new Date(inspection.inspected_at).toLocaleString('vi-VN')
+                          : '—'}
+                      </td>
+                      <td className="admin-analytics-strong">{inspection.ticket_code || '—'}</td>
+                      <td>{inspection.staff_email || `Nhân viên #${inspection.staff_user_id || '—'}`}</td>
+                      <td>
+                        <span className={`admin-status-badge audit-${String(inspection.result || '').toLowerCase()}`}>
+                          {({
+                            VALID: 'Hợp lệ',
+                            ALREADY_USED: 'Đã sử dụng',
+                            CANCELLED: 'Đã hủy',
+                            INVALID: 'Không hợp lệ',
+                            UNPAID: 'Chưa thanh toán',
+                          })[inspection.result] || inspection.result || 'Không rõ'}
+                        </span>
+                      </td>
+                      <td>{inspection.note || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       )}
 
