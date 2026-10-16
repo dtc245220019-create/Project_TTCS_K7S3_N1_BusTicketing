@@ -5,7 +5,7 @@ from database import get_connection
 import csv
 import io
 from fastapi.responses import StreamingResponse
-from be4_revenue import revenue_report
+from api_doanh_thu import revenue_report
 
 router = APIRouter(prefix="/api/v1/admin")
 
