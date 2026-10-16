@@ -5,16 +5,16 @@ echo    KHOI DONG HE THONG SMART BUS TICKETING - UNIFIED ECOSYSTEM
 echo =====================================================================
 echo.
 
-if not exist "ve-xe-frontend\node_modules\" (
+if not exist "frontend\node_modules\" (
     echo [!] Phat hien chua cai dat thu vien Frontend, dang chay npm install...
-    cd ve-xe-frontend && call npm install && cd ..
+    cd frontend && call npm install && cd ..
 )
 
 echo [1/2] Dang khoi chay Backend Server FastAPI (Port 8000)...
-start "SmartBus - Backend (FastAPI)" cmd /k "python main.py"
+start "SmartBus - Backend (FastAPI)" cmd /k "python backend/main.py"
 
 echo [2/2] Dang khoi chay Frontend React Vite (Port 5173)...
-start "SmartBus - Frontend (React Vite)" cmd /k "npm --prefix ve-xe-frontend run dev"
+start "SmartBus - Frontend (React Vite)" cmd /k "npm --prefix frontend run dev"
 
 echo.
 echo =====================================================================

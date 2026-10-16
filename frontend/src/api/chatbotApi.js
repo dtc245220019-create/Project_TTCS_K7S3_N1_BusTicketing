@@ -2,7 +2,7 @@
 // Cấu hình bằng biến môi trường trong ve-xe-frontend/.env.local (xem .env.example).
 // LƯU Ý: key đặt ở frontend sẽ nằm trong bundle => chỉ phù hợp demo/đồ án.
 // Khi triển khai thật nên chuyển lời gọi này về backend (proxy) để giấu key.
-import { fetchJson } from '../api';
+import { fetchJson } from './client.js';
 
 const env = import.meta.env;
 const PROVIDER = (env.VITE_AI_PROVIDER || 'gemini').toLowerCase();

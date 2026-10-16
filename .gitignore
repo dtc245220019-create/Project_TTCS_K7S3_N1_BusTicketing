@@ -37,8 +37,11 @@ ve-xe-frontend/venv/
 
 # Node & Frontend
 node_modules/
-ve-xe-frontend/node_modules/
-ve-xe-frontend/dist/
+frontend/node_modules/
+frontend/dist/
+frontend/venv/
+ve-xe-frontend/
+ve-xe-frontend
 
 # Scratch & temporary
 doc_content.txt
