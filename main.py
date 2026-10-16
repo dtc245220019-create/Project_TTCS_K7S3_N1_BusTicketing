@@ -8,6 +8,7 @@ Integrates:
 """
 
 import sys
+
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -25,6 +26,9 @@ from fastapi import FastAPI
 from api import app as api_app
 from database import get_connection, initialize_database
 from seed_data import seed_database, seed_rich_demo_data
+
+# Import router Audit & Discount Approval
+from audit_api import router as audit_router
 
 
 # =============================================================================
@@ -89,10 +93,12 @@ async def lifespan(app: FastAPI):
     print("-> Background Scheduler da tat an toan.")
 
 
+# Tích hợp audit_router vào FastAPI app chính
+api_app.include_router(audit_router)
+
 # Gán lifespan cho app
 api_app.router.lifespan_context = lifespan
 app = api_app
-
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
