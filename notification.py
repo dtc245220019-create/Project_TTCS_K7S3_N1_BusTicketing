@@ -14,7 +14,7 @@ def send_email_confirmation(to_email: str, ticket_data: dict):
     sender_email = "busticketingduan@gmail.com"
     sender_password = "wrykoqvwkzlcxbpx"
 
-    # Trích xuất dữ liệu đồng bộ từ Vé
+    # Trích xuất dữ liệu đồng bộ từ Vé xe
     ticket_code = ticket_data.get('ticket_code', 'N/A')
     customer_name = ticket_data.get('customer_name', 'Quý khách')
     route_name = ticket_data.get('route_name', 'Chưa xác định')
