@@ -8,6 +8,8 @@ function Header() {
   const [user, setUser] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const isHome = location.pathname === '/';
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef(null);
 
@@ -25,7 +27,7 @@ function Header() {
           setNotifications(data);
           setUnreadCount(Math.min(data.length, 3));
         }
-      } catch (e) {
+      } catch (_e) {
         // Fallback demo notifications
         setNotifications([
           {
@@ -67,7 +69,7 @@ function Header() {
   };
 
   const handleActorSwitch = (targetRole) => {
-    let newUser = null;
+    let newUser;
     if (targetRole === 'HanhKhach') {
       newUser = {
         id: 1,
@@ -118,17 +120,33 @@ function Header() {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <header className="navbar no-print">
-      <div className="logo">
-        <Link to="/" style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="logo-icon" style={{ fontSize: '24px' }}>🚌</span>
-          <span style={{ fontWeight: '800', fontSize: '18px', letterSpacing: '-0.5px' }}>
-            Smart <span style={{ color: '#38bdf8' }}>BusTicketing</span>
-          </span>
-        </Link>
+    <header className={`navbar no-print ${isHome ? 'navbar-home' : 'navbar-inner-page'}`}>
+     <div className="header-brand-group">
+        {!isHome && (
+          <button
+            className="sidebar-toggle"
+            type="button"
+            aria-label="Mở menu"
+            onClick={() => setShowSidebar((open) => !open)}
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        )}
+  
+        <div className="logo">
+          <Link to="/" className="brand-link" style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="brand-icon" style={{ fontSize: '24px' }}>🚌</span>
+            <span className="brand-name" style={{ fontWeight: '800', fontSize: '18px', letterSpacing: '-0.5px' }}>
+              Smart&nbsp;
+              <span style={{ color: '#38bdf8' }} >BusTicketing</span>
+            </span>
+          </Link>
+        </div>
       </div>
 
-      <nav className="nav-links">
+      <nav className={`nav-links ${!isHome ? 'nav-links-hidden-inner' : ''}`}>
         <Link to="/" className={isActive('/') ? 'active' : ''}>
           Trang chủ
         </Link>
@@ -147,6 +165,12 @@ function Header() {
             </Link>
             <Link to="/dashboard" className={isActive('/dashboard') || isActive('/cancellation') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <span>🎟️</span> Vé của tôi
+            </Link>
+            <Link to="/feedback" className={isActive('/feedback') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>💬</span> Đánh giá
+            </Link>
+            <Link to="/tra-cuu-hoan-tien" className={isActive('/tra-cuu-hoan-tien') || isActive('/refund-status') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>💸</span> Hoàn tiền
             </Link>
           </>
         )}
@@ -465,6 +489,35 @@ function Header() {
           </div>
         )}
       </div>
+      {!isHome && showSidebar && (
+        <>
+          <button className="sidebar-backdrop" aria-label="Đóng menu" onClick={() => setShowSidebar(false)} />
+          <aside className="smartbus-sidebar" aria-label="Điều hướng chính">
+            <div className="sidebar-heading">
+              <span className="sidebar-bus-icon">🚌</span>
+              <div><strong>SmartBus</strong><small>Di chuyển thông minh</small></div>
+              <button className="sidebar-close" onClick={() => setShowSidebar(false)} aria-label="Đóng">×</button>
+            </div>
+            <div className="sidebar-section-label">MENU CHÍNH</div>
+            {[
+              ['/', '🏠', 'Trang chủ'],
+              ['/buses', '🚌', user && (user.role === 'Admin' || user.role === 'QuanTriVien') ? 'Điều phối chuyến' : user?.role === 'TaiXe' ? 'Lịch trình xe' : 'Tra cứu chuyến xe'],
+              ['/map', '🗺️', 'Bản đồ & theo dõi xe'],
+              ['/monthly-pass', '🎫', 'Vé tháng'],
+              ['/dashboard', '🎟️', user?.role === 'TaiXe' ? 'Lịch sử chuyến' : 'Vé của tôi'],
+              ['/feedback', '💌', 'Đánh giá & góp ý'],
+              ['/tra-cuu-hoan-tien', '💸', 'Tra cứu hoàn tiền'],
+              ['/verify-ticket', '📱', 'Soát vé QR'],
+              ['/admin', '⚙️', 'Quản trị hệ thống'],
+            ].map(([path, icon, label]) => (
+              <Link key={path} to={path} onClick={() => setShowSidebar(false)} className={`sidebar-link ${location.pathname === path ? 'active' : ''}`}>
+                <span className="sidebar-link-icon">{icon}</span><span>{label}</span><span className="sidebar-chevron">›</span>
+              </Link>
+            ))}
+            <div className="sidebar-help-card"><strong>Hành trình thuận tiện hơn</strong><p>Tra cứu chuyến, quản lý vé và theo dõi xe tại một nơi.</p></div>
+          </aside>
+        </>
+      )}
     </header>
   );
 }

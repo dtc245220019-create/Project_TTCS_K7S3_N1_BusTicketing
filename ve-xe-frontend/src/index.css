@@ -81,3 +81,23 @@ a {
 button, input, select, textarea {
   font-family: inherit;
 }
+
+/* Modern Hover Lift & Elevation Effects */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.25);
+}
+
+.hover-lift-subtle {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.hover-lift-subtle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
