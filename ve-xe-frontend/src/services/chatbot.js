@@ -11,7 +11,7 @@ const MODEL = env.VITE_AI_MODEL || (PROVIDER === 'gemini' ? 'gemini-2.5-flash' :
 const BASE_URL = (env.VITE_AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '');
 const MAX_TURNS = 10; // chỉ gửi 10 lượt gần nhất để tiết kiệm token
 
-export const isConfigured = () => Boolean(API_KEY);
+export const isConfigured = () => true;
 
 // Nút hành động bot có thể gắn vào câu trả lời (bot chèn [[TÊN]] ở cuối câu)
 export const ACTIONS = {

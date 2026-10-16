@@ -4,21 +4,47 @@ import { ACTIONS, askBot, isConfigured, parseReply } from '../services/chatbot';
 import './ChatWidget.css';
 
 const GREETING =
-  'Xin chào! Mình là trợ lý Smart BusTicketing 🚌 Mình có thể giúp bạn tra cứu tuyến, giá vé, cách đặt/hủy/đổi vé hoặc gửi phản ánh.';
+  'Xin chào! Mình là SmartBus AI 🤖 Trợ lý ảo đặt vé & chăm sóc khách hàng 24/7. Bạn có thể hỏi mình về lịch trình xe, giá vé, cơ chế giữ chỗ 10 phút, mã giảm giá, hoặc quy định đổi/hủy vé nhé!';
 const NO_KEY =
-  'Chatbot chưa được cấu hình API key. Tạo file ve-xe-frontend/.env.local (xem .env.example), điền VITE_AI_API_KEY rồi chạy lại npm run dev.';
+  'Hệ thống AI đang tạm thời bảo trì kết nối. Vui lòng thử lại sau ít giây!';
 const QUICK = [
-  { label: '💰 Giá vé các tuyến', ask: 'Cho mình xem giá vé của các tuyến hiện có' },
-  { label: '🔄 Cách hủy / đổi vé', ask: 'Mình muốn hủy hoặc đổi vé thì làm thế nào?' },
-  { label: '⏱️ Giữ chỗ hoạt động ra sao?', ask: 'Giữ chỗ hoạt động như thế nào?' },
-  { label: '📢 Gửi phản ánh', to: '/feedback' },
+  { label: '🚌 Chuyến đi Đà Lạt', ask: 'Có chuyến nào đi Đà Lạt không?' },
+  { label: '🔄 Cách hủy vé & hoàn tiền 100%', ask: 'Tôi muốn hủy chuyến và nhận lại tiền vé thì làm sao?' },
+  { label: '⏱️ Cơ chế giữ chỗ 10 phút', ask: 'Giữ chỗ hoạt động như thế nào?' },
+  { label: '🎁 Mã giảm giá & Ưu đãi HSSV', ask: 'Hôm nay có voucher hay ưu đãi sinh viên nào không?' },
+  { label: '💳 Hướng dẫn thanh toán', ask: 'Hệ thống hỗ trợ những phương thức thanh toán nào?' },
+  { label: '📢 Gửi phản ánh chất lượng', to: '/feedback' },
 ];
 const initial = () => [{ role: 'bot', text: GREETING, local: true }];
 
-// Hiển thị **in đậm** mà AI hay trả về, không cần thư viện markdown
+// Hiển thị định dạng văn bản đẹp mắt: in đậm, code, xuống dòng
 function RichText({ text }) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.length > 4 && part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : part
+  if (!text) return null;
+  const lines = text.split('\n');
+  return (
+    <div className="cw-rich-text">
+      {lines.map((line, lineIdx) => {
+        const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i}>{part.slice(2, -2)}</strong>;
+          }
+          if (part.startsWith('`') && part.endsWith('`')) {
+            return <code key={i} style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: '4px', fontSize: '0.9em' }}>{part.slice(1, -1)}</code>;
+          }
+          return part;
+        });
+
+        if (!line.trim()) {
+          return <div key={lineIdx} style={{ height: '6px' }} />;
+        }
+
+        return (
+          <div key={lineIdx} style={{ margin: '2px 0', lineHeight: 1.5 }}>
+            {parts}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
