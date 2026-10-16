@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { createNewVoucher } from '../api';
 
-function CreateVoucher({ onClose }) {
+function CreateVoucher({ onClose, onCreated }) {
   const [formData, setFormData] = useState({
     code: '',
     title: '',
@@ -27,20 +28,38 @@ function CreateVoucher({ onClose }) {
     setIsLoading(true);
     setMessage('');
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (formData.expiryDate && formData.expiryDate < todayStr) {
+      setIsLoading(false);
+      setMessage('❌ Ngày hết hạn không thể ở trong quá khứ! Vui lòng chọn từ hôm nay trở đi.');
+      return;
+    }
+
     try {
-      // Giả lập gọi API tạo voucher
+      const payload = {
+        code: formData.code.trim().toUpperCase(),
+        title: formData.title.trim(),
+        discount_type: formData.discountType,
+        discount_value: Number(formData.discountValue),
+        min_order_value: formData.minOrder ? Number(formData.minOrder) : 0,
+        max_discount_amount: formData.maxDiscount ? Number(formData.maxDiscount) : null,
+        expiry_date: formData.expiryDate || '2026-12-31'
+      };
+
+      await createNewVoucher(payload);
+      setIsLoading(false);
+      setMessage('✅ Tạo mã ưu đãi thành công trên hệ thống!');
+      if (onCreated) {
+        onCreated(payload);
+      }
+      // Reset form sau khi tạo
+      setFormData({ code: '', title: '', discountType: 'fixed', discountValue: '', minOrder: '', maxDiscount: '', expiryDate: '' });
       setTimeout(() => {
-        setIsLoading(false);
-        setMessage('✅ Tạo mã ưu đãi thành công!');
-        // Reset form sau khi tạo
-        setFormData({ code: '', title: '', discountType: 'fixed', discountValue: '', minOrder: '', maxDiscount: '', expiryDate: '' });
-        
-        // Tùy chọn: Tự động đóng popup sau 2 giây khi tạo thành công
-        // setTimeout(() => onClose(), 2000);
-      }, 1000);
+        if (onClose) onClose();
+      }, 1500);
     } catch (error) {
       setIsLoading(false);
-      setMessage('❌ Có lỗi xảy ra, vui lòng thử lại.');
+      setMessage(`❌ Lỗi tạo voucher: ${error.message || 'Không thể tạo mã'}`);
     }
   };
 
@@ -108,7 +127,15 @@ function CreateVoucher({ onClose }) {
           {/* Hàng 4: Thời hạn */}
           <div>
             <label style={labelStyle}>Ngày hết hạn</label>
-            <input name="expiryDate" type="date" value={formData.expiryDate} onChange={handleChange} required style={inputStyle} />
+            <input
+              name="expiryDate"
+              type="date"
+              min={new Date().toISOString().split('T')[0]}
+              value={formData.expiryDate}
+              onChange={handleChange}
+              required
+              style={inputStyle}
+            />
           </div>
 
           {/* Thông báo kết quả */}
