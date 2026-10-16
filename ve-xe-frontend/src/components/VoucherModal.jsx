@@ -1,5 +1,3 @@
-import React from 'react';
-
 function VoucherModal({ isOpen, onClose, onSelect, vouchers = [] }) {
   // Nếu state isOpen = false thì không hiển thị gì cả
   if (!isOpen) return null;

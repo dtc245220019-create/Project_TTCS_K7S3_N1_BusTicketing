@@ -343,4 +343,3 @@ function RefundStatusPage() {
 }
 
 export default RefundStatusPage;
-EOF
