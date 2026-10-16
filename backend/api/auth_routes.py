@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends, status
 
 from database import get_connection
 from notification import send_registration_confirmation
-from routers.common import RegisterRequest, LoginRequest, log_audit
+from common import RegisterRequest, LoginRequest, log_audit
 
 router = APIRouter(tags=["Authentication & Users"])
 

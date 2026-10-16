@@ -3,7 +3,7 @@
 //   POST /api/v1/feedbacks            body: { user_id, trip_id?, ticket_code?, category, rating_stars, content }
 //   GET  /api/v1/feedbacks?user_id=   -> [{ id, category, rating_stars, content, status, admin_reply, created_at, ticket_code }]
 // Trong lúc backend chưa có endpoint, phản ánh được lưu tạm ở localStorage để giao diện vẫn demo được.
-import { fetchJson } from '../api';
+import { fetchJson } from './client.js';
 
 export const CATEGORIES = [
   { id: 'SU_CO', label: 'Sự cố chuyến xe', icon: '🚧' },

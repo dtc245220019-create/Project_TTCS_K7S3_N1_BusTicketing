@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from database import get_connection
-from routers.common import log_audit
+from common import log_audit
 
 router = APIRouter(tags=["Vouchers & Fees"])
 

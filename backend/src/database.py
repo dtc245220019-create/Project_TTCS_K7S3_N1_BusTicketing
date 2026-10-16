@@ -30,9 +30,20 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-BASE_DIR = Path(__file__).resolve().parent
+_curr = Path(__file__).resolve().parent
+if (_curr / "data").exists():
+    BASE_DIR = _curr
+elif (_curr.parent / "data").exists():
+    BASE_DIR = _curr.parent
+elif (_curr.parent.parent / "data").exists():
+    BASE_DIR = _curr.parent.parent
+else:
+    BASE_DIR = _curr.parent.parent
+
 DATABASE_PATH = BASE_DIR / "data" / "bus_booking.db"
+DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATABASE_PATH}")
+
 
 # =============================================================================
 # SQLITE DDL SCHEMA (For raw sqlite connections & unit tests)

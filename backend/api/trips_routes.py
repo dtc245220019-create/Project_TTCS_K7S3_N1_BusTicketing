@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, List, Optional
 from fastapi import APIRouter, HTTPException, Query, status
 from database import get_connection, remove_accents
-from routers.common import HoldSeatRequest, log_audit
+from common import HoldSeatRequest, log_audit
 
 router = APIRouter(tags=["Trips, Routes & Map"])
 

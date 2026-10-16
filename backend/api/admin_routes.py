@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from database import get_connection
-from routers.common import log_audit
+from common import log_audit
 
 
 def parse_report_date(value: Optional[str], field_name: str, *, end_of_day: bool = False):

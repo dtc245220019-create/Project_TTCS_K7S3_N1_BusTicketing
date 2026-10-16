@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from database import get_connection
 from ticket_changes import TicketChangeError, cancel_ticket, change_seat
 from boarding_api import BoardingRequest, board_ticket, normalize_code, resolve_staff
-from routers.common import (
+from common import (
     CancelRequest,
     ChangeSeatRequest,
     ChangeTripRequest,
