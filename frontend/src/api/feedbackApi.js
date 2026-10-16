@@ -70,3 +70,22 @@ export async function listFeedbacks(userId) {
   }
   return [...local, ...remote].sort((a, b) => ts(b) - ts(a));
 }
+
+export function getFeedbacksList() {
+  return fetchJson('/api/v1/feedbacks');
+}
+
+export function updateFeedbackStatus(feedbackId, status) {
+  return fetchJson(`/api/v1/feedbacks/${feedbackId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function submitFeedbackForm(feedbackData) {
+  return fetchJson('/api/v1/feedbacks', {
+    method: 'POST',
+    body: JSON.stringify(feedbackData),
+  });
+}
+
