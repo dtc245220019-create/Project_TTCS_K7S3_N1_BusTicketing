@@ -122,18 +122,17 @@ function Header() {
   return (
     <header className={`navbar no-print ${isHome ? 'navbar-home' : 'navbar-inner-page'}`}>
      <div className="header-brand-group">
-        {!isHome && (
-          <button
-            className="sidebar-toggle"
-            type="button"
-            aria-label="Mở menu"
-            onClick={() => setShowSidebar((open) => !open)}
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-        )}
+        <button
+          className="sidebar-toggle"
+          type="button"
+          aria-label="Mở menu dọc"
+          onClick={() => setShowSidebar((open) => !open)}
+          title="Mở menu dọc"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
   
         <div className="logo">
           <Link to="/" className="brand-link" style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -498,7 +497,7 @@ function Header() {
           </div>
         )}
       </div>
-      {!isHome && showSidebar && (
+      {showSidebar && (
         <>
           <button className="sidebar-backdrop" aria-label="Đóng menu" onClick={() => setShowSidebar(false)} />
           <aside className="smartbus-sidebar" aria-label="Điều hướng chính">

@@ -1714,19 +1714,13 @@ button, .btn {
 
 .navbar-inner-page { backdrop-filter: none !important; }
 
-/* Luon hien thi thanh menu ngang tren moi trang */
+/* Luon giu ca thanh menu ngang va nut mo menu doc */
 .nav-links-hidden-inner {
   display: flex !important;
 }
 
 .sidebar-toggle {
-  display: none !important;
-}
-
-@media (max-width: 992px) {
-  .sidebar-toggle {
-    display: flex !important;
-  }
+  display: flex !important;
 }
 
 /* Giữ nút menu và thương hiệu ở cạnh trái */
