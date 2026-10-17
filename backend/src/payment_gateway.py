@@ -103,7 +103,7 @@ def verify_vnpay_signature(params: dict, hash_secret: str = VNPAY_HASH_SECRET) -
 
     data = {
         k: v for k, v in params.items()
-        if k not in ("vnp_SecureHash", "vnp_SecureHashType")
+        if k.startswith("vnp_") and k not in ("vnp_SecureHash", "vnp_SecureHashType")
     }
 
     expected = hmac.new(
