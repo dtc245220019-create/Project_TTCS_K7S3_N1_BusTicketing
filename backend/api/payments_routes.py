@@ -141,8 +141,28 @@ def vnpay_ipn(request: Request):
                        )""",
                     (row["booking_code"],),
                 )
+                connection.execute(
+                    "UPDATE demo_tickets SET status = 'ACTIVE' WHERE booking_code = ?",
+                    (row["booking_code"],),
+                )
+            log_audit(
+                connection,
+                user_id=None,
+                action="VNPAY_PAYMENT_SUCCESS",
+                entity_type="payments",
+                entity_id=row["id"],
+                details=f"VNPay payment {txn_ref} confirmed success for booking {row['booking_code']}",
+            )
         else:
             connection.execute("UPDATE payments SET status = 'FAILED' WHERE id = ?", (row["id"],))
+            log_audit(
+                connection,
+                user_id=None,
+                action="VNPAY_PAYMENT_FAILED",
+                entity_type="payments",
+                entity_id=row["id"],
+                details=f"VNPay payment {txn_ref} failed with response code {response_code}",
+            )
 
         connection.commit()
 
@@ -156,9 +176,22 @@ def vnpay_return(request: Request):
     txn_ref = params.get("vnp_TxnRef", "")
     code = params.get("vnp_ResponseCode", "")
     success = valid and code == "00"
+    booking_code = None
+    amount = None
+    if txn_ref:
+        with get_connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM payments WHERE transaction_code = ?", (txn_ref,)
+            ).fetchone()
+            if row:
+                booking_code = row["booking_code"]
+                amount = row["amount"]
+
     return {
         "success": success,
         "transaction_code": txn_ref,
+        "booking_code": booking_code,
+        "amount": amount,
         "response_code": code,
         "message": "Giao dịch VNPay thành công!" if success else "Giao dịch VNPay không thành công hoặc chữ ký không hợp lệ.",
     }
@@ -183,13 +216,18 @@ def create_zalopay_payment(payload: ZaloPayCreateRequest):
         "transaction_code": transaction_code,
         "status": "PENDING",
         "mac": mac,
+        "payment_url": f"https://sandbox.zalopay.vn/pay/{transaction_code}",
         "message": "Đã khởi tạo giao dịch ZaloPay thành công!",
     }
 
 
 @router.post("/api/v1/payments/zalopay/callback", summary="ZaloPay Callback Webhook (US18)")
 async def zalopay_callback(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return {"return_code": -1, "return_message": "Invalid JSON body"}
+
     data = body.get("data", "")
     mac = body.get("mac", "")
 
@@ -203,6 +241,9 @@ async def zalopay_callback(request: Request):
         return {"return_code": -1, "return_message": "Invalid data format"}
 
     txn_code = payload.get("transaction_code") or payload.get("app_trans_id")
+    if not txn_code:
+        return {"return_code": 0, "return_message": "Missing transaction code"}
+
     with get_connection() as connection:
         row = connection.execute(
             "SELECT * FROM payments WHERE transaction_code = ?", (txn_code,)
@@ -232,6 +273,19 @@ async def zalopay_callback(request: Request):
                    )""",
                 (row["booking_code"],),
             )
+            connection.execute(
+                "UPDATE demo_tickets SET status = 'ACTIVE' WHERE booking_code = ?",
+                (row["booking_code"],),
+            )
+
+        log_audit(
+            connection,
+            user_id=None,
+            action="ZALOPAY_PAYMENT_SUCCESS",
+            entity_type="payments",
+            entity_id=row["id"],
+            details=f"ZaloPay payment {txn_code} confirmed success for booking {row['booking_code']}",
+        )
         connection.commit()
 
     return {"return_code": 1, "return_message": "Success"}
