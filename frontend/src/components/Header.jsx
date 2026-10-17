@@ -146,7 +146,7 @@ function Header() {
         </div>
       </div>
 
-      <nav className={`nav-links ${!isHome ? 'nav-links-hidden-inner' : ''}`}>
+      <nav className="nav-links">
         <Link to="/" className={isActive('/') ? 'active' : ''}>
           Trang chủ
         </Link>
@@ -232,21 +232,13 @@ function Header() {
           </>
         )}
 
-        {/* Cẩm nang FAQ & Hướng dẫn vận hành 4 Role */}
+        {/* Chức năng FAQ tinh gọn cho thanh ngang */}
         <Link
           to="/faq"
           className={isActive('/faq') || isActive('/huong-dan') ? 'active' : ''}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            backgroundColor: isActive('/faq') ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
-            borderRadius: '8px',
-            padding: '6px 12px',
-            fontWeight: '700',
-          }}
+          style={{ fontWeight: '700' }}
         >
-          <span>💡</span> FAQ & Hướng dẫn
+          FAQ
         </Link>
       </nav>
 

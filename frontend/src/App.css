@@ -54,22 +54,22 @@
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   white-space: nowrap;
 }
 
 .nav-links a {
   color: #cbd5e1;
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 7px 13px;
+  padding: 6px 10px;
   border-radius: 8px;
   border: 1px solid transparent;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   white-space: nowrap;
 }
 
@@ -1714,8 +1714,19 @@ button, .btn {
 
 .navbar-inner-page { backdrop-filter: none !important; }
 
+/* Luon hien thi thanh menu ngang tren moi trang */
 .nav-links-hidden-inner {
+  display: flex !important;
+}
+
+.sidebar-toggle {
   display: none !important;
+}
+
+@media (max-width: 992px) {
+  .sidebar-toggle {
+    display: flex !important;
+  }
 }
 
 /* Giữ nút menu và thương hiệu ở cạnh trái */
