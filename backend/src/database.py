@@ -318,6 +318,21 @@ CREATE TABLE IF NOT EXISTS refunds (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     processed_at TIMESTAMP
 );
+
+-- 20. ERD: FAQS & SYSTEM_GUIDES (Huong dan van hanh & Cau hoi thuong gap)
+CREATE TABLE IF NOT EXISTS faqs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,
+    role_target TEXT NOT NULL DEFAULT 'ALL',
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    keywords TEXT DEFAULT '',
+    order_num INTEGER DEFAULT 0,
+    icon TEXT DEFAULT '💡',
+    is_active INTEGER DEFAULT 1,
+    helpful_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 import unicodedata
@@ -718,6 +733,22 @@ class Notification(Base):
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
     status = Column(String(20), default="SENT")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FAQ(Base):
+    __tablename__ = "faqs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String(50), nullable=False)
+    role_target = Column(String(50), default="ALL")
+    question = Column(String(500), nullable=False)
+    answer = Column(Text, nullable=False)
+    keywords = Column(String(255), default="")
+    order_num = Column(Integer, default=0)
+    icon = Column(String(10), default="💡")
+    is_active = Column(Boolean, default=True)
+    helpful_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

@@ -57,6 +57,7 @@ from vouchers_routes import router as vouchers_router
 from monthly_pass_routes import router as monthly_pass_router
 from admin_routes import router as admin_router
 from interactions_routes import router as interactions_router
+from faq_routes import router as faq_router
 
 app = FastAPI(
     title="Smart Bus Ticketing API - Unified System",
@@ -89,3 +90,4 @@ app.include_router(vouchers_router)
 app.include_router(monthly_pass_router)
 app.include_router(admin_router)
 app.include_router(interactions_router)
+app.include_router(faq_router)
