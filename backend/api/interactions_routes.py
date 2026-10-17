@@ -100,7 +100,8 @@ def update_feedback_status(feedback_id: int, payload: dict):
 
 
 class ChatbotAskRequest(BaseModel):
-    message: str
+    message: Optional[str] = None
+    question: Optional[str] = None
     user_id: Optional[int] = None
     conversation: Optional[list] = []
 
@@ -111,9 +112,15 @@ from chatbot_engine import process_smart_chat
 @router.post("/api/v1/chatbot/chat", tags=["Sprint 3 - Chatbot AI"])
 @router.post("/api/v1/chatbot/ask", tags=["Sprint 3 - Chatbot AI"])
 def chatbot_chat_endpoint(req: ChatbotAskRequest):
+    content = (req.message or req.question or "").strip()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Nội dung câu hỏi (message hoặc question) không được để trống",
+        )
     with get_connection() as conn:
         return process_smart_chat(
-            message=req.message,
+            message=content,
             conn=conn,
             user_id=req.user_id,
             conversation=req.conversation,

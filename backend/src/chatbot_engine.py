@@ -60,46 +60,64 @@ CITY_ALIASES = {
     "dalat": ["da lat", "dalat", "lam dong"],
     "nhatrang": ["nha trang", "khanh hoa"],
     "cantho": ["can tho"],
+    "vungtau": ["vung tau", "ba ria", "vt"],
+    "quangninh": ["quang ninh", "ha long"],
+    "thanhhoa": ["thanh hoa"],
+    "nghean": ["nghe an", "vinh"],
 }
 
 
 def extract_locations(query: str) -> Dict[str, Optional[str]]:
     """Phân tích điểm đi và điểm đến từ câu hỏi tự nhiên của người dùng."""
     norm = normalize_vn(query)
-    found_cities = []
+    found_occurrences = []
 
     for standard_city, aliases in CITY_ALIASES.items():
         for alias in aliases:
-            if re.search(r"\b" + re.escape(alias) + r"\b", norm):
-                found_cities.append(standard_city)
+            m = re.search(r"\b" + re.escape(alias) + r"\b", norm)
+            if m:
+                found_occurrences.append((m.start(), m.end(), standard_city))
                 break
+
+    found_occurrences.sort(key=lambda x: x[0])
+    found_cities = [x[2] for x in found_occurrences]
 
     origin = None
     destination = None
 
-    # Phát hiện mẫu: "đi <đến>", "đến <đến>", "về <đến>"
-    dest_match = re.search(r"(?:di|den|ve|to)\s+([a-z\s]+?)(?:\s+(?:tu|khoi hanh|ngay|khong|chua|\?|$))", norm)
-    if dest_match:
-        cand = dest_match.group(1).strip()
-        for std, aliases in CITY_ALIASES.items():
-            if any(a in cand for a in aliases):
-                destination = std
-                break
-
-    # Phát hiện mẫu: "từ <đi>", "khởi hành từ <đi>"
-    orig_match = re.search(r"(?:tu|khoi hanh tu|from)\s+([a-z\s]+?)(?:\s+(?:di|den|ve|ngay|khong|\?|$))", norm)
+    # Phát hiện mẫu: "từ <A>", "khởi hành từ <A>", "xuat phat tu <A>"
+    orig_match = re.search(r"(?:tu|khoi hanh tu|xuat phat tu|from)\s+([a-z\s]+?)(?:\s+(?:di|den|ve|vao|toi|ngay|khong|\?|$))", norm)
     if orig_match:
         cand = orig_match.group(1).strip()
         for std, aliases in CITY_ALIASES.items():
-            if any(a in cand for a in aliases):
+            if any(re.search(r"\b" + re.escape(a) + r"\b", cand) for a in aliases):
                 origin = std
                 break
 
-    # Nếu chỉ tìm thấy 1 địa danh và có từ "đi/đến/có chuyến...": mặc định là destination
-    if not destination and found_cities:
-        if any(w in norm for w in ["di", "den", "ve", "chuyen"]):
-            destination = found_cities[0]
-        else:
+    # Phát hiện mẫu: "đi <B>", "đến <B>", "về <B>", "vào <B>", "tới <B>"
+    dest_match = re.search(r"(?:di|den|ve|vao|toi|to)\s+([a-z\s]+?)(?:\s+(?:tu|khoi hanh|ngay|khong|chua|\?|$))", norm)
+    if dest_match:
+        cand = dest_match.group(1).strip()
+        for std, aliases in CITY_ALIASES.items():
+            if any(re.search(r"\b" + re.escape(a) + r"\b", cand) for a in aliases):
+                destination = std
+                break
+
+    # Nếu có từ 2 thành phố trở lên:
+    if len(found_cities) >= 2:
+        if not origin and not destination:
+            origin = found_cities[0]
+            destination = found_cities[1]
+        elif origin and not destination:
+            rem = [c for c in found_cities if c != origin]
+            if rem:
+                destination = rem[0]
+        elif destination and not origin:
+            rem = [c for c in found_cities if c != destination]
+            if rem:
+                origin = rem[0]
+    elif len(found_cities) == 1:
+        if not destination and not origin:
             destination = found_cities[0]
 
     return {"origin": origin, "destination": destination, "all_found": found_cities}
@@ -268,6 +286,10 @@ def process_smart_chat(
             "dalat": "Đà Lạt",
             "nhatrang": "Nha Trang",
             "cantho": "Cần Thơ",
+            "vungtau": "Vũng Tàu",
+            "quangninh": "Quảng Ninh",
+            "thanhhoa": "Thanh Hóa",
+            "nghean": "Nghệ An",
         }
 
         matched_trips = []
