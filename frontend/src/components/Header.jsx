@@ -231,6 +231,23 @@ function Header() {
             </Link>
           </>
         )}
+
+        {/* Cẩm nang FAQ & Hướng dẫn vận hành 4 Role */}
+        <Link
+          to="/faq"
+          className={isActive('/faq') || isActive('/huong-dan') ? 'active' : ''}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            backgroundColor: isActive('/faq') ? 'rgba(56, 189, 248, 0.25)' : 'transparent',
+            borderRadius: '8px',
+            padding: '6px 12px',
+            fontWeight: '700',
+          }}
+        >
+          <span>💡</span> FAQ & Hướng dẫn
+        </Link>
       </nav>
 
       <div className="auth-buttons" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -509,6 +526,7 @@ function Header() {
               ['/tra-cuu-hoan-tien', '💸', 'Tra cứu hoàn tiền'],
               ['/verify-ticket', '📱', 'Soát vé QR'],
               ['/admin', '⚙️', 'Quản trị hệ thống'],
+              ['/faq', '💡', 'FAQ & Hướng dẫn vận hành'],
             ].map(([path, icon, label]) => (
               <Link key={path} to={path} onClick={() => setShowSidebar(false)} className={`sidebar-link ${location.pathname === path ? 'active' : ''}`}>
                 <span className="sidebar-link-icon">{icon}</span><span>{label}</span><span className="sidebar-chevron">›</span>

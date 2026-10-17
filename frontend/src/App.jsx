@@ -15,6 +15,7 @@ import MonthlyPassPage from './pages/MonthlyPassPage';
 import AdminDashboard from './pages/AdminDashboard';
 import FeedbackPage from './pages/FeedbackPage';
 import RefundStatusPage from './pages/RefundStatusPage';
+import FaqPage from './pages/FaqPage';
 import ChatWidget from './components/ChatWidget';
 import './App.css';
 
@@ -43,6 +44,8 @@ function App() {
             <Route path="/feedback" element={<FeedbackPage />} />
             <Route path="/refund-status" element={<RefundStatusPage />} />
             <Route path="/tra-cuu-hoan-tien" element={<RefundStatusPage />} />
+            <Route path="/faq" element={<FaqPage />} />
+            <Route path="/huong-dan" element={<FaqPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Routes>

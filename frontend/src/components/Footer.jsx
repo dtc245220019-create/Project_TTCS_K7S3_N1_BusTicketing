@@ -49,7 +49,8 @@ function Footer() {
           </h4>
           <p style={{ fontSize: '14px', margin: '0 0 6px 0', color: '#cbd5e1' }}>📧 hotro@smartbus.vn</p>
           <p style={{ fontSize: '14px', margin: '0 0 6px 0', color: '#cbd5e1' }}>📍 Số 20 Phạm Hùng, Nam Từ Liêm, Hà Nội</p>
-          <p style={{ fontSize: '14px', margin: '0 0 10px 0' }}><a href="/feedback" style={{ color: '#7dd3fc', fontWeight: 600 }}>📢 Gửi phản ánh / góp ý</a></p>
+          <p style={{ fontSize: '14px', margin: '0 0 6px 0' }}><a href="/feedback" style={{ color: '#7dd3fc', fontWeight: 600 }}>📢 Gửi phản ánh / góp ý</a></p>
+          <p style={{ fontSize: '14px', margin: '0 0 10px 0' }}><a href="/faq" style={{ color: '#38bdf8', fontWeight: 600 }}>💡 Cẩm nang FAQ & Hướng dẫn 4 Role</a></p>
           <div style={{ fontSize: '13px', color: '#94a3b8' }}>Tổng đài đặt vé miễn phí:</div>
           <div style={{ fontSize: '24px', fontWeight: '800', color: '#38bdf8', marginTop: '2px' }}>1900 6868</div>
         </div>
