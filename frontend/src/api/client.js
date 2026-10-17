@@ -40,3 +40,4 @@ export * from './monthlyPassApi.js';
 export * from './adminApi.js';
 export * from './notificationsApi.js';
 export * from './feedbackApi.js';
+export * from './faqApi.js';
