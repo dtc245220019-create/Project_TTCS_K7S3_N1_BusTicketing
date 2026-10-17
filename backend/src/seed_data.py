@@ -490,6 +490,264 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
     connection.execute("UPDATE users SET discount_status = 'ChoDuyet' WHERE id IN (1, 3)")
     connection.execute("UPDATE users SET discount_status = 'DaDuyet' WHERE id = 10")
 
+    # 17. Demo FAQs & Hệ thống Hướng dẫn vận hành 4 Role (SmartBus Knowledge Base)
+    demo_faqs = [
+        # --- HÀNH KHÁCH (CUSTOMER / HanhKhach) ---
+        (
+            1,
+            "DAT_VE",
+            "HanhKhach",
+            "Làm thế nào để tìm kiếm chuyến xe và chọn chỗ ngồi ưng ý?",
+            "Bước 1: Truy cập Trang chủ hoặc mục 'Chuyến xe'.\nBước 2: Chọn Điểm đi, Điểm đến và Ngày khởi hành, sau đó nhấn 'Tìm Chuyến Xe'.\nBước 3: Chọn chuyến xe phù hợp và bấm 'Chọn Ghế'. Hệ thống hiển thị sơ đồ 2 tầng trực quan: Tầng dưới (A01-A18) và Tầng trên (B01-B18).\nBước 4: Bấm vào ghế màu xanh lá (ghế trống) để chọn. Ghế của bạn sẽ chuyển sang màu xanh dương nổi bật.\nBước 5: Nhấn 'Tiến hành thanh toán'. Hệ thống sẽ tự động giữ chỗ trong 10 phút để bạn hoàn tất đơn hàng.",
+            "tìm chuyến, chọn ghế, sơ đồ ghế, tầng 1 tầng 2, đặt vé",
+            1,
+            "🚌",
+            1,
+            42
+        ),
+        (
+            2,
+            "DAT_VE",
+            "HanhKhach",
+            "Cơ chế 'Tạm giữ ghế 10 phút' hoạt động như thế nào?",
+            "Khi bạn chọn ghế và tiến hành đặt vé, hệ thống kích hoạt cơ chế khóa ghế tạm thời (HELD) trong vòng 10 phút. Trong thời gian này, không hành khách nào khác có thể chọn ghế đó. Đồng hồ đếm ngược sẽ hiển thị trên màn hình thanh toán. Nếu sau 10 phút bạn chưa hoàn tất thanh toán, Cronjob tự động của SmartBus sẽ giải phóng ghế về trạng thái TRỐNG (AVAILABLE) để người khác có thể đặt.",
+            "giữ chỗ, 10 phút, đếm ngược, hết hạn giữ ghế, tự động nhả ghế",
+            2,
+            "⏱️",
+            1,
+            38
+        ),
+        (
+            3,
+            "THANH_TOAN",
+            "HanhKhach",
+            "Hệ thống SmartBus hỗ trợ những phương thức thanh toán nào?",
+            "SmartBus tích hợp cổng thanh toán đa kênh an toàn:\n1. Quét mã VietQR chuyển khoản ngân hàng 24/7 (tự động nhận diện giao dịch).\n2. Cổng thanh toán trực tuyến VNPay (hỗ trợ thẻ ATM nội địa và ứng dụng Mobile Banking).\n3. Ví điện tử ZaloPay / MoMo.\n4. Cổng thanh toán Sandbox thử nghiệm tức thì dành cho môi trường Demo.\nSau khi thanh toán thành công, vé điện tử kèm mã QR sẽ được gửi ngay lập tức về hòm thư Email và lưu vào mục 'Vé của tôi'.",
+            "thanh toán, vnpay, zalopay, vietqr, sandbox, momo",
+            3,
+            "💳",
+            1,
+            56
+        ),
+        (
+            4,
+            "VE_THANG",
+            "HanhKhach",
+            "Làm sao để đăng ký vé tháng xe buýt và nhận ưu đãi giảm giá HSSV?",
+            "Bước 1: Vào mục 'Vé tháng' trên thanh điều hướng.\nBước 2: Chọn Tuyến đường bạn thường xuyên đi lại và chọn loại vé (1 tháng, 3 tháng hoặc 1 năm).\nBước 3: Nhập thông tin CCCD và tải lên hình ảnh Thẻ Học sinh - Sinh viên hoặc giấy tờ ưu tiên nếu thuộc diện đối tượng chính sách.\nBước 4: Nhấn 'Đăng ký vé tháng'. Hệ thống sẽ áp dụng mức chiết khấu 30% - 50% ngay sau khi Ban Quản Trị duyệt hồ sơ.\nBước 5: Bạn sẽ nhận mã thẻ vé tháng số hóa kèm mã QR để đi xe không giới hạn số lượt.",
+            "vé tháng, đăng ký vé tháng, hssv, học sinh sinh viên, ưu đãi",
+            4,
+            "🎫",
+            1,
+            64
+        ),
+        (
+            5,
+            "DOI_HUY_VE",
+            "HanhKhach",
+            "Chính sách đổi vé, đổi ghế hoặc hủy vé hoàn tiền quy định ra sao?",
+            "Chính sách hoàn/hủy vé tự động theo quy định của SmartBus:\n• Trước giờ khởi hành trên 24 tiếng: Hoàn 90% giá trị vé (phí xử lý 10%).\n• Trước giờ khởi hành từ 12 đến 24 tiếng: Hoàn 70% giá trị vé (phí xử lý 30%).\n• Dưới 12 tiếng hoặc sau khi xe đã xuất bến: Không hỗ trợ hoàn hủy.\nCách thực hiện: Vào 'Vé của tôi' -> Chọn vé cần thao tác -> Bấm 'Đổi chuyến / Đổi ghế' (miễn phí chênh lệch cùng hạng) hoặc 'Yêu cầu hủy vé & hoàn tiền'. Bạn có thể tra cứu tiến độ hoàn tiền tại mục 'Hoàn tiền'.",
+            "hủy vé, đổi vé, hoàn tiền, đổi chuyến, chính sách hoàn",
+            5,
+            "💸",
+            1,
+            89
+        ),
+        (
+            6,
+            "SOAT_VE_BOARDING",
+            "HanhKhach",
+            "Khi lên xe buýt tôi cần xuất trình những giấy tờ hoặc mã gì?",
+            "Bạn chỉ cần mở điện thoại vào mục 'Vé của tôi' và bấm 'Xem mã QR vé' (hoặc mở email vé điện tử đã được SmartBus gửi). Khi bước lên xe, đưa mã QR trước máy quét của Phụ xe hoặc điện thoại của Tài xế. Hệ thống sẽ phát âm thanh báo 'Hợp lệ' và xác nhận bạn đã lên xe thành công. Nếu điện thoại hết pin, bạn chỉ cần đọc Số điện thoại hoặc Mã vé (ví dụ: TK-XXXX) cho Phụ xe kiểm tra.",
+            "lên xe, xuất trình vé, mã qr vé, quét mã, lên trạm",
+            6,
+            "📱",
+            1,
+            35
+        ),
+        (
+            7,
+            "KY_THUAT",
+            "HanhKhach",
+            "Làm sao để theo dõi vị trí xe buýt trực tiếp trên bản đồ GPS?",
+            "Vào mục 'Bản đồ' trên thanh điều hướng. Bản đồ số sẽ hiển thị trực quan toàn bộ mạng lưới tuyến xe, các trạm dừng dọc hành trình và biểu tượng xe buýt đang di chuyển theo thời gian thực (real-time GPS simulation). Bạn có thể bấm vào từng trạm dừng để xem khoảng cách km và thời gian dự kiến xe sẽ đến đón.",
+            "bản đồ, gps, theo dõi xe, vị trí trạm dừng, xe đến trong bao lâu",
+            7,
+            "🗺️",
+            1,
+            47
+        ),
+        (
+            8,
+            "KY_THUAT",
+            "HanhKhach",
+            "Tôi có thể liên hệ hỗ trợ hoặc phản ánh chất lượng chuyến đi ở đâu?",
+            "Bạn có 3 kênh hỗ trợ nhanh:\n1. Bấm vào biểu tượng Chatbot AI ở góc phải màn hình để được trợ lý ảo giải đáp 24/7 về lịch trình, quy định hành lý và giá vé.\n2. Vào mục 'Đánh giá' để gửi sao và nhận xét chi tiết sau chuyến đi.\n3. Gọi trực tiếp tổng đài chăm sóc khách hàng SmartBus: 1900 6868.",
+            "hỗ trợ, liên hệ, chatbot ai, đánh giá dịch vụ, khiếu nại",
+            8,
+            "💬",
+            1,
+            29
+        ),
+
+        # --- TÀI XẾ (DRIVER / TaiXe) ---
+        (
+            9,
+            "SOAT_VE_BOARDING",
+            "TaiXe",
+            "Quy trình xem lịch trình chạy xe và điểm danh trước chuyến đi",
+            "Bước 1: Chuyển vai trò sang 'Tài Xế' (hoặc đăng nhập bằng tài khoản tài xế).\nBước 2: Truy cập mục 'Lịch trình xe' hoặc 'Lịch sử chuyến'. Bạn sẽ thấy danh sách các chuyến xe được Ban Quản Trị phân công phụ trách trong ngày (mã chuyến, biển số xe, giờ xuất bến, điểm đi, điểm đến).\nBước 3: Kiểm tra thông số xe và xác nhận sẵn sàng xuất bến trước giờ chạy ít nhất 15 phút.",
+            "tài xế, lịch trình, phân công, xuất bến, lái xe",
+            9,
+            "🧭",
+            1,
+            51
+        ),
+        (
+            10,
+            "SOAT_VE_BOARDING",
+            "TaiXe",
+            "Hướng dẫn Tài xế sử dụng tính năng Soát vé & Check-in tại cửa xe",
+            "Bước 1: Vào mục 'Soát vé & Lên xe' trên thanh điều hướng.\nBước 2: Chọn chuyến xe hiện tại đang phục vụ.\nBước 3: Hướng camera điện thoại về phía mã QR trên vé của hành khách (hoặc trên ứng dụng của họ). Hệ thống sẽ tự động quét và kiểm tra tính hợp lệ tức thì.\nBước 4: Nhấn nút 'Xác nhận lên xe' để chuyển trạng thái vé sang 'USED' (Đã lên xe) và đồng bộ trực tiếp lên hệ thống trung tâm.",
+            "tài xế, soát vé, check-in, quét qr, cửa xe",
+            10,
+            "📷",
+            1,
+            44
+        ),
+        (
+            11,
+            "KY_THUAT",
+            "TaiXe",
+            "Quy trình xử lý sự cố kỹ thuật hoặc tắc đường dọc hành trình",
+            "Khi gặp sự cố ngoài ý muốn (xe hỏng hóc, sự cố lốp, tắc đường nghiêm trọng):\n1. Đảm bảo an toàn tuyệt đối cho toàn bộ hành khách trên xe, bật đèn cảnh báo.\n2. Liên hệ ngay Bộ phận Điều phối & Tổng đài điều hành qua Hotline nội bộ.\n3. Thông báo rõ lý do và dự kiến thời gian chậm trễ cho hành khách trên xe để họ an tâm.\n4. Ban điều phối sẽ kích hoạt xe dự phòng hoặc gửi thông báo SMS/Email khẩn cấp tới các hành khách ở trạm kế tiếp.",
+            "tài xế, sự cố, hỏng xe, tắc đường, báo cáo sự cố",
+            11,
+            "⚠️",
+            1,
+            33
+        ),
+
+        # --- PHỤ XE / NHÂN VIÊN SOÁT VÉ (STAFF / PhuXe) ---
+        (
+            12,
+            "SOAT_VE_BOARDING",
+            "PhuXe",
+            "Hướng dẫn Phụ xe soát vé QR và xử lý khi hành khách quên mã vé",
+            "Bước 1: Vào mục 'Soát vé QR' trên thanh menu.\nBước 2: Quét mã QR trên màn hình điện thoại hoặc vé giấy của hành khách.\nBước 3: Nếu khách hết pin hoặc quên mã vé: Bấm chuyển sang tab 'Tra cứu thủ công', nhập Số điện thoại hoặc Họ tên của khách để tìm vé. Nếu vé hiển thị trạng thái 'ĐÃ THANH TOÁN (PAID)', bấm nút 'Xác nhận lên xe'.\nBước 4: Hướng dẫn hành khách về đúng số ghế (tầng 1 hoặc tầng 2) đã ghi rõ trên vé.",
+            "phụ xe, soát vé, quên vé, tra cứu sđt, lên xe",
+            12,
+            "🎟️",
+            1,
+            62
+        ),
+        (
+            13,
+            "DAT_VE",
+            "PhuXe",
+            "Cách xuất vé trực tiếp cho khách lên xe tại trạm dừng (Bán vé quầy)",
+            "Đối với hành khách vãng lai bắt xe dọc đường:\nBước 1: Vào mục 'Bán vé quầy' hoặc 'Chuyến xe'.\nBước 2: Chọn chuyến xe đang chạy, kiểm tra các ghế trống (màu xanh lá).\nBước 3: Nhập thông tin nhanh của khách (Họ tên, SĐT) và chọn ghế theo yêu cầu của khách.\nBước 4: Thu tiền mặt hoặc đưa mã QR tĩnh để khách quét chuyển khoản.\nBước 5: Bấm 'Xuất vé nhanh', hệ thống ghi nhận doanh thu và in hoặc gửi vé điện tử qua SMS/Email cho khách.",
+            "phụ xe, bán vé trực tiếp, vé quầy, khách dọc đường, tiền mặt",
+            13,
+            "💵",
+            1,
+            49
+        ),
+        (
+            14,
+            "VE_THANG",
+            "PhuXe",
+            "Cách kiểm tra tính hợp lệ của Vé Tháng khi hành khách xuất trình",
+            "Hành khách sử dụng vé tháng sẽ xuất trình thẻ cứng hoặc mã QR vé tháng trên điện thoại.\nPhụ xe dùng ứng dụng quét mã QR vé tháng hoặc vào mục 'Vé tháng' nhập mã thẻ. Màn hình sẽ hiển thị: Tên hành khách, Ảnh chân dung, Tuyến đường được phép đi và Ngày hết hạn. Nếu trạng thái là 'CÒN HẠN (ConHan)' và đúng tuyến, mời khách lên xe.",
+            "phụ xe, kiểm tra vé tháng, thẻ tháng, hết hạn vé tháng",
+            14,
+            "🆔",
+            1,
+            40
+        ),
+
+        # --- QUẢN TRỊ VIÊN (ADMIN / QuanTriVien) ---
+        (
+            15,
+            "QUAN_TRI",
+            "Admin",
+            "Quy trình tạo chuyến xe mới và phân công Tài xế, Phụ xe (Điều phối)",
+            "Bước 1: Chuyển vai trò sang 'Quản trị viên' và truy cập mục 'Quản Trị Hệ Thống' (/admin).\nBước 2: Chuyển sang tab 'Điều phối chuyến' hoặc 'Quản lý Chuyến xe'.\nBước 3: Bấm nút '+ Thêm chuyến xe mới'.\nBước 4: Chọn Tuyến đường (Route), Xe buýt (Bus) phụ trách, phân công Tài xế (Driver) và Phụ xe (Staff).\nBước 5: Nhập thời gian khởi hành và kết thúc dự kiến, điều chỉnh giá vé cơ bản nếu cần.\nBước 6: Nhấn 'Lưu chuyến xe'. Hệ thống sẽ tự động khởi tạo danh sách ghế tương ứng với loại xe buýt đã chọn.",
+            "admin, tạo chuyến xe, phân công tài xế, điều phối, quản trị",
+            15,
+            "👑",
+            1,
+            78
+        ),
+        (
+            16,
+            "QUAN_TRI",
+            "Admin",
+            "Cách phê duyệt hồ sơ giảm giá vé tháng cho Học sinh - Sinh viên (US23)",
+            "Bước 1: Vào Admin Dashboard -> Tab 'Hồ sơ Vé Tháng & Giảm giá'.\nBước 2: Hệ thống hiển thị danh sách người dùng có trạng thái 'Chờ duyệt (ChoDuyet)'.\nBước 3: Nhấn 'Xem chi tiết' để kiểm tra hình ảnh Thẻ HSSV hoặc giấy tờ chứng minh.\nBước 4: Nhấn nút 'Duyệt giảm giá' (Chuyển sang 'DaDuyet'). Hệ thống sẽ tự động gửi Email thông báo chúc mừng tới người dùng và kích hoạt chiết khấu 30-50% cho các lần mua vé tháng tiếp theo.",
+            "admin, duyệt giảm giá, hssv, duyệt hồ sơ, vé tháng ưu đãi",
+            16,
+            "🎓",
+            1,
+            71
+        ),
+        (
+            17,
+            "DOI_HUY_VE",
+            "Admin",
+            "Quy trình thẩm định và phê duyệt yêu cầu Hoàn tiền / Hủy vé (US08)",
+            "Bước 1: Vào Admin Dashboard -> Chọn tab 'Quản lý Hoàn tiền'.\nBước 2: Xem danh sách các yêu cầu hoàn tiền đang ở trạng thái 'PENDING'. Hệ thống tính toán sẵn tỷ lệ khấu trừ (10% hoặc 30%) và số tiền đề xuất hoàn dựa trên mốc thời gian khách gửi đơn.\nBước 3: Kiểm tra thông tin STK ngân hàng, Tên người thụ hưởng của khách hàng.\nBước 4: Nhấn 'Phê duyệt hoàn tiền'. Hệ thống ghi nhận trạng thái 'REFUNDED', hủy vé trong cơ sở dữ liệu và kích hoạt thông báo gửi tới khách hàng.",
+            "admin, duyệt hoàn tiền, us08, hủy vé, chuyển khoản hoàn tiền",
+            17,
+            "⚖️",
+            1,
+            83
+        ),
+        (
+            18,
+            "QUAN_TRI",
+            "Admin",
+            "Cách tạo mã Voucher khuyến mãi và thiết lập chính sách phụ phí (US18)",
+            "Bước 1: Tại trang Quản trị, chọn tab 'Voucher & Phụ phí'.\nBước 2: Bấm nút 'Tạo Voucher Mới'.\nBước 3: Nhập Mã khuyến mãi (ví dụ: HE2026, BANMOI, TRIAN), phần trăm giảm giá (%) hoặc số tiền giảm cố định, số lượng phát hành tối đa và ngày hết hạn.\nBước 4: Nhấn 'Kích hoạt Voucher'. Người dùng khi đặt vé có thể nhập mã này tại bước thanh toán để được giảm trừ trực tiếp vào tổng tiền.",
+            "admin, tạo voucher, khuyến mãi, mã giảm giá, us18, phụ phí",
+            18,
+            "🎁",
+            1,
+            67
+        ),
+        (
+            19,
+            "QUAN_TRI",
+            "Admin",
+            "Hướng dẫn theo dõi Báo cáo Doanh thu, Tỷ lệ lấp đầy ghế và Xuất Excel",
+            "Bước 1: Tại Admin Dashboard, chọn tab 'Thống kê & Doanh thu'.\nBước 2: Theo dõi các chỉ số KPI trực quan: Tổng doanh thu, Số vé bán ra, Tỷ lệ lấp đầy ghế bình quân (Occupancy Rate) và Biểu đồ doanh thu theo ngày/tháng.\nBước 3: Chọn khoảng thời gian hoặc lọc theo từng tuyến xe trọng điểm.\nBước 4: Nhấn nút 'Xuất báo cáo Excel / CSV'. Hệ thống sẽ trích xuất toàn bộ dữ liệu tài chính chi tiết để phục vụ báo cáo kế toán và nghiệm thu dự án.",
+            "admin, doanh thu, thống kê, tỷ lệ lấp đầy, xuất excel, csv, báo cáo",
+            19,
+            "📊",
+            1,
+            95
+        ),
+        (
+            20,
+            "QUAN_TRI",
+            "Admin",
+            "Cách giám sát Nhật ký kiểm toán hệ thống (Audit Logs) để bảo mật",
+            "Bước 1: Vào Admin Dashboard -> Tab 'Nhật ký kiểm toán (Audit Logs)'.\nBước 2: Bảng hiển thị toàn bộ hoạt động nhạy cảm trong hệ thống theo dòng thời gian (Ai làm gì? Thời điểm nào? Tác động lên bảng dữ liệu nào? Chi tiết thông số).\nBước 3: Sử dụng thanh lọc để tìm kiếm các hành vi như: Đổi ghế, Phê duyệt hoàn tiền, Tạo voucher, Phân công tài xế nhằm phục vụ công tác thanh tra và kiểm soát rủi ro bảo mật.",
+            "admin, audit log, nhật ký kiểm toán, bảo mật, truy vết lịch sử",
+            20,
+            "🛡️",
+            1,
+            58
+        ),
+    ]
+
+    for faq in demo_faqs:
+        connection.execute(
+            """INSERT OR REPLACE INTO faqs (id, category, role_target, question, answer, keywords, order_num, icon, is_active, helpful_count)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            faq,
+        )
+
     connection.commit()
 
 
