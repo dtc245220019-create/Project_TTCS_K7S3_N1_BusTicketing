@@ -35,6 +35,9 @@ function App() {
             <Route path="/monthly-pass" element={<MonthlyPassPage />} />
             <Route path="/ve-thang" element={<MonthlyPassPage />} />
             <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/profile" element={<UserDashboard defaultTab="profile" />} />
+            <Route path="/customer-info" element={<UserDashboard defaultTab="profile" />} />
+            <Route path="/thong-tin-khach-hang" element={<UserDashboard defaultTab="profile" />} />
             <Route path="/cancellation" element={<UserDashboard defaultTab="exchange-cancel" />} />
             <Route path="/cancel-ticket" element={<UserDashboard defaultTab="exchange-cancel" />} />
             <Route path="/ticket-cancellation" element={<TicketCancellation />} />

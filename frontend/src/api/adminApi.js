@@ -40,8 +40,13 @@ export function getAdminOccupancy() {
   return fetchJson('/api/v1/admin/occupancy');
 }
 
-export function getRevenueExportUrl() {
-  return `${API_BASE_URL}/api/v1/admin/revenue/export`;
+export function getRevenueExportUrl(startDate = null, endDate = null) {
+  let url = `${API_BASE_URL}/api/v1/admin/revenue/export`;
+  const params = [];
+  if (startDate) params.push(`from_date=${startDate}`);
+  if (endDate) params.push(`to_date=${endDate}`);
+  if (params.length) url += `?${params.join('&')}`;
+  return url;
 }
 
 export function getPendingDiscounts() {
