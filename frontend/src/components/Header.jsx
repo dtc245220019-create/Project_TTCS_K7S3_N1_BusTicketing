@@ -122,18 +122,17 @@ function Header() {
   return (
     <header className={`navbar no-print ${isHome ? 'navbar-home' : 'navbar-inner-page'}`}>
      <div className="header-brand-group">
-        {!isHome && (
-          <button
-            className="sidebar-toggle"
-            type="button"
-            aria-label="Mở menu"
-            onClick={() => setShowSidebar((open) => !open)}
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-          </button>
-        )}
+        <button
+          className="sidebar-toggle"
+          type="button"
+          aria-label="Mở menu dọc"
+          onClick={() => setShowSidebar((open) => !open)}
+          title="Mở menu dọc"
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
   
         <div className="logo">
           <Link to="/" className="brand-link" style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -146,7 +145,7 @@ function Header() {
         </div>
       </div>
 
-      <nav className={`nav-links ${!isHome ? 'nav-links-hidden-inner' : ''}`}>
+      <nav className="nav-links">
         <Link to="/" className={isActive('/') ? 'active' : ''}>
           Trang chủ
         </Link>
@@ -231,6 +230,15 @@ function Header() {
             </Link>
           </>
         )}
+
+        {/* Chức năng FAQ tinh gọn cho thanh ngang */}
+        <Link
+          to="/faq"
+          className={isActive('/faq') || isActive('/huong-dan') ? 'active' : ''}
+          style={{ fontWeight: '700' }}
+        >
+          FAQ
+        </Link>
       </nav>
 
       <div className="auth-buttons" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -489,7 +497,7 @@ function Header() {
           </div>
         )}
       </div>
-      {!isHome && showSidebar && (
+      {showSidebar && (
         <>
           <button className="sidebar-backdrop" aria-label="Đóng menu" onClick={() => setShowSidebar(false)} />
           <aside className="smartbus-sidebar" aria-label="Điều hướng chính">
@@ -509,6 +517,7 @@ function Header() {
               ['/tra-cuu-hoan-tien', '💸', 'Tra cứu hoàn tiền'],
               ['/verify-ticket', '📱', 'Soát vé QR'],
               ['/admin', '⚙️', 'Quản trị hệ thống'],
+              ['/faq', '💡', 'FAQ & Hướng dẫn vận hành'],
             ].map(([path, icon, label]) => (
               <Link key={path} to={path} onClick={() => setShowSidebar(false)} className={`sidebar-link ${location.pathname === path ? 'active' : ''}`}>
                 <span className="sidebar-link-icon">{icon}</span><span>{label}</span><span className="sidebar-chevron">›</span>
