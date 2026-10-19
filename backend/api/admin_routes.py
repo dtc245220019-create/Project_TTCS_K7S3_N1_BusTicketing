@@ -328,6 +328,7 @@ def assign_trip_staff(trip_id: int, payload: AssignTripRequest):
         if payload.driver_id is not None:
             updates.append("driver_id = ?")
             params.append(payload.driver_id)
+            updates.append("driver_status = 'ASSIGNED'")
         if payload.staff_id is not None:
             updates.append("staff_id = ?")
             params.append(payload.staff_id)
@@ -382,6 +383,7 @@ def get_driver_trips(
         results = []
         for r in rows:
             tid = r["id"]
+            d_status = r["driver_status"] if ("driver_status" in r.keys() and r["driver_status"]) else "ASSIGNED"
             p_rows = connection.execute(
                 """SELECT t.id as ticket_id, t.ticket_code, t.status as ticket_status,
                           COALESCE(s.seat_number, 'A01') as seat_number,
@@ -405,10 +407,15 @@ def get_driver_trips(
                 "departure_at": r["departure_at"],
                 "arrival_at": r["arrival_at"],
                 "status": r["status"],
+                "driver_status": d_status,
                 "license_plate": r["license_plate"] or "29B-123.45",
                 "bus_type": r["bus_type"] or "Giường nằm cao cấp",
                 "driver_name": r["driver_name"] or "Trần Văn Tài",
+                "driver_id": r["driver_id"],
                 "staff_name": r["staff_name"] or "Chưa phân công",
+                "staff_id": r["staff_id"],
+                "available_seats": r["available_seats"],
+                "total_passengers": len(p_rows),
                 "passengers": [
                     {
                         "ticket_id": p["ticket_id"],
@@ -423,6 +430,51 @@ def get_driver_trips(
                 ],
             })
         return results
+
+
+class ConfirmDriverTripRequest(BaseModel):
+    driver_id: Optional[int] = None
+    driver_status: Optional[str] = "ACCEPTED"
+    note: Optional[str] = ""
+
+
+@router.put("/api/v1/driver/trips/{trip_id}/confirm", summary="Tài xế xác nhận nhận chuyến lái xe")
+def confirm_driver_trip(trip_id: int, payload: ConfirmDriverTripRequest):
+    with get_connection() as connection:
+        trip = connection.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")
+
+        valid_statuses = ("ASSIGNED", "ACCEPTED", "DEPARTED", "COMPLETED")
+        target_status = payload.driver_status or "ACCEPTED"
+        if target_status not in valid_statuses:
+            raise HTTPException(status_code=400, detail="Trạng thái phân công không hợp lệ")
+
+        connection.execute(
+            "UPDATE trips SET driver_status = ? WHERE id = ?",
+            (target_status, trip_id),
+        )
+        if target_status == "DEPARTED":
+            connection.execute("UPDATE trips SET status = 'DEPARTED' WHERE id = ?", (trip_id,))
+        elif target_status == "COMPLETED":
+            connection.execute("UPDATE trips SET status = 'COMPLETED' WHERE id = ?", (trip_id,))
+        connection.commit()
+
+        log_audit(
+            connection,
+            payload.driver_id or trip["driver_id"] or 11,
+            "DRIVER_CONFIRM_TRIP",
+            "TRIP",
+            trip_id,
+            f"Tài xế cập nhật trạng thái chuyến #{trip_id} thành {target_status}",
+        )
+
+        return {
+            "success": True,
+            "message": f"Tài xế đã cập nhật trạng thái chuyến xe #{trip_id} thành '{target_status}' thành công!",
+            "trip_id": trip_id,
+            "driver_status": target_status,
+        }
 
 
 class BoardPassengerRequest(BaseModel):
@@ -477,48 +529,76 @@ def get_audit_logs():
 def get_pending_discounts():
     with get_connection() as conn:
         users = conn.execute(
-            """SELECT id, full_name, email, phone, discount_type, discount_status 
+            """SELECT id, full_name, email, phone, discount_type, discount_status,
+                      created_at
                FROM users 
-               WHERE discount_status = 'ChoDuyet' OR (discount_type != 'Khong' AND discount_status != 'DaDuyet')"""
+               WHERE discount_status = 'ChoDuyet' OR (discount_type != 'Khong' AND discount_status != 'DaDuyet')
+               ORDER BY id DESC"""
         ).fetchall()
-        return [dict(u) for u in users]
+        user_list = [dict(u) for u in users]
+        return {"pending_users": user_list, "users": user_list, "count": len(user_list)}
 
 
 class ApproveDiscountRequest(BaseModel):
     admin_id: Optional[int] = 12
-    status: str  # 'DaDuyet' hoặc 'TuChoi'
+    status: Optional[str] = None  # 'DaDuyet' hoặc 'TuChoi'
+    approved: Optional[bool] = None
     discount_type: Optional[str] = None
     note: Optional[str] = None
+    notes: Optional[str] = None
 
 
 @router.put("/api/v1/admin/discounts/{user_id}/approve", tags=["Sprint 3 - Audit & Security"])
-def approve_discount(user_id: int, req: ApproveDiscountRequest):
+@router.post("/api/v1/admin/discounts/{user_id}/approve", tags=["Sprint 3 - Audit & Security"])
+def approve_discount(user_id: int, req: Optional[ApproveDiscountRequest] = None):
+    if req is None:
+        req = ApproveDiscountRequest(approved=True, status="DaDuyet")
     with get_connection() as conn:
-        user = conn.execute("SELECT id, full_name, discount_type FROM users WHERE id = ?", (user_id,)).fetchone()
+        user = conn.execute("SELECT id, full_name, email, discount_type FROM users WHERE id = ?", (user_id,)).fetchone()
         if not user:
             raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
 
+        is_approved = True if req.approved is True or req.status in ("DaDuyet", "APPROVED") else False
+        target_status = "DaDuyet" if is_approved else "TuChoi"
         final_type = (
             req.discount_type
             or (user["discount_type"] if user["discount_type"] != "Khong" else "HSSV")
-            if req.status == "DaDuyet"
+            if target_status == "DaDuyet"
             else "Khong"
         )
         conn.execute(
             "UPDATE users SET discount_status = ?, discount_type = ? WHERE id = ?",
-            (req.status, final_type, user_id),
+            (target_status, final_type, user_id),
         )
 
-        action_name = "APPROVE_DISCOUNT" if req.status == "DaDuyet" else "REJECT_DISCOUNT"
-        details_msg = f"Duyệt ưu đãi [{final_type}] cho #{user_id} ({user['full_name']}). Ghi chú: {req.note or 'Không'}"
+        action_name = "APPROVE_DISCOUNT" if target_status == "DaDuyet" else "REJECT_DISCOUNT"
+        note_text = req.note or req.notes or ("Đã xác thực hợp lệ" if is_approved else "Chưa đạt yêu cầu")
+        details_msg = f"Duyệt ưu đãi [{final_type}] cho #{user_id} ({user['full_name']}). Ghi chú: {note_text}"
         log_audit(conn, req.admin_id or 12, action_name, "USER_DISCOUNT", user_id, details_msg)
+
+        try:
+            notif_title = "🎉 [SmartBus] Hồ sơ ưu đãi của bạn đã được xác minh thành công!" if is_approved else "⚠️ [SmartBus] Thông báo về hồ sơ ưu đãi"
+            notif_msg = (
+                f"Chúc mừng bạn! Hồ sơ ưu đãi đối tượng '{final_type}' của bạn đã được Quản trị viên phê duyệt thành công. "
+                f"Từ bây giờ, bạn sẽ được tự động áp dụng mức giảm giá 20% cho các lần đặt vé tiếp theo."
+            ) if is_approved else (
+                f"Rất tiếc, hồ sơ ưu đãi của bạn chưa được phê duyệt. Lý do: {note_text}. Bạn có thể cập nhật lại minh chứng tại trang thông tin cá nhân."
+            )
+            conn.execute(
+                """INSERT INTO notifications (user_id, type, recipient, title, message, status)
+                   VALUES (?, 'EMAIL', ?, ?, ?, 'SENT')""",
+                (user_id, user["email"] or "customer@example.com", notif_title, notif_msg),
+            )
+        except Exception as ex:
+            print(f"[DISCOUNT NOTIF ERROR]: {ex}")
+
         conn.commit()
         return {
             "success": True,
-            "message": f"Cập nhật ưu đãi thành công ({req.status})",
+            "message": f"Cập nhật ưu đãi thành công ({target_status})",
             "user_id": user_id,
             "discount_type": final_type,
-            "discount_status": req.status,
+            "discount_status": target_status,
         }
 
 
@@ -745,6 +825,22 @@ def admin_approve_refund(refund_id: int):
     with get_connection() as conn:
         try:
             res = approve_refund(conn, refund_id)
+            rf = conn.execute("SELECT user_id, ticket_code, approved_amount, bank_name, bank_account FROM refunds WHERE id = ?", (refund_id,)).fetchone()
+            if rf and rf["user_id"]:
+                u = conn.execute("SELECT email FROM users WHERE id = ?", (rf["user_id"],)).fetchone()
+                email = u["email"] if u else "customer@example.com"
+                amount_str = f"{int(rf['approved_amount'] or 0):,} VNĐ"
+                conn.execute(
+                    """INSERT INTO notifications (user_id, type, recipient, title, message, status)
+                       VALUES (?, 'EMAIL', ?, ?, ?, 'SENT')""",
+                    (
+                        rf["user_id"],
+                        email,
+                        f"💸 [SmartBus] Yêu cầu hoàn tiền vé #{rf['ticket_code']} đã hoàn tất!",
+                        f"Quản trị viên đã duyệt hoàn trả số tiền {amount_str} cho vé #{rf['ticket_code']}. Tiền đã được chuyển tới {rf['bank_name'] or 'tài khoản của bạn'} ({rf['bank_account'] or ''}).",
+                    ),
+                )
+                conn.commit()
         except RefundError as exc:
             raise HTTPException(status_code=404, detail=str(exc))
         res["message"] = "Đã phê duyệt và hoàn tiền thành công!"

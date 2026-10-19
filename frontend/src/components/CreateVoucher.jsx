@@ -36,19 +36,27 @@ function CreateVoucher({ onClose, onCreated }) {
     }
 
     try {
+      // Làm sạch giá trị nhập (hỗ trợ nhập cả '20' hoặc '20%')
+      const rawValStr = String(formData.discountValue).trim();
+      const isPercentInput = rawValStr.endsWith('%') || formData.discountType === 'percentage' || formData.discountType === 'percent';
+      const cleanNum = parseFloat(rawValStr.replace(/[^0-9.]/g, '')) || 0;
+
+      const normType = isPercentInput ? 'percent' : 'fixed';
+
       const payload = {
         code: formData.code.trim().toUpperCase(),
         title: formData.title.trim(),
-        discount_type: formData.discountType,
-        discount_value: Number(formData.discountValue),
-        min_order_value: formData.minOrder ? Number(formData.minOrder) : 0,
-        max_discount_amount: formData.maxDiscount ? Number(formData.maxDiscount) : null,
+        discount_type: normType,
+        discount_value: cleanNum,
+        discount_percent: normType === 'percent' ? cleanNum : null,
+        min_order_value: formData.minOrder ? Number(String(formData.minOrder).replace(/[^0-9.]/g, '')) : 0,
+        max_discount_amount: formData.maxDiscount ? Number(String(formData.maxDiscount).replace(/[^0-9.]/g, '')) : null,
         expiry_date: formData.expiryDate || '2026-12-31'
       };
 
       await createNewVoucher(payload);
       setIsLoading(false);
-      setMessage('✅ Tạo mã ưu đãi thành công trên hệ thống!');
+      setMessage(`✅ Tạo mã ưu đãi thành công! (Giảm ${cleanNum}${normType === 'percent' ? '%' : ' VNĐ'})`);
       if (onCreated) {
         onCreated(payload);
       }
@@ -103,12 +111,27 @@ function CreateVoucher({ onClose, onCreated }) {
               <label style={labelStyle}>Loại giảm giá</label>
               <select name="discountType" value={formData.discountType} onChange={handleChange} style={inputStyle}>
                 <option value="fixed">Tiền mặt (VNĐ)</option>
-                <option value="percentage">Phần trăm (%)</option>
+                <option value="percent">Phần trăm (%)</option>
               </select>
             </div>
             <div style={{ flex: 1, minWidth: '150px' }}>
-              <label style={labelStyle}>Giá trị giảm</label>
-              <input name="discountValue" type="number" value={formData.discountValue} onChange={handleChange} required style={inputStyle} placeholder={formData.discountType === 'fixed' ? 'VD: 50000' : 'VD: 20'} min="1" />
+              <label style={labelStyle}>
+                Giá trị giảm {formData.discountType === 'percent' ? '(%)' : '(VNĐ)'}
+              </label>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  name="discountValue" 
+                  type="text" 
+                  value={formData.discountValue} 
+                  onChange={handleChange} 
+                  required 
+                  style={{ ...inputStyle, paddingRight: formData.discountType === 'percent' ? '30px' : '10px' }} 
+                  placeholder={formData.discountType === 'percent' ? 'VD: 20 hoặc 20%' : 'VD: 50000'} 
+                />
+                {formData.discountType === 'percent' && (
+                  <span style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-30%)', color: '#64748b', fontWeight: 'bold' }}>%</span>
+                )}
+              </div>
             </div>
           </div>
 

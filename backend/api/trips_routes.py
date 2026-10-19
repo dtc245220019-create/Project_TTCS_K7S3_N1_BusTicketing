@@ -195,6 +195,14 @@ def hold_seats_endpoint(trip_id: int, payload: HoldSeatRequest):
         raise HTTPException(status_code=400, detail="Vui lòng chọn ít nhất 1 ghế")
 
     with get_connection() as connection:
+        if payload.user_id:
+            u = connection.execute("SELECT role FROM users WHERE id = ?", (payload.user_id,)).fetchone()
+            if u and u["role"] in ("TaiXe", "PhuXe", "DRIVER", "CONDUCTOR", "STAFF"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Tài khoản Tài xế và Phụ xe không được phép giữ ghế/đặt vé. Tài xế thực hiện nhận lái chuyến xe, Phụ xe thực hiện soát vé."
+                )
+
         trip = connection.execute("SELECT * FROM trips WHERE id = ?", (trip_id,)).fetchone()
         if not trip:
             raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")

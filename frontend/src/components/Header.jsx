@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { getCurrentUser, setCurrentUser, getNotifications } from '../api';
+import { getCurrentUser, setCurrentUser, getNotifications, getProfile } from '../api';
 
 function Header() {
   const location = useLocation();
@@ -15,7 +15,20 @@ function Header() {
   const notifRef = useRef(null);
 
   useEffect(() => {
-    setUser(getCurrentUser());
+    const cur = getCurrentUser();
+    setUser(cur);
+    if (cur && cur.id) {
+      getProfile(cur.id)
+        .then((prof) => {
+          const fresh = prof?.user || (prof?.id ? prof : null);
+          if (fresh) {
+            const merged = { ...cur, ...fresh };
+            setCurrentUser(merged);
+            setUser(merged);
+          }
+        })
+        .catch(() => {});
+    }
   }, [location.pathname]);
 
   // Load notifications
@@ -72,16 +85,35 @@ function Header() {
   const handleActorSwitch = (targetRole) => {
     let newUser;
     if (targetRole === 'HanhKhach') {
-      newUser = {
-        id: 1,
-        full_name: 'Nguyễn Văn A (Hành Khách)',
-        email: 'customer@example.com',
-        role: 'HanhKhach',
-        discount_type: 'HSSV',
-      };
-      setCurrentUser(newUser);
-      setUser(newUser);
-      navigate('/dashboard');
+      getProfile(1)
+        .then((prof) => {
+          const fresh = prof?.user || (prof?.id ? prof : null);
+          const usr = fresh ? { ...fresh, role: 'HanhKhach' } : {
+            id: 1,
+            full_name: 'Nguyễn Văn A (Hành Khách)',
+            email: 'customer@example.com',
+            role: 'HanhKhach',
+            discount_type: 'HSSV',
+            discount_status: 'DaDuyet',
+          };
+          setCurrentUser(usr);
+          setUser(usr);
+          navigate('/dashboard');
+        })
+        .catch(() => {
+          const usr = {
+            id: 1,
+            full_name: 'Nguyễn Văn A (Hành Khách)',
+            email: 'customer@example.com',
+            role: 'HanhKhach',
+            discount_type: 'HSSV',
+            discount_status: 'DaDuyet',
+          };
+          setCurrentUser(usr);
+          setUser(usr);
+          navigate('/dashboard');
+        });
+      return;
     } else if (targetRole === 'TaiXe') {
       newUser = {
         id: 11,
@@ -92,7 +124,7 @@ function Header() {
       };
       setCurrentUser(newUser);
       setUser(newUser);
-      navigate('/verify-ticket');
+      navigate('/buses');
     } else if (targetRole === 'PhuXe') {
       newUser = {
         id: 2,
@@ -177,11 +209,8 @@ function Header() {
 
         {user && user.role === 'TaiXe' && (
           <>
-            <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
-              Lịch trình xe
-            </Link>
-            <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(245, 158, 11, 0.2)', border: '1px solid #f59e0b', color: '#fef08a' }}>
-              <span>🚌</span> Soát vé & Lên xe
+            <Link to="/buses" className={isActive('/buses') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(245, 158, 11, 0.2)', border: '1px solid #f59e0b', color: '#fef08a' }}>
+              <span>🚌</span> Chuyến Xe Được Phân Công & Nhận Lái
             </Link>
             <Link to="/dashboard" className={isActive('/dashboard') ? 'active' : ''}>
               Lịch sử chuyến
@@ -191,14 +220,8 @@ function Header() {
 
         {user && user.role === 'PhuXe' && (
           <>
-            <Link to="/buses" className={isActive('/buses') ? 'active' : ''}>
-              Bán vé quầy
-            </Link>
-            <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(168, 85, 247, 0.2)', border: '1px solid #a855f7', color: '#f3e8ff' }}>
-              <span>🎫</span> Soát vé QR
-            </Link>
-            <Link to="/monthly-pass" className={isActive('/monthly-pass') ? 'active' : ''}>
-              Vé tháng
+            <Link to="/verify-ticket" className={isActive('/verify-ticket') ? 'active' : ''} style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: 'rgba(168, 85, 247, 0.25)', border: '1px solid #a855f7', color: '#f3e8ff', fontWeight: 'bold' }}>
+              <span>🎫</span> Rà Soát Vé Xe (Soát vé & QR)
             </Link>
           </>
         )}
@@ -525,16 +548,35 @@ function Header() {
             <div className="sidebar-section-label">MENU CHÍNH</div>
             {[
               ['/', '🏠', 'Trang chủ'],
-              ['/dashboard?tab=profile', '👤', 'Thông tin khách hàng'],
-              ['/buses', '🚌', user && (user.role === 'Admin' || user.role === 'QuanTriVien') ? 'Điều phối chuyến' : user?.role === 'TaiXe' ? 'Lịch trình xe' : 'Tra cứu chuyến xe'],
-              ['/map', '🗺️', 'Bản đồ & theo dõi xe'],
-              ['/monthly-pass', '🎫', 'Vé tháng'],
-              ['/dashboard', '🎟️', user?.role === 'TaiXe' ? 'Lịch sử chuyến' : 'Vé của tôi'],
-              ['/feedback', '💌', 'Đánh giá & góp ý'],
-              ['/tra-cuu-hoan-tien', '💸', 'Tra cứu hoàn tiền'],
-              ['/verify-ticket', '📱', 'Soát vé QR'],
-              ['/admin', '⚙️', 'Quản trị hệ thống'],
-              ['/faq', '💡', 'FAQ & Hướng dẫn vận hành'],
+              ...(user?.role === 'PhuXe'
+                ? [
+                    ['/verify-ticket', '🎫', 'Rà soát vé xe (Soát vé & QR)'],
+                    ['/faq', '💡', 'FAQ & Hướng dẫn'],
+                  ]
+                : user?.role === 'TaiXe'
+                ? [
+                    ['/buses', '🚌', 'Chuyến xe phân công & Nhận lái'],
+                    ['/dashboard', '🎟️', 'Lịch sử chuyến'],
+                    ['/faq', '💡', 'FAQ & Hướng dẫn'],
+                  ]
+                : (user?.role === 'Admin' || user?.role === 'QuanTriVien')
+                ? [
+                    ['/admin', '⚙️', 'Quản trị hệ thống'],
+                    ['/buses', '🚌', 'Điều phối chuyến'],
+                    ['/verify-ticket', '📱', 'Soát vé QR'],
+                    ['/faq', '💡', 'FAQ & Hướng dẫn'],
+                  ]
+                : [
+                    ['/dashboard?tab=profile', '👤', 'Thông tin khách hàng'],
+                    ['/buses', '🚌', 'Tra cứu & Đặt chuyến xe'],
+                    ['/map', '🗺️', 'Bản đồ & theo dõi xe'],
+                    ['/monthly-pass', '🎫', 'Vé tháng'],
+                    ['/dashboard', '🎟️', 'Vé của tôi'],
+                    ['/feedback', '💌', 'Đánh giá & góp ý'],
+                    ['/tra-cuu-hoan-tien', '💸', 'Tra cứu hoàn tiền'],
+                    ['/faq', '💡', 'FAQ & Hướng dẫn'],
+                  ]
+              ),
             ].map(([path, icon, label]) => (
               <Link key={path} to={path} onClick={() => setShowSidebar(false)} className={`sidebar-link ${location.pathname === path ? 'active' : ''}`}>
                 <span className="sidebar-link-icon">{icon}</span><span>{label}</span><span className="sidebar-chevron">›</span>

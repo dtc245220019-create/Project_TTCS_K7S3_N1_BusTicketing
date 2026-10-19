@@ -16,17 +16,15 @@ function RefundManagement() {
       } else {
         // Mock fallback nếu database trống
         setRefundRequests([
-          { id: 1, refund_code: 'RF001', passenger_name: 'Nguyễn Văn A', amount: 250000, reason: 'Hủy chuyến do ốm', status: 'PENDING', created_at: '2026-10-10 09:30' },
-          { id: 2, refund_code: 'RF002', passenger_name: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'APPROVED', created_at: '2026-10-09 14:15' },
-          { id: 3, refund_code: 'RF003', passenger_name: 'Lê Văn C', amount: 300000, reason: 'Đổi lịch trình', status: 'REJECTED', created_at: '2026-10-08 11:20' }
+          { id: 1, refund_code: 'RF001', ticket_code: 'TKT-8892', passenger_name: 'Nguyễn Văn A', amount: 280000, reason: 'Thay đổi kế hoạch cá nhân', status: 'APPROVED', created_at: '2026-10-10 09:30' },
+          { id: 2, refund_code: 'RF002', ticket_code: 'TKT-9901', passenger_name: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'APPROVED', created_at: '2026-10-09 14:15' }
         ]);
       }
     } catch (err) {
       console.warn('Lỗi lấy danh sách hoàn tiền:', err);
       setRefundRequests([
-        { id: 1, refund_code: 'RF001', passenger_name: 'Nguyễn Văn A', amount: 250000, reason: 'Hủy chuyến do ốm', status: 'PENDING', created_at: '2026-10-10 09:30' },
-        { id: 2, refund_code: 'RF002', passenger_name: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'APPROVED', created_at: '2026-10-09 14:15' },
-        { id: 3, refund_code: 'RF003', passenger_name: 'Lê Văn C', amount: 300000, reason: 'Đổi lịch trình', status: 'REJECTED', created_at: '2026-10-08 11:20' }
+        { id: 1, refund_code: 'RF001', ticket_code: 'TKT-8892', passenger_name: 'Nguyễn Văn A', amount: 280000, reason: 'Thay đổi kế hoạch cá nhân', status: 'APPROVED', created_at: '2026-10-10 09:30' },
+        { id: 2, refund_code: 'RF002', ticket_code: 'TKT-9901', passenger_name: 'Trần Thị B', amount: 150000, reason: 'Đặt nhầm ngày', status: 'APPROVED', created_at: '2026-10-09 14:15' }
       ]);
     } finally {
       setLoading(false);
@@ -50,6 +48,29 @@ function RefundManagement() {
       } else {
         await rejectRefundRequest(id, 'Hủy vé quá muộn hoặc không hợp lệ');
       }
+
+      // Đồng bộ ngay lập tức vào localStorage nếu cùng chạy trên cùng một máy / trình duyệt
+      try {
+        const localCancelled = JSON.parse(localStorage.getItem('smartbus_cancelled_tickets') || '[]');
+        const reqItem = refundRequests.find(r => r.id === id || r.refund_code === id);
+        const code = (reqItem?.ticket_code || reqItem?.ticketCode || '').toUpperCase();
+        const updatedLocal = localCancelled.map(item => {
+          const itemCode = (item.ticketCode || item.ticket_code || item.id || '').toUpperCase();
+          if (item.id === id || item.refund_id === id || (code && itemCode === code)) {
+            return {
+              ...item,
+              status: isApprove ? 'REFUNDED' : 'REJECTED',
+              refundStatus: isApprove ? '✅ ĐÃ HOÀN TIỀN THÀNH CÔNG' : '❌ ĐÃ TỪ CHỐI HOÀN TIỀN',
+              processedAt: new Date().toLocaleString('vi-VN'),
+            };
+          }
+          return item;
+        });
+        localStorage.setItem('smartbus_cancelled_tickets', JSON.stringify(updatedLocal));
+      } catch (localErr) {
+        console.warn('Sync local cancelled error:', localErr);
+      }
+
       setRefundRequests(prev => prev.map(req => 
         (req.id === id || req.refund_code === id) ? { ...req, status: targetStatus } : req
       ));
@@ -122,10 +143,10 @@ function RefundManagement() {
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
           <thead style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
             <tr>
-              <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Mã YC</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Mã Vé & YC</th>
               <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Khách hàng</th>
               <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Số tiền</th>
-              <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Lý do hoàn</th>
+              <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Lý do & Thông tin nhận hoàn</th>
               <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Thời gian</th>
               <th style={{ padding: '14px 16px', textAlign: 'left', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Trạng thái</th>
               <th style={{ padding: '14px 16px', textAlign: 'center', color: '#475569', fontSize: '13px', fontWeight: '700' }}>Thao tác</th>
@@ -142,16 +163,27 @@ function RefundManagement() {
               refundRequests.map((req) => (
                 <tr key={req.id || req.refund_code} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: 'bold', color: '#1e3a8a' }}>
-                    {req.refund_code || `RF-${req.id}`}
+                    {req.ticket_code ? (
+                      <div>
+                        <div>{req.ticket_code}</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>Mã YC: RF-{req.id}</div>
+                      </div>
+                    ) : (req.refund_code || `RF-${req.id}`)}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '600', color: '#334155' }}>
-                    {req.passenger_name || req.user || 'Khách hàng'}
+                    <div>{req.passenger_name || req.user || 'Khách hàng'}</div>
+                    {req.phone && req.phone !== '---' && <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'normal' }}>SĐT: {req.phone}</div>}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '700', color: '#dc2626' }}>
                     {Number(req.amount || req.requested_amount || 0).toLocaleString('vi-VN')} đ
                   </td>
-                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', maxWidth: '220px' }}>
-                    {req.reason || 'Khách hàng yêu cầu hủy vé'}
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', maxWidth: '240px' }}>
+                    <div>{req.reason || 'Khách hàng yêu cầu hủy vé'}</div>
+                    {req.bank_name && (
+                      <div style={{ fontSize: '11.5px', color: '#0369a1', marginTop: '4px', fontWeight: '500' }}>
+                        🏦 {req.bank_name} - STK: {req.bank_account} ({req.account_holder})
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '12px', color: '#64748b' }}>
                     {req.created_at || req.date || 'Vừa xong'}

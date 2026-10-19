@@ -62,10 +62,12 @@ def create_voucher(payload: CreateVoucherRequest):
     if end[:10] < today_str:
         raise HTTPException(status_code=400, detail="Ngày hết hạn của mã giảm giá không thể ở trong quá khứ")
 
+    raw_type = str(payload.discount_type or "percent").strip().lower()
+    norm_type = "percent" if raw_type in ("percent", "percentage", "%") else "fixed"
     name = payload.title or payload.name or code
-    disc_val = payload.discount_value or (payload.discount_percent or 10.0)
-    disc_pct = payload.discount_percent if payload.discount_type == "percent" else (payload.discount_value or 0.0)
-    max_disc = payload.max_discount or (payload.discount_value if payload.discount_type == "fixed" else 100000.0)
+    disc_val = float(payload.discount_value or (payload.discount_percent or 10.0))
+    disc_pct = disc_val if norm_type == "percent" else 0.0
+    max_disc = float(payload.max_discount or (disc_val if norm_type == "fixed" else 100000.0))
 
     with get_connection() as connection:
         existing = connection.execute(
@@ -78,7 +80,7 @@ def create_voucher(payload: CreateVoucherRequest):
             """INSERT INTO vouchers 
                (code, voucher_code, name, description, discount_type, discount_value, discount_percent, min_order_value, max_discount, max_discount_amount, start_date, end_date, expires_at, is_active, status)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE')""",
-            (code, code, name, payload.description or "", payload.discount_type, disc_val,
+            (code, code, name, payload.description or "", norm_type, disc_val,
              disc_pct, payload.min_order_value, max_disc, int(max_disc), start, end, end),
         )
         connection.commit()
@@ -108,11 +110,19 @@ def apply_voucher_endpoint(payload: VoucherApplyRequest):
                 detail=f"Giá trị đơn hàng phải từ {int(min_val):,} VNĐ để áp dụng mã này"
             )
 
-        disc_type = row["discount_type"] if "discount_type" in row.keys() and row["discount_type"] else "percent"
-        disc_val = row["discount_value"] if "discount_value" in row.keys() and row["discount_value"] is not None else (row["discount_percent"] or 0.0)
+        disc_type = str(row["discount_type"] or "percent").strip().lower()
+        disc_val = float(row["discount_value"] if "discount_value" in row.keys() and row["discount_value"] is not None else (row["discount_percent"] or 0.0))
+        if disc_val == 0.0 and "discount_percent" in row.keys() and row["discount_percent"]:
+            disc_val = float(row["discount_percent"])
+
         max_disc = row["max_discount"] if "max_discount" in row.keys() and row["max_discount"] is not None else (row["max_discount_amount"] or None)
 
-        if disc_type == "percent":
+        is_percent = (
+            disc_type in ("percent", "percentage", "%") or
+            (disc_val <= 100.0 and disc_val > 0.0 and row.get("discount_percent") is not None and float(row.get("discount_percent") or 0) > 0.0)
+        )
+
+        if is_percent:
             discount_amount = payload.order_value * (disc_val / 100.0)
         else:
             discount_amount = disc_val

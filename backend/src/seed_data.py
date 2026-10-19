@@ -477,7 +477,7 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
     # 15. Demo Refunds (Sprint 3 - US08)
     demo_refunds = [
         (1, 1, 1, 1, "TKT-8892", 1, "Thay đổi kế hoạch cá nhân", 280000.0, 280000.0, "REFUNDED", "Vietcombank", "0123456789", "NGUYEN VAN A", "Đã chuyển khoản hoàn tất", "2026-10-08 10:00:00", "2026-10-08 11:30:00"),
-        (2, 2, 2, 2, "TKT-9901", 10, "Bận lịch thi đột xuất tại trường", 300000.0, 300000.0, "PENDING", "MB Bank", "9876543210", "NGUYEN VAN A", "Chờ kế toán xác nhận ủy nhiệm chi", "2026-10-10 14:15:00", None),
+        (2, 2, 2, 2, "TKT-9901", 10, "Bận lịch thi đột xuất tại trường", 300000.0, 300000.0, "REFUNDED", "MB Bank", "9876543210", "NGUYEN VAN A", "Đã duyệt hoàn tiền thành công", "2026-10-10 14:15:00", "2026-10-10 15:00:00"),
     ]
     for rf in demo_refunds:
         connection.execute(

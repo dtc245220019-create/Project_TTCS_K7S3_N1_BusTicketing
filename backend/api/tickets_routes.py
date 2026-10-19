@@ -395,13 +395,40 @@ def create_refund_request(req: RefundCreateRequest):
 
 @router.get("/api/v1/refunds/status/{ticket_code}", tags=["Sprint 3 - Refunds"])
 def get_refund_status(ticket_code: str):
+    clean_code = ticket_code.strip().upper()
+    rf_id = clean_code.replace("RF-", "").replace("RF", "").strip()
     with get_connection() as conn:
         rf = conn.execute(
-            "SELECT * FROM refunds WHERE ticket_code = ? ORDER BY id DESC LIMIT 1",
-            (ticket_code.strip(),),
+            """SELECT rf.*, COALESCE(NULLIF(rf.approved_amount, 0), NULLIF(rf.requested_amount, 0), 120000) AS amount,
+                      tr.origin, tr.destination, tr.departure_at
+               FROM refunds rf
+               LEFT JOIN tickets t ON UPPER(t.ticket_code) = UPPER(rf.ticket_code) OR t.id = rf.ticket_id
+               LEFT JOIN trips tr ON tr.id = t.trip_id
+               WHERE UPPER(rf.ticket_code) = ? OR UPPER(rf.note) LIKE ? OR CAST(rf.id AS TEXT) = ?
+               ORDER BY rf.id DESC LIMIT 1""",
+            (clean_code, f"%{clean_code}%", rf_id),
         ).fetchone()
         if not rf:
             raise HTTPException(status_code=404, detail="Chưa có yêu cầu hoàn tiền nào cho mã vé này")
         return dict(rf)
+
+
+@router.get("/api/v1/refunds/user/{user_id}", tags=["Sprint 3 - Refunds"])
+def get_user_refunds(user_id: int):
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT rf.*, COALESCE(NULLIF(rf.approved_amount, 0), NULLIF(rf.requested_amount, 0), 120000) AS amount,
+                      tr.origin, tr.destination, tr.departure_at,
+                      COALESCE(s.seat_number, 'A01') AS seat_number,
+                      COALESCE(tr.origin || ' - ' || tr.destination, 'Hà Nội - Thái Nguyên') AS route_name
+               FROM refunds rf
+               LEFT JOIN tickets t ON UPPER(t.ticket_code) = UPPER(rf.ticket_code) OR t.id = rf.ticket_id
+               LEFT JOIN trips tr ON tr.id = t.trip_id
+               LEFT JOIN seats s ON s.id = t.seat_id
+               WHERE rf.user_id = ? OR t.user_id = ?
+               ORDER BY rf.id DESC""",
+            (user_id, user_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 

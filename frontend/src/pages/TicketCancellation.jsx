@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getTicketByCode, cancelTicket, getCurrentUser } from '../api';
+import { getTicketByCode, cancelTicket, requestRefundTicket, getCurrentUser } from '../api';
 
 const DEMO_TICKETS = {
   'TKT-8892': {
@@ -87,11 +87,24 @@ function TicketCancellation() {
       return;
     }
 
+    const user = getCurrentUser();
     try {
-      const user = getCurrentUser();
       await cancelTicket(ticket.ticketCode, user ? user.id : 1);
     } catch {
       // Continue to local save
+    }
+
+    try {
+      await requestRefundTicket({
+        ticket_code: ticket.ticketCode,
+        user_id: user ? user.id : 1,
+        reason: reason,
+        bank_name: 'Vietcombank',
+        bank_account: '0987654321',
+        account_holder: user?.full_name || ticket.passenger || 'Hành khách',
+      });
+    } catch (rfErr) {
+      console.warn('requestRefundTicket warning in TicketCancellation:', rfErr);
     }
 
     const cancelledTickets = JSON.parse(

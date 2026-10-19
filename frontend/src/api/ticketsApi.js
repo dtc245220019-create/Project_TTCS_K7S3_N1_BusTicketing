@@ -60,6 +60,13 @@ export function getDriverTrips(driverId = null) {
   return fetchJson(url);
 }
 
+export function confirmDriverTrip(tripId, driverId = null, driverStatus = 'ACCEPTED') {
+  return fetchJson(`/api/v1/driver/trips/${tripId}/confirm`, {
+    method: 'PUT',
+    body: JSON.stringify({ driver_id: driverId, driver_status: driverStatus }),
+  });
+}
+
 export function boardPassenger(ticketId, staffEmail = 'taixe.nguyen@smartbus.vn') {
   return fetchJson('/api/v1/driver/board-passenger', {
     method: 'POST',
@@ -76,4 +83,8 @@ export function requestRefundTicket(payload) {
 
 export function checkRefundStatus(refundCode) {
   return fetchJson(`/api/v1/refunds/status/${refundCode}`);
+}
+
+export function getUserRefunds(userId = 1) {
+  return fetchJson(`/api/v1/refunds/user/${userId}`);
 }

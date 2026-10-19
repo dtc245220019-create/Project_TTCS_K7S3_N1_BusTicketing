@@ -56,7 +56,7 @@ export function getPendingDiscounts() {
 export function approveDiscount(userId, approved = true, notes = '') {
   return fetchJson(`/api/v1/admin/discounts/${userId}/approve`, {
     method: 'PUT',
-    body: JSON.stringify({ approved, notes }),
+    body: JSON.stringify({ approved, status: approved ? 'DaDuyet' : 'TuChoi', notes }),
   });
 }
 

@@ -312,4 +312,5 @@ def get_current_user(user_id: int = Query(1)):
         user_dict = dict(user)
         if "password_hash" in user_dict:
             del user_dict["password_hash"]
+        user_dict["user"] = dict(user_dict)
         return user_dict
