@@ -7,8 +7,12 @@ import {
   changeTicketSeat,
   changeTicketTrip,
   getCurrentUser,
+  setCurrentUser,
   getMonthlyPasses,
   getTrips,
+  updateProfile,
+  registerDiscount,
+  getProfile,
 } from '../api';
 import PrintableTicket from '../components/PrintableTicket';
 
@@ -168,6 +172,97 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
     email: 'customer@example.com',
     role: 'HanhKhach',
     phone: '0901234567',
+    discount_type: 'Khong',
+    discount_status: 'ChoDuyet',
+  };
+
+  // State thông tin khách hàng (Profile)
+  const [userProfile, setUserProfile] = useState(currentUser);
+  const [profileName, setProfileName] = useState(currentUser.full_name || '');
+  const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
+  const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
+  const [profileUpdating, setProfileUpdating] = useState(false);
+  const [profileMsg, setProfileMsg] = useState('');
+  const [profileErr, setProfileErr] = useState('');
+
+  // State xác minh đối tượng ưu đãi (Đăng ký)
+  const [discountTypeForm, setDiscountTypeForm] = useState(currentUser.discount_type !== 'Khong' ? currentUser.discount_type : 'HSSV');
+  const [idCardNumber, setIdCardNumber] = useState('');
+  const [proofNote, setProofNote] = useState('');
+  const [discountSubmitting, setDiscountSubmitting] = useState(false);
+  const [discountMsg, setDiscountMsg] = useState('');
+  const [discountErr, setDiscountErr] = useState('');
+
+  // Đồng bộ thông tin profile mới nhất khi load
+  useEffect(() => {
+    const u = getCurrentUser();
+    if (u) {
+      setUserProfile(u);
+      setProfileName(u.full_name || '');
+      setProfilePhone(u.phone || '');
+      setProfileEmail(u.email || '');
+      if (u.discount_type && u.discount_type !== 'Khong') {
+        setDiscountTypeForm(u.discount_type);
+      }
+    }
+  }, []);
+
+  const handleUpdateProfile = async (e) => {
+    if (e) e.preventDefault();
+    if (!profileName.trim()) {
+      setProfileErr('Họ và tên không được để trống');
+      return;
+    }
+    setProfileUpdating(true);
+    setProfileMsg('');
+    setProfileErr('');
+    try {
+      const res = await updateProfile({
+        user_id: userProfile.id || currentUser.id,
+        full_name: profileName,
+        phone: profilePhone,
+        email: profileEmail,
+      });
+      const updated = { ...userProfile, ...(res.user || {}), full_name: profileName, phone: profilePhone, email: profileEmail };
+      setCurrentUser(updated);
+      setUserProfile(updated);
+      setProfileMsg('✅ Cập nhật thông tin khách hàng thành công!');
+    } catch (err) {
+      setProfileErr(err.message || 'Cập nhật thất bại, vui lòng thử lại');
+    } finally {
+      setProfileUpdating(false);
+    }
+  };
+
+  const handleRegisterDiscount = async (e) => {
+    if (e) e.preventDefault();
+    if (!idCardNumber.trim()) {
+      setDiscountErr('Vui lòng nhập số thẻ HSSV hoặc số CCCD xác minh');
+      return;
+    }
+    setDiscountSubmitting(true);
+    setDiscountMsg('');
+    setDiscountErr('');
+    try {
+      await registerDiscount({
+        user_id: userProfile.id || currentUser.id,
+        discount_type: discountTypeForm,
+        id_card_number: idCardNumber,
+        proof_note: proofNote,
+      });
+      const updated = {
+        ...userProfile,
+        discount_type: discountTypeForm,
+        discount_status: 'ChoDuyet',
+      };
+      setCurrentUser(updated);
+      setUserProfile(updated);
+      setDiscountMsg('🎉 Đã gửi hồ sơ xác minh đối tượng ưu đãi thành công! Ban Quản Trị sẽ xem xét và phê duyệt trong vòng 24h.');
+    } catch (err) {
+      setDiscountErr(err.message || 'Gửi hồ sơ thất bại, vui lòng thử lại.');
+    } finally {
+      setDiscountSubmitting(false);
+    }
   };
 
   // Đồng bộ tab nếu URL thay đổi
@@ -715,7 +810,77 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
             <div className="stat-lbl">Thẻ Vé Tháng</div>
           </div>
         </div>
+
+        <div className="dashboard-stat-card" onClick={() => setActiveTab('profile')}>
+          <div className="stat-icon-wrapper" style={{ background: '#ecfdf5', color: '#059669' }}>
+            👤
+          </div>
+          <div className="stat-content">
+            <div className="stat-val">{userProfile.discount_status === 'DaDuyet' ? 'Đã duyệt' : userProfile.discount_type !== 'Khong' ? 'Chờ duyệt' : 'Cơ bản'}</div>
+            <div className="stat-lbl">Hồ Sơ Ưu Đãi</div>
+          </div>
+        </div>
       </div>
+
+      {/* THÔNG BÁO KHI SẮP ĐẾN THỜI GIAN XE CHẠY (DEPARTURE ALERT BANNER) */}
+      {(() => {
+        const soonTicket = upcomingTickets.find((t) => t.status !== 'CANCELLED');
+        if (!soonTicket) return null;
+        return (
+          <div
+            className="departure-alert-banner no-print"
+            style={{
+              background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+              border: '1.5px solid #fde68a',
+              borderRadius: '14px',
+              padding: '16px 20px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '16px',
+              boxShadow: '0 4px 15px rgba(245, 158, 11, 0.12)',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ fontSize: '32px' }}>⏰</div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: '#92400e', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>THÔNG BÁO: CHUYẾN XE SẮP ĐẾN GIỜ KHỞI HÀNH!</span>
+                  <span style={{ fontSize: '11px', backgroundColor: '#ef4444', color: 'white', padding: '1px 8px', borderRadius: '12px' }}>Sắp xuất bến</span>
+                </div>
+                <div style={{ fontSize: '13.5px', color: '#78350f', marginTop: '3px' }}>
+                  Mã vé: <b>#{soonTicket.ticket_code || soonTicket.id}</b> • Tuyến: <b>{soonTicket.routeName || `${soonTicket.departure_city} ➔ ${soonTicket.arrival_city}`}</b> • Xuất bến: <b>{soonTicket.departureTime || soonTicket.departure_time}</b> • Ghế: <b>{soonTicket.seatNumber || soonTicket.seat_numbers?.join(', ')}</b>
+                </div>
+                <div style={{ fontSize: '12px', color: '#b45309', marginTop: '2px', fontWeight: '600' }}>
+                  ⚠️ Quý khách vui lòng có mặt tại điểm đón trước 15 phút và chuẩn bị sẵn mã QR để nhân viên/tài xế soát vé lên xe.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedTicketDetail(soonTicket)}
+              style={{
+                backgroundColor: '#d97706',
+                color: 'white',
+                border: 'none',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                fontWeight: '700',
+                fontSize: '13px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(217,119,6,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>📱</span> Xem Vé & Mã QR
+            </button>
+          </div>
+        );
+      })()}
 
       {/* 3. Navigation Tabs */}
       <div className="dashboard-tabs-bar no-print">
@@ -761,6 +926,14 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
           <span>🪪</span>
           Vé Tháng
           <span className="tab-badge">{monthlyPasses.length}</span>
+        </button>
+
+        <button
+          className={`dashboard-tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          <span>👤</span>
+          Thông Tin Khách Hàng & Ưu Đãi
         </button>
       </div>
 
@@ -1425,7 +1598,7 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
             </div>
           )}
         </div>
-      ) : (
+      ) : activeTab === 'monthly' ? (
         /* TAB 5: VÉ THÁNG (MONTHLY PASS) */
         <div className="no-print">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '14px', padding: '16px 20px', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -1521,6 +1694,276 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
               ))}
             </div>
           )}
+        </div>
+      ) : (
+        /* TAB 6: TRANG THÔNG TIN KHÁCH HÀNG & XÁC MINH ĐỐI TƯỢNG ƯU ĐÃI (PROFILE) */
+        <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Header banner profile */}
+          <div style={{
+            background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+            borderRadius: '16px',
+            padding: '24px 28px',
+            color: 'white',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                border: '2px solid rgba(255,255,255,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '28px',
+              }}>
+                👤
+              </div>
+              <div>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '22px', fontWeight: '800' }}>
+                  {userProfile.full_name}
+                </h2>
+                <div style={{ fontSize: '13px', color: '#bfdbfe', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <span>📧 {userProfile.email}</span>
+                  <span>📞 {userProfile.phone || '0901234567'}</span>
+                  <span>🆔 ID: #{userProfile.id || 1}</span>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <span style={{
+                backgroundColor: userProfile.discount_status === 'DaDuyet'
+                  ? '#10b981'
+                  : userProfile.discount_type !== 'Khong'
+                  ? '#f59e0b'
+                  : 'rgba(255,255,255,0.25)',
+                color: 'white',
+                fontWeight: 'bold',
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '13px',
+              }}>
+                {userProfile.discount_status === 'DaDuyet'
+                  ? `✓ Ưu đãi: ${userProfile.discount_type} (Giảm 20%)`
+                  : userProfile.discount_type !== 'Khong'
+                  ? `⏳ Ưu đãi: ${userProfile.discount_type} (Chờ duyệt)`
+                  : 'Chưa đăng ký ưu đãi'}
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px' }}>
+            {/* CỘT 1: THÔNG TIN TÀI KHOẢN & CẬP NHẬT */}
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '20px' }}>📝</span>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0f172a' }}>
+                  Thông Tin Cá Nhân
+                </h3>
+              </div>
+
+              {profileMsg && (
+                <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' }}>
+                  {profileMsg}
+                </div>
+              )}
+              {profileErr && (
+                <div style={{ backgroundColor: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' }}>
+                  ⚠️ {profileErr}
+                </div>
+              )}
+
+              <form onSubmit={handleUpdateProfile}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                    Họ và tên
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                    Số điện thoại
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                    Email đăng nhập
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={profileEmail}
+                    onChange={(e) => setProfileEmail(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '18px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                    Vai trò hệ thống
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={userProfile.role === 'TaiXe' ? 'Tài xế' : userProfile.role === 'PhuXe' ? 'Phụ xe' : userProfile.role === 'Admin' ? 'Quản trị viên' : 'Hành khách'}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc', color: '#64748b' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={profileUpdating}
+                  style={{
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    padding: '11px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    fontSize: '14px',
+                    cursor: profileUpdating ? 'not-allowed' : 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  {profileUpdating ? 'Đang lưu thay đổi...' : '💾 Lưu Thông Tin Cá Nhân'}
+                </button>
+              </form>
+            </div>
+
+            {/* CỘT 2: XÁC MINH ĐỐI TƯỢNG ƯU ĐÃI (ĐĂNG KÝ HỒ SƠ) */}
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', border: '1px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>🎓</span>
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '800', color: '#0f172a' }}>
+                    Xác Minh Đối Tượng Ưu Đãi
+                  </h3>
+                </div>
+                <span style={{
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: userProfile.discount_status === 'DaDuyet' ? '#dcfce7' : '#fef3c7',
+                  color: userProfile.discount_status === 'DaDuyet' ? '#166534' : '#b45309',
+                }}>
+                  {userProfile.discount_status === 'DaDuyet' ? 'ĐÃ DUYỆT' : 'CHỜ DUYỆT'}
+                </span>
+              </div>
+
+              <p style={{ fontSize: '13px', color: '#64748b', lineHeight: 1.5, marginBottom: '16px' }}>
+                Đăng ký xác minh đối tượng chính sách để được hệ thống tự động khấu trừ <b>20% - 50%</b> giá vé xe khách và thẻ vé tháng.
+              </p>
+
+              {discountMsg && (
+                <div style={{ backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' }}>
+                  {discountMsg}
+                </div>
+              )}
+              {discountErr && (
+                <div style={{ backgroundColor: '#fee2e2', border: '1px solid #fecaca', color: '#dc2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px' }}>
+                  ⚠️ {discountErr}
+                </div>
+              )}
+
+              <form onSubmit={handleRegisterDiscount}>
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                    Chọn diện đối tượng ưu đãi
+                  </label>
+                  <select
+                    value={discountTypeForm}
+                    onChange={(e) => setDiscountTypeForm(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: 'white' }}
+                  >
+                    <option value="HSSV">🎓 Học sinh / Sinh viên (Giảm 20%)</option>
+                    <option value="NguoiCaoTuoi">👵 Người cao tuổi (&gt; 60 tuổi - Giảm 20%)</option>
+                    <option value="ThuongBinh">🎖️ Thương binh / Chính sách (Giảm 30%)</option>
+                    <option value="NguoiKhuyetTat">♿ Người khuyết tật (Giảm 50%)</option>
+                  </select>
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                    Số CCCD hoặc Mã số thẻ HSSV / Thẻ ưu tiên
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="ví dụ: 001202012345 hoặc SV2026-889"
+                    value={idCardNumber}
+                    onChange={(e) => setIdCardNumber(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
+                    Đơn vị công tác / Trường học hoặc Ghi chú
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ví dụ: Đại học Bách Khoa, Khóa 2023-2027"
+                    value={proofNote}
+                    onChange={(e) => setProofNote(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '18px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
+                    📎 Minh chứng đối tượng kèm theo:
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px' }}>
+                    Chụp rõ 2 mặt thẻ HSSV hoặc giấy chứng nhận chính sách còn thời hạn.
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#166534', cursor: 'pointer' }}>
+                    <input type="checkbox" defaultChecked />
+                    <span>✓ Đã liên kết số định danh cá nhân với cơ sở dữ liệu xác thực</span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={discountSubmitting}
+                  style={{
+                    backgroundColor: '#16a34a',
+                    color: 'white',
+                    border: 'none',
+                    padding: '11px 20px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    fontSize: '14px',
+                    cursor: discountSubmitting ? 'not-allowed' : 'pointer',
+                    width: '100%',
+                  }}
+                >
+                  {discountSubmitting ? 'Đang gửi hồ sơ...' : '📤 Gửi Hồ Sơ Xác Minh Ưu Đãi'}
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
       )}
 

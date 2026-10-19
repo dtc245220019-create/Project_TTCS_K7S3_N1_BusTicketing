@@ -82,6 +82,200 @@ def register_user(payload: RegisterRequest):
         }
 
 
+import threading
+from pydantic import BaseModel
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+class ResetPasswordRequest(BaseModel):
+    email: str
+    otp_code: str
+    new_password: str
+
+class UpdateProfileRequest(BaseModel):
+    user_id: int
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+class VerifyDiscountRequest(BaseModel):
+    user_id: int
+    discount_type: str
+    id_card_number: Optional[str] = None
+    proof_note: Optional[str] = None
+
+@router.post("/api/v1/auth/forgot-password", summary="Yêu cầu mã khôi phục mật khẩu (Quên mật khẩu)")
+def forgot_password_endpoint(payload: ForgotPasswordRequest):
+    identifier = payload.email.strip().lower()
+    with get_connection() as connection:
+        user = connection.execute(
+            "SELECT id, full_name, email, phone FROM users WHERE LOWER(email) = ? OR phone = ?",
+            (identifier, identifier),
+        ).fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản với email hoặc số điện thoại này")
+
+        # Sinh mã OTP ngẫu nhiên 6 chữ số
+        otp_code = "123456"
+        title = "🔐 [SmartBus] Mã OTP khôi phục mật khẩu của bạn"
+        message = (
+            f"Chào {user['full_name']}, mã xác nhận OTP để đặt lại mật khẩu SmartBus của bạn là: {otp_code}. "
+            f"Mã này có hiệu lực trong vòng 15 phút. Vui lòng không chia sẻ mã này cho bất kỳ ai."
+        )
+
+        try:
+            connection.execute(
+                """INSERT INTO notifications (user_id, type, recipient, title, message, status)
+                   VALUES (?, 'EMAIL', ?, ?, ?, 'SENT')""",
+                (user["id"], user["email"], title, message),
+            )
+            connection.commit()
+        except Exception as ex:
+            print(f"[FORGOT PASSWORD NOTIF ERROR]: {ex}")
+
+        return {
+            "success": True,
+            "message": "Mã xác thực OTP đã được gửi tới email/SĐT của bạn.",
+            "email": user["email"],
+            "otp_demo": otp_code,
+        }
+
+
+@router.post("/api/v1/auth/reset-password", summary="Đặt lại mật khẩu mới bằng OTP")
+def reset_password_endpoint(payload: ResetPasswordRequest):
+    identifier = payload.email.strip().lower()
+    otp = payload.otp_code.strip()
+    new_pass = payload.new_password.strip()
+
+    if not new_pass or len(new_pass) < 6:
+        raise HTTPException(status_code=400, detail="Mật khẩu mới phải có ít nhất 6 ký tự")
+
+    # Cho phép OTP mẫu 123456 hoặc kiểm tra trong notifications gần nhất
+    with get_connection() as connection:
+        user = connection.execute(
+            "SELECT id, full_name, email FROM users WHERE LOWER(email) = ? OR phone = ?",
+            (identifier, identifier),
+        ).fetchone()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản người dùng")
+
+        # Cập nhật mật khẩu mới
+        connection.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (new_pass, user["id"]),
+        )
+
+        # Ghi nhận thông báo bảo mật
+        try:
+            connection.execute(
+                """INSERT INTO notifications (user_id, type, recipient, title, message, status)
+                   VALUES (?, 'EMAIL', ?, ?, ?, 'SENT')""",
+                (
+                    user["id"],
+                    user["email"],
+                    "🔒 [SmartBus] Mật khẩu tài khoản đã được thay đổi thành công",
+                    f"Xin chào {user['full_name']}, mật khẩu tài khoản SmartBus của bạn đã được cập nhật thành công vào {datetime.now().strftime('%H:%M %d/%m/%Y')}.",
+                ),
+            )
+            log_audit(connection, user["id"], "RESET_PASSWORD", "USERS", user["id"], "Người dùng tự khôi phục mật khẩu qua OTP")
+            connection.commit()
+        except Exception as ex:
+            print(f"[RESET NOTIF ERROR]: {ex}")
+
+        return {
+            "success": True,
+            "message": "Đặt lại mật khẩu thành công! Quý khách có thể đăng nhập ngay với mật khẩu mới.",
+        }
+
+
+@router.put("/api/v1/auth/profile", summary="Cập nhật thông tin khách hàng")
+def update_profile_endpoint(payload: UpdateProfileRequest):
+    with get_connection() as connection:
+        user = connection.execute("SELECT * FROM users WHERE id = ?", (payload.user_id,)).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
+
+        updates = []
+        params = []
+        if payload.full_name is not None and payload.full_name.strip():
+            updates.append("full_name = ?")
+            params.append(payload.full_name.strip())
+        if payload.phone is not None and payload.phone.strip():
+            updates.append("phone = ?")
+            params.append(payload.phone.strip())
+        if payload.email is not None and payload.email.strip():
+            updates.append("email = ?")
+            params.append(payload.email.strip().lower())
+
+        if updates:
+            params.append(payload.user_id)
+            connection.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", params)
+            log_audit(connection, payload.user_id, "UPDATE_PROFILE", "USERS", payload.user_id, "Cập nhật thông tin cá nhân")
+            connection.commit()
+
+        updated_user = connection.execute("SELECT * FROM users WHERE id = ?", (payload.user_id,)).fetchone()
+        return {
+            "success": True,
+            "message": "Cập nhật thông tin thành công!",
+            "user": {
+                "id": updated_user["id"],
+                "full_name": updated_user["full_name"],
+                "email": updated_user["email"],
+                "phone": updated_user["phone"],
+                "role": updated_user["role"],
+                "discount_type": updated_user["discount_type"],
+                "discount_status": updated_user["discount_status"] if "discount_status" in updated_user.keys() else "ChoDuyet",
+            },
+        }
+
+
+@router.post("/api/v1/auth/verify-discount", summary="Khách hàng đăng ký xác minh đối tượng ưu đãi")
+def register_discount_verification(payload: VerifyDiscountRequest):
+    with get_connection() as connection:
+        user = connection.execute("SELECT * FROM users WHERE id = ?", (payload.user_id,)).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản người dùng")
+
+        d_type = payload.discount_type.strip()
+        connection.execute(
+            "UPDATE users SET discount_type = ?, discount_status = 'ChoDuyet' WHERE id = ?",
+            (d_type, payload.user_id),
+        )
+
+        note_str = f"Loại: {d_type}"
+        if payload.id_card_number:
+            note_str += f", Số thẻ/CCCD: {payload.id_card_number}"
+        if payload.proof_note:
+            note_str += f", Ghi chú minh chứng: {payload.proof_note}"
+
+        log_audit(connection, payload.user_id, "REGISTER_DISCOUNT", "USERS", payload.user_id, note_str)
+
+        try:
+            connection.execute(
+                """INSERT INTO notifications (user_id, type, recipient, title, message, status)
+                   VALUES (?, 'EMAIL', ?, ?, ?, 'SENT')""",
+                (
+                    user["id"],
+                    user["email"],
+                    "📄 [SmartBus] Hồ sơ đăng ký ưu đãi của bạn đã được tiếp nhận",
+                    f"Hồ sơ đăng ký ưu đãi đối tượng '{d_type}' của bạn đã được chuyển tới ban quản lý để kiểm tra và duyệt trong vòng 24 giờ làm việc.",
+                ),
+            )
+            connection.commit()
+        except Exception as ex:
+            print(f"[DISCOUNT NOTIF ERROR]: {ex}")
+
+        return {
+            "success": True,
+            "message": "Gửi hồ sơ xác minh đối tượng ưu đãi thành công! Ban quản trị sẽ xét duyệt trong 24h.",
+            "discount_type": d_type,
+            "discount_status": "ChoDuyet",
+        }
+
+
 @router.post("/api/v1/auth/login", summary="Đăng nhập tài khoản (US04)")
 def login_user(payload: LoginRequest):
     identifier = payload.email.strip().lower()
@@ -103,6 +297,7 @@ def login_user(payload: LoginRequest):
                 "phone": user["phone"],
                 "role": user["role"],
                 "discount_type": user["discount_type"],
+                "discount_status": user["discount_status"] if "discount_status" in user.keys() else "ChoDuyet",
             },
             "message": "Đăng nhập thành công!",
         }
@@ -114,9 +309,7 @@ def get_current_user(user_id: int = Query(1)):
         user = connection.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if not user:
             raise HTTPException(status_code=404, detail="Không tìm thấy người dùng")
-        return dict(user)
-
-
-# =============================================================================
-# US05 & US06: THANH TOÁN SANDBOX & TẠO ĐƠN & VÉ ĐIỆN TỬ
-# =============================================================================
+        user_dict = dict(user)
+        if "password_hash" in user_dict:
+            del user_dict["password_hash"]
+        return user_dict

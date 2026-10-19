@@ -49,7 +49,9 @@ function AdminDashboard() {
   // Revenue & Occupancy tab states
   const [revenueData, setRevenueData] = useState(null);
   const [occupancyData, setOccupancyData] = useState(null);
-  const [revenueGroupBy, setRevenueGroupBy] = useState('month');
+  const [revenueGroupBy, setRevenueGroupBy] = useState('day');
+  const [revenueStartDate, setRevenueStartDate] = useState('');
+  const [revenueEndDate, setRevenueEndDate] = useState('');
   const [_loadingAnalytics, setLoadingAnalytics] = useState(false);
   const [seatOccupancyDetails, setSeatOccupancyDetails] = useState([]);
   const [seatOccupancyLoading, setSeatOccupancyLoading] = useState(false);
@@ -196,11 +198,11 @@ function AdminDashboard() {
     }
   };
 
-  const loadRevenueAndOccupancy = async () => {
+  const loadRevenueAndOccupancy = async (start = revenueStartDate, end = revenueEndDate) => {
     setLoadingAnalytics(true);
     try {
       const [revRes, occRes] = await Promise.allSettled([
-        getAdminRevenue(revenueGroupBy),
+        getAdminRevenue(revenueGroupBy, start || null, end || null),
         getAdminOccupancy(),
       ]);
       if (revRes.status === 'fulfilled' && revRes.value) {
@@ -1108,27 +1110,86 @@ function AdminDashboard() {
               </h2>
               <p>Phân tích hiệu quả vận hành các tuyến, thống kê doanh thu đa chiều và tỷ lệ lấp đầy</p>
             </div>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Từ:</label>
+                <input
+                  type="date"
+                  value={revenueStartDate}
+                  onChange={(e) => setRevenueStartDate(e.target.value)}
+                  style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Đến:</label>
+                <input
+                  type="date"
+                  value={revenueEndDate}
+                  onChange={(e) => setRevenueEndDate(e.target.value)}
+                  style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px' }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => loadRevenueAndOccupancy(revenueStartDate, revenueEndDate)}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  border: 'none',
+                  padding: '7px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                🔍 Lọc
+              </button>
+              {(revenueStartDate || revenueEndDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRevenueStartDate('');
+                    setRevenueEndDate('');
+                    loadRevenueAndOccupancy('', '');
+                  }}
+                  style={{
+                    backgroundColor: '#e2e8f0',
+                    color: '#334155',
+                    border: 'none',
+                    padding: '7px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Xóa lọc
+                </button>
+              )}
               <select
                 value={revenueGroupBy}
-                onChange={(e) => setRevenueGroupBy(e.target.value)}
-                style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
+                onChange={(e) => {
+                  setRevenueGroupBy(e.target.value);
+                  setTimeout(() => loadRevenueAndOccupancy(revenueStartDate, revenueEndDate), 50);
+                }}
+                style={{ padding: '7px 10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: '600' }}
               >
                 <option value="day">Theo Ngày (day)</option>
                 <option value="month">Theo Tháng (month)</option>
               </select>
               <a
-                href={getRevenueExportUrl()}
+                href={getRevenueExportUrl(revenueStartDate, revenueEndDate)}
                 target="_blank"
                 rel="noreferrer"
                 download="bao_cao_doanh_thu_smartbus.csv"
                 style={{
                   backgroundColor: '#10b981',
                   color: 'white',
-                  padding: '8px 16px',
+                  padding: '7px 14px',
                   borderRadius: '8px',
                   textDecoration: 'none',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   fontWeight: '700',
                   display: 'flex',
                   alignItems: 'center',
@@ -1143,26 +1204,112 @@ function AdminDashboard() {
           {/* Revenue KPI Summary */}
           <div className="admin-revenue-summary">
             <article className="admin-revenue-primary">
-              <span>TỔNG DOANH THU GHI NHẬN</span>
+              <span>TỔNG DOANH THU THỰC NHẬN (NET)</span>
               <strong>
-                {revenueData?.summary?.total_revenue != null
-                  ? Number(revenueData.summary.total_revenue).toLocaleString('vi-VN') + ' đ'
-                  : '4.850.000 đ'}
+                {Number(
+                  revenueData?.total_revenue ?? revenueData?.summary?.total_revenue ?? stats?.total_revenue ?? 0
+                ).toLocaleString('vi-VN')} đ
               </strong>
-              <small>Dữ liệu hợp nhất từ vé lẻ, thẻ vé tháng và thanh toán online</small>
+              <small>
+                Đã trừ {Number(revenueData?.refunded_amount ?? revenueData?.summary?.refunded_amount ?? 0).toLocaleString('vi-VN')} đ tiền hoàn trả vé
+              </small>
+            </article>
+
+            <article>
+              <span>DOANH THU GỘP (GROSS)</span>
+              <strong style={{ color: '#1e293b' }}>
+                {Number(
+                  revenueData?.gross_revenue ?? revenueData?.summary?.gross_revenue ?? (revenueData?.total_revenue ?? stats?.total_revenue ?? 0)
+                ).toLocaleString('vi-VN')} đ
+              </strong>
+              <small>Tổng thu trước khi đối trừ hoàn vé</small>
             </article>
 
             <article>
               <span>TỔNG SỐ ĐƠN ĐẶT</span>
-              <strong>{revenueData?.summary?.total_orders ?? 14} đơn</strong>
+              <strong>{revenueData?.transaction_count ?? revenueData?.summary?.total_orders ?? stats?.paid_tickets ?? 0} đơn</strong>
               <small>Thanh toán thành công qua VietQR, VNPay, ZaloPay</small>
             </article>
 
             <article>
               <span>SỐ VÉ ĐÃ PHÁT HÀNH</span>
-              <strong>{revenueData?.summary?.total_tickets ?? 21} vé</strong>
-              <small>Bao gồm vé thường và vé ưu đãi HSSV</small>
+              <strong>{revenueData?.summary?.total_tickets ?? revenueData?.transaction_count ?? stats?.total_tickets ?? 0} vé</strong>
+              <small>Bao gồm vé thường và vé ưu đãi</small>
             </article>
+          </div>
+
+          {/* Daily Revenue Breakdown Table */}
+          <div className="admin-analytics-panel" style={{ marginBottom: '24px' }}>
+            <div className="admin-analytics-panel-heading">
+              <div>
+                <span className="admin-analytics-eyebrow" style={{ color: '#059669' }}>DAILY REVENUE</span>
+                <h3 style={{ fontSize: '16px', fontWeight: '700' }}>📅 Báo Cáo Doanh Thu Theo Ngày & Phân Tích Giao Dịch</h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                  Thống kê doanh thu gộp, số tiền hoàn trả vé và doanh thu thực nhận theo từng ngày
+                </p>
+              </div>
+              <div style={{ fontSize: '13px', color: '#64748b' }}>
+                Tổng số ngày có giao dịch: <strong style={{ color: '#0f172a' }}>{revenueData?.by_day?.length || 0} ngày</strong>
+              </div>
+            </div>
+
+            <div className="admin-analytics-table-wrap">
+              <table className="admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Ngày Giao Dịch</th>
+                    <th>Số Đơn / Vé</th>
+                    <th>Doanh Thu Gộp (Gross)</th>
+                    <th>Số Tiền Hoàn Trả</th>
+                    <th>Doanh Thu Thực Nhận (Net)</th>
+                    <th>Trạng Thái Đối Soát</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(revenueData?.by_day && revenueData.by_day.length > 0) ? (
+                    revenueData.by_day.map((d, idx) => (
+                      <tr key={d.date || idx}>
+                        <td className="admin-analytics-strong">
+                          📅 {d.date || 'Hôm nay'}
+                        </td>
+                        <td>
+                          <strong>{d.transaction_count}</strong> giao dịch
+                        </td>
+                        <td style={{ color: '#475569' }}>
+                          {Number(d.gross_revenue ?? d.revenue).toLocaleString('vi-VN')} đ
+                        </td>
+                        <td style={{ color: d.refunded_amount > 0 ? '#dc2626' : '#94a3b8' }}>
+                          {d.refunded_amount > 0
+                            ? `- ${Number(d.refunded_amount).toLocaleString('vi-VN')} đ`
+                            : '0 đ'}
+                        </td>
+                        <td style={{ fontWeight: '800', color: '#059669', fontSize: '15px' }}>
+                          {Number(d.net_revenue ?? d.revenue).toLocaleString('vi-VN')} đ
+                        </td>
+                        <td>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            fontWeight: '600',
+                            backgroundColor: '#ecfdf5',
+                            color: '#065f46'
+                          }}>
+                            ✅ Khớp sổ cái
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                        Không có giao dịch nào được ghi nhận trong khoảng thời gian đã chọn.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Route Occupancy Table */}

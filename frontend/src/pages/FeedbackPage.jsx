@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCurrentUser, getTickets } from '../api';
-import { CATEGORIES, STATUS, listFeedbacks, submitFeedback } from '../services/feedbackApi';
+import { CATEGORIES, STATUS, listFeedbacks, submitFeedback, getFeedbacksList } from '../services/feedbackApi';
 import './FeedbackPage.css';
 
 const RATING_LABELS = ['', 'Rất tệ', 'Chưa tốt', 'Bình thường', 'Tốt', 'Rất tốt'];
@@ -51,6 +51,9 @@ function FeedbackPage() {
   const user = getCurrentUser();
   const [tickets, setTickets] = useState([]);
   const [history, setHistory] = useState([]);
+  const [communityList, setCommunityList] = useState([]);
+  const [activeTab, setActiveTab] = useState('community'); // 'community' | 'mine'
+  const [starFilter, setStarFilter] = useState(0); // 0: all
   const [loadingList, setLoadingList] = useState(true);
   const [category, setCategory] = useState('');
   const [ticketCode, setTicketCode] = useState('');
@@ -61,17 +64,27 @@ function FeedbackPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const reload = useCallback(async () => {
-    if (!user) return;
     setLoadingList(true);
-    setHistory(await listFeedbacks(user.id));
+    try {
+      const allRes = await getFeedbacksList();
+      const allList = Array.isArray(allRes) ? allRes : allRes?.items || [];
+      setCommunityList(allList);
+    } catch {
+      setCommunityList([]);
+    }
+
+    if (user) {
+      setHistory(await listFeedbacks(user.id));
+    }
     setLoadingList(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user) return;
     reload();
-    getTickets(user.id).then((r) => setTickets(Array.isArray(r) ? r : r.items || [])).catch(() => setTickets([]));
+    if (user) {
+      getTickets(user.id).then((r) => setTickets(Array.isArray(r) ? r : r.items || [])).catch(() => setTickets([]));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
@@ -178,10 +191,146 @@ function FeedbackPage() {
           <button type="submit" className="fb-btn block" disabled={submitting}>{submitting ? 'Đang gửi...' : 'Gửi phản ánh →'}</button>
         </form>
 
-        <aside className="fb-side">
-          <h2 className="fb-h2">Phản ánh của tôi</h2>
+        <aside className="fb-side" style={{ minWidth: '380px' }}>
+          {/* TAB CHUYỂN ĐỔI: CỘNG ĐỒNG / CỦA TÔI */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
+            <button
+              type="button"
+              onClick={() => setActiveTab('community')}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: 'none',
+                background: activeTab === 'community' ? 'white' : 'transparent',
+                fontWeight: activeTab === 'community' ? '700' : '600',
+                color: activeTab === 'community' ? '#1d4ed8' : '#64748b',
+                boxShadow: activeTab === 'community' ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              🌟 Khách hàng khác ({communityList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('mine')}
+              style={{
+                flex: 1,
+                padding: '8px 10px',
+                borderRadius: '8px',
+                border: 'none',
+                background: activeTab === 'mine' ? 'white' : 'transparent',
+                fontWeight: activeTab === 'mine' ? '700' : '600',
+                color: activeTab === 'mine' ? '#1d4ed8' : '#64748b',
+                boxShadow: activeTab === 'mine' ? '0 2px 4px rgba(0,0,0,0.06)' : 'none',
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              📋 Của tôi ({history.length})
+            </button>
+          </div>
+
+          {/* LỌC THEO SỐ SAO NẾU ĐANG Ở TAB CỘNG ĐỒNG */}
+          {activeTab === 'community' && (
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              {[
+                { label: 'Tất cả', val: 0 },
+                { label: '5 ★', val: 5 },
+                { label: '4 ★', val: 4 },
+                { label: '3 ★', val: 3 },
+                { label: '1-2 ★', val: 2 },
+              ].map((flt) => (
+                <button
+                  key={flt.val}
+                  type="button"
+                  onClick={() => setStarFilter(flt.val)}
+                  style={{
+                    padding: '3px 8px',
+                    borderRadius: '12px',
+                    border: '1px solid',
+                    borderColor: starFilter === flt.val ? '#2563eb' : '#cbd5e1',
+                    background: starFilter === flt.val ? '#eff6ff' : 'white',
+                    color: starFilter === flt.val ? '#1d4ed8' : '#64748b',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {flt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {loadingList ? (
             <div className="fb-skeleton" />
+          ) : activeTab === 'community' ? (
+            communityList.filter((f) => {
+              const stars = f.rating_stars || f.rating || 5;
+              if (starFilter === 0) return true;
+              if (starFilter === 2) return stars <= 2;
+              return stars === starFilter;
+            }).length === 0 ? (
+              <div className="fb-empty">
+                <span>💬</span>
+                <p>Chưa có phản ánh nào từ khách hàng khác phù hợp với bộ lọc.</p>
+              </div>
+            ) : (
+              <ul className="fb-list">
+                {communityList
+                  .filter((f) => {
+                    const stars = f.rating_stars || f.rating || 5;
+                    if (starFilter === 0) return true;
+                    if (starFilter === 2) return stars <= 2;
+                    return stars === starFilter;
+                  })
+                  .map((f) => {
+                    const st = STATUS[f.status] || STATUS.DA_GUI;
+                    const cat = catOf(f.category);
+                    return (
+                      <li key={f.id} className="fb-item" style={{ borderLeft: '3px solid #3b82f6' }}>
+                        <div className="fb-item-top">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0f172a' }}>
+                              👤 {f.user_name || 'Khách hàng SmartBus'}
+                            </span>
+                            {cat && (
+                              <span style={{ fontSize: '11px', color: '#64748b' }}>
+                                · {cat.icon} {cat.label}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`fb-badge ${st.tone}`}>{st.label}</span>
+                        </div>
+
+                        <div style={{ margin: '4px 0' }}>
+                          <Stars value={f.rating_stars || f.rating || 5} readOnly size="sm" />
+                        </div>
+
+                        {f.route_name && (
+                          <div style={{ fontSize: '11px', fontWeight: '600', color: '#2563eb', marginBottom: '4px' }}>
+                            🚌 {f.route_name}
+                          </div>
+                        )}
+
+                        <p className="fb-item-text" style={{ margin: '6px 0', fontSize: '13.5px' }}>{f.content || f.comment}</p>
+
+                        <div className="fb-item-meta">
+                          <span>{fmtDate(f.created_at)}</span>
+                        </div>
+
+                        {f.admin_reply && (
+                          <div className="fb-reply" style={{ marginTop: '8px', fontSize: '12px' }}>
+                            <strong>Phản hồi từ SmartBus:</strong> {f.admin_reply}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+              </ul>
+            )
           ) : history.length === 0 ? (
             <div className="fb-empty"><span>📭</span><p>Bạn chưa gửi phản ánh nào.</p></div>
           ) : (

@@ -68,9 +68,14 @@ def update_user_role(user_id: int, payload: UpdateRoleRequest):
 @router.get("/api/v1/admin/stats", summary="Thống kê tổng quan hệ thống (Admin)")
 def get_admin_stats():
     with get_connection() as connection:
-        total_rev = connection.execute(
+        gross_rev = connection.execute(
             "SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'SUCCESS'"
         ).fetchone()[0]
+        total_refunded = connection.execute(
+            "SELECT COALESCE(SUM(approved_amount), 0) FROM refunds WHERE status = 'REFUNDED'"
+        ).fetchone()[0]
+        total_rev = gross_rev - total_refunded
+
         total_tickets = connection.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
         total_trips = connection.execute("SELECT COUNT(*) FROM trips").fetchone()[0]
         total_users = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -94,6 +99,8 @@ def get_admin_stats():
 
         return {
             "total_revenue": int(total_rev),
+            "gross_revenue": int(gross_rev),
+            "refunded_amount": int(total_refunded),
             "total_tickets": total_tickets,
             "total_trips": total_trips,
             "total_users": total_users,
@@ -523,9 +530,27 @@ def admin_revenue_report(
     to_date: Optional[str] = Query(None),
     route_id: Optional[int] = Query(None),
     trip_id: Optional[int] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    group_by: Optional[str] = Query("day"),
 ):
-    start = parse_report_date(from_date, "from_date")
-    end = parse_report_date(to_date, "to_date", end_of_day=True)
+    if not isinstance(from_date, str):
+        from_date = None
+    if not isinstance(to_date, str):
+        to_date = None
+    if not isinstance(start_date, str):
+        start_date = None
+    if not isinstance(end_date, str):
+        end_date = None
+    if not isinstance(route_id, int):
+        route_id = None
+    if not isinstance(trip_id, int):
+        trip_id = None
+
+    effective_from = from_date or start_date
+    effective_to = to_date or end_date
+    start = parse_report_date(effective_from, "from_date")
+    end = parse_report_date(effective_to, "to_date", end_of_day=True)
 
     conditions = ["p.status = 'SUCCESS'"]
     params = []
@@ -589,15 +614,24 @@ def admin_revenue_report(
         day["refunded_amount"] = sum(
             row["refunded_amount"] for row in rows if (row.get("paid_at") or "")[:10] == (day.get("date") or "")
         )
-        day["revenue"] = day["gross_revenue"] - day["refunded_amount"]
+        day["net_revenue"] = day["gross_revenue"] - day["refunded_amount"]
+        day["revenue"] = day["net_revenue"]
 
     gross = sum(row.get("amount") or 0 for row in rows)
     refunded = sum(row["refunded_amount"] for row in rows)
+    net_total = gross - refunded
     return {
+        "summary": {
+            "total_revenue": net_total,
+            "gross_revenue": gross,
+            "refunded_amount": refunded,
+            "total_orders": len(rows),
+            "total_tickets": len(rows),
+        },
         "transaction_count": len(rows),
         "gross_revenue": gross,
         "refunded_amount": refunded,
-        "total_revenue": gross - refunded,
+        "total_revenue": net_total,
         "by_day": by_day,
         "transactions": rows,
     }

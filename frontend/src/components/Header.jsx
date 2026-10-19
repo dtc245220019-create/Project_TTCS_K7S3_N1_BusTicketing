@@ -9,6 +9,7 @@ function Header() {
   const [notifications, setNotifications] = useState([]);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const isHome = location.pathname === '/';
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef(null);
@@ -347,17 +348,25 @@ function Header() {
                             fontWeight: '700',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            backgroundColor: n.type === 'EMAIL' ? '#dbeafe' : '#fef3c7',
-                            color: n.type === 'EMAIL' ? '#1d4ed8' : '#b45309',
+                            backgroundColor: n.title?.includes('⏰') || n.title?.includes('Nhắc nhở')
+                              ? '#fef3c7'
+                              : n.type === 'EMAIL'
+                              ? '#dbeafe'
+                              : '#fef3c7',
+                            color: n.title?.includes('⏰') || n.title?.includes('Nhắc nhở')
+                              ? '#b45309'
+                              : n.type === 'EMAIL'
+                              ? '#1d4ed8'
+                              : '#b45309',
                           }}
                         >
-                          {n.type === 'EMAIL' ? '✉️ EMAIL' : '💬 SMS'}
+                          {n.title?.includes('⏰') || n.title?.includes('Nhắc nhở') ? '⏰ SẮP KHỞI HÀNH' : n.type === 'EMAIL' ? '✉️ EMAIL' : '💬 SMS'}
                         </span>
                         <span style={{ fontSize: '10px', color: '#94a3b8' }}>
                           {n.created_at ? n.created_at.toString().slice(0, 16) : 'Vừa xong'}
                         </span>
                       </div>
-                      <div style={{ fontSize: '12px', fontWeight: '700', color: '#1e293b', marginBottom: '2px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '700', color: n.title?.includes('⏰') ? '#b45309' : '#1e293b', marginBottom: '2px' }}>
                         {n.title}
                       </div>
                       <div style={{ fontSize: '11px', color: '#64748b', lineHeight: 1.4 }}>
@@ -421,9 +430,15 @@ function Header() {
 
         {user ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'white' }}>{user.full_name}</div>
-              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+            <Link
+              to="/dashboard?tab=profile"
+              title="Nhấn để xem Trang thông tin khách hàng & đối tượng ưu đãi"
+              style={{ textAlign: 'right', textDecoration: 'none', cursor: 'pointer' }}
+            >
+              <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
+                <span>👤</span> {user.full_name}
+              </div>
+              <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', marginTop: '2px' }}>
                 <span
                   style={{
                     fontSize: '10px',
@@ -451,13 +466,13 @@ function Header() {
                 </span>
                 {user.discount_type && user.discount_type !== 'Khong' && (
                   <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '8px', backgroundColor: '#3b82f6', color: 'white' }}>
-                    {user.discount_type} (-20%)
+                    {user.discount_type} {user.discount_status === 'ChoDuyet' ? '(Chờ duyệt)' : '(-20%)'}
                   </span>
                 )}
               </div>
-            </div>
+            </Link>
             <button
-              onClick={handleLogout}
+              onClick={() => setShowLogoutConfirm(true)}
               style={{
                 backgroundColor: 'rgba(255,255,255,0.15)',
                 color: 'white',
@@ -466,6 +481,7 @@ function Header() {
                 borderRadius: '8px',
                 fontSize: '12px',
                 cursor: 'pointer',
+                fontWeight: '600',
               }}
             >
               Đăng xuất
@@ -509,6 +525,7 @@ function Header() {
             <div className="sidebar-section-label">MENU CHÍNH</div>
             {[
               ['/', '🏠', 'Trang chủ'],
+              ['/dashboard?tab=profile', '👤', 'Thông tin khách hàng'],
               ['/buses', '🚌', user && (user.role === 'Admin' || user.role === 'QuanTriVien') ? 'Điều phối chuyến' : user?.role === 'TaiXe' ? 'Lịch trình xe' : 'Tra cứu chuyến xe'],
               ['/map', '🗺️', 'Bản đồ & theo dõi xe'],
               ['/monthly-pass', '🎫', 'Vé tháng'],
@@ -526,6 +543,97 @@ function Header() {
             <div className="sidebar-help-card"><strong>Hành trình thuận tiện hơn</strong><p>Tra cứu chuyến, quản lý vé và theo dõi xe tại một nơi.</p></div>
           </aside>
         </>
+      )}
+
+      {/* MODAL XÁC NHẬN ĐĂNG XUẤT */}
+      {showLogoutConfirm && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          backdropFilter: 'blur(4px)',
+          padding: '20px',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            maxWidth: '420px',
+            width: '100%',
+            padding: '28px',
+            textAlign: 'center',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+            border: '1px solid #e2e8f0',
+            animation: 'fadeIn 0.2s ease-out',
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              backgroundColor: '#fee2e2',
+              color: '#dc2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '26px',
+              margin: '0 auto 16px auto',
+            }}>
+              🚪
+            </div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '800', color: '#0f172a' }}>
+              Xác Nhận Đăng Xuất
+            </h3>
+            <p style={{ margin: '0 0 24px 0', fontSize: '14px', color: '#64748b', lineHeight: 1.5 }}>
+              Bạn có chắc chắn muốn đăng xuất khỏi tài khoản <b>{user?.full_name}</b> không? Phiên làm việc của bạn sẽ kết thúc.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: 'white',
+                  color: '#475569',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  flex: 1,
+                }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutConfirm(false);
+                  handleLogout();
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  cursor: 'pointer',
+                  flex: 1,
+                  boxShadow: '0 2px 8px rgba(239,68,68,0.3)',
+                }}
+              >
+                Đăng Xuất
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </header>
   );
