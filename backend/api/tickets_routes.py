@@ -377,38 +377,20 @@ class RefundCreateRequest(BaseModel):
 
 @router.post("/api/v1/refunds/request", tags=["Sprint 3 - Refunds"])
 def create_refund_request(req: RefundCreateRequest):
+    # US08: uy thac cho module rieng backend/src/refund_api.py
+    from refund_api import RefundError, request_refund
     with get_connection() as conn:
-        ticket = conn.execute("SELECT * FROM tickets WHERE ticket_code = ?", (req.ticket_code.strip(),)).fetchone()
-        if not ticket:
-            raise HTTPException(status_code=404, detail="Không tìm thấy mã vé yêu cầu hoàn tiền")
-
-        conn.execute("UPDATE tickets SET status = 'CANCELLED' WHERE id = ?", (ticket["id"],))
-        amt = float(ticket["actual_price"] or 0)
-        cursor = conn.cursor()
-        cursor.execute(
-            """INSERT INTO refunds (ticket_id, ticket_code, user_id, reason, requested_amount, approved_amount, status, bank_name, bank_account, account_holder, note, created_at)
-               VALUES (?, ?, ?, ?, ?, 0, 'PENDING', ?, ?, ?, 'Chờ kế toán xác nhận', ?)""",
-            (
-                ticket["id"],
-                req.ticket_code.strip(),
-                req.user_id or ticket["user_id"],
-                req.reason,
-                amt,
-                req.bank_name,
-                req.bank_account,
-                req.account_holder,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            ),
-        )
-        log_audit(conn, req.user_id or 1, "REQUEST_REFUND", "TICKET", ticket["id"], f"Yêu cầu hoàn tiền vé {req.ticket_code}")
-        conn.commit()
-        return {
-            "success": True,
-            "message": "Yêu cầu hoàn tiền đã được tiếp nhận! Hệ thống sẽ xử lý trong 24h.",
-            "refund_id": cursor.lastrowid,
-            "ticket_code": req.ticket_code,
-            "amount": amt,
-        }
+        try:
+            res = request_refund(
+                conn, req.ticket_code, req.user_id, req.reason,
+                req.bank_name, req.bank_account, req.account_holder,
+            )
+        except RefundError as exc:
+            code = 404 if "tim thay" in str(exc).lower() else 422
+            raise HTTPException(status_code=code, detail=str(exc))
+        res["message"] = "Yêu cầu hoàn tiền đã được tiếp nhận! Hệ thống sẽ xử lý trong 24h."
+        res["amount"] = res.pop("amount", 0)
+        return res
 
 
 @router.get("/api/v1/refunds/status/{ticket_code}", tags=["Sprint 3 - Refunds"])

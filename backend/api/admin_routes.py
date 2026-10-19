@@ -706,40 +706,29 @@ def admin_get_refunds():
 
 @router.post("/api/v1/admin/refunds/{refund_id}/approve", tags=["Sprint 3 - Refunds"])
 def admin_approve_refund(refund_id: int):
+    # US08: uy thac cho module rieng backend/src/refund_api.py (SET REFUNDED de khop doanh_thu_api)
+    from refund_api import RefundError, approve_refund
     with get_connection() as conn:
-        rf = conn.execute("SELECT * FROM refunds WHERE id = ?", (refund_id,)).fetchone()
-        if not rf:
-            raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu hoàn tiền")
-        amt = rf["requested_amount"]
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn.execute(
-            """UPDATE refunds SET status = 'APPROVED', approved_amount = ?, processed_at = ?, note = 'Đã hoàn tiền thành công vào tài khoản'
-               WHERE id = ?""",
-            (amt, now_str, refund_id),
-        )
-        if rf["ticket_code"]:
-            conn.execute("UPDATE tickets SET status = 'CANCELLED' WHERE ticket_code = ?", (rf["ticket_code"],))
-        log_audit(conn, 12, "APPROVE_REFUND", "REFUND", refund_id, f"Hoàn tiền {int(amt):,}đ cho vé {rf['ticket_code']}")
-        conn.commit()
-        return {"success": True, "message": "Đã phê duyệt và hoàn tiền thành công!", "status": "APPROVED"}
+        try:
+            res = approve_refund(conn, refund_id)
+        except RefundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        res["message"] = "Đã phê duyệt và hoàn tiền thành công!"
+        return res
 
 
 @router.post("/api/v1/admin/refunds/{refund_id}/reject", tags=["Sprint 3 - Refunds"])
 def admin_reject_refund(refund_id: int, payload: Optional[dict] = None):
+    # US08: uy thac cho module rieng backend/src/refund_api.py
+    from refund_api import RefundError, reject_refund
     payload = payload or {}
     reason = payload.get("reason", "Hủy vé quá muộn so với giờ quy định")
     with get_connection() as conn:
-        rf = conn.execute("SELECT * FROM refunds WHERE id = ?", (refund_id,)).fetchone()
-        if not rf:
-            raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu hoàn tiền")
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        conn.execute(
-            """UPDATE refunds SET status = 'REJECTED', processed_at = ?, note = ?
-               WHERE id = ?""",
-            (now_str, reason, refund_id),
-        )
-        log_audit(conn, 12, "REJECT_REFUND", "REFUND", refund_id, f"Từ chối hoàn vé: {reason}")
-        conn.commit()
-        return {"success": True, "message": "Đã từ chối hoàn tiền", "status": "REJECTED"}
+        try:
+            res = reject_refund(conn, refund_id, reason)
+        except RefundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        res["message"] = "Đã từ chối hoàn tiền"
+        return res
 
 
