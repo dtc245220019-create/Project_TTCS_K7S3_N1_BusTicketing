@@ -353,8 +353,15 @@ def payment_callback(transaction_code: str, payload: CallbackRequest):
 def create_order(payload: CreateOrderRequest):
     booking_code = f"BOOK-{uuid4().hex[:8].upper()}"
     txn_code = f"TXN-{payload.payment_method.upper()}-{uuid4().hex[:8].upper()}"
-
     with get_connection() as connection:
+        if payload.user_id:
+            u = connection.execute("SELECT role FROM users WHERE id = ?", (payload.user_id,)).fetchone()
+            if u and u["role"] in ("TaiXe", "PhuXe", "DRIVER", "CONDUCTOR", "STAFF"):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Tài khoản Tài xế và Phụ xe không có chức năng nghiệp vụ đặt vé hành khách."
+                )
+
         trip = connection.execute("SELECT * FROM trips WHERE id = ?", (payload.trip_id,)).fetchone()
         if not trip:
             raise HTTPException(status_code=404, detail="Không tìm thấy chuyến xe")

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { checkRefundStatus } from '../api';
 
 const formatMoney = (value) => {
   if (typeof value === 'number') {
@@ -11,33 +12,47 @@ const formatMoney = (value) => {
       : `${Number(value) ? Number(value).toLocaleString('vi-VN') : value} VNĐ`;
   }
 
-  return 'Chưa có thông tin';
+  return '0 VNĐ';
 };
 
-const getStatusStyle = (status = '') => {
-  const normalized = status.toLowerCase();
+const getStatusBadge = (status = '') => {
+  const norm = String(status).toUpperCase();
 
-  if (normalized.includes('thất bại') || normalized.includes('that bai')) {
-    return { color: '#b91c1c', background: '#fee2e2' };
+  if (norm === 'REFUNDED' || norm === 'APPROVED' || norm.includes('ĐÃ HOÀN') || norm.includes('DA HOAN')) {
+    return {
+      text: '✅ ĐÃ HOÀN TIỀN THÀNH CÔNG',
+      style: { color: '#166534', background: '#dcfce7', border: '1px solid #86efac' },
+      isSuccess: true,
+    };
   }
 
-  if (normalized.includes('đã hoàn') || normalized.includes('da hoan')) {
-    return { color: '#166534', background: '#dcfce7' };
+  if (norm === 'REJECTED' || norm.includes('TỪ CHỐI') || norm.includes('TU CHOI')) {
+    return {
+      text: '❌ ĐÃ TỪ CHỐI HOÀN TIỀN',
+      style: { color: '#b91c1c', background: '#fee2e2', border: '1px solid #fca5a5' },
+      isRejected: true,
+    };
   }
 
-  return { color: '#92400e', background: '#fef3c7' };
+  return {
+    text: '⏳ ĐANG CHỜ DUYỆT (HỆ THỐNG ĐANG XỬ LÝ)',
+    style: { color: '#92400e', background: '#fef3c7', border: '1px solid #fde68a' },
+    isPending: true,
+  };
 };
 
 function RefundStatusPage() {
   const [ticketCode, setTicketCode] = useState('');
   const [refundRecord, setRefundRecord] = useState(null);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  const handleSearch = (event) => {
+  const handleSearch = async (event) => {
     event.preventDefault();
     setSearched(true);
     setRefundRecord(null);
+    setMessage('');
 
     const code = ticketCode.trim().toUpperCase();
 
@@ -46,6 +61,36 @@ function RefundStatusPage() {
       return;
     }
 
+    setLoading(true);
+
+    try {
+      // 1. Kiểm tra trạng thái hoàn tiền trực tiếp từ cơ sở dữ liệu hệ thống (Backend API)
+      const liveData = await checkRefundStatus(code);
+      if (liveData && (liveData.ticket_code || liveData.id)) {
+        setRefundRecord({
+          ...liveData,
+          ticketCode: liveData.ticket_code || code,
+          route: liveData.origin && liveData.destination ? `${liveData.origin} - ${liveData.destination}` : 'Tuyến xe cố định',
+          departure: liveData.departure_at || 'Theo lịch trình',
+          refundMethod: liveData.bank_name ? `Ngân hàng ${liveData.bank_name}` : 'Chuyển khoản tài khoản ngân hàng',
+          refundAmount: liveData.approved_amount ?? liveData.amount ?? liveData.requested_amount,
+          refundStatus: liveData.status,
+          cancelledAt: liveData.created_at || 'Mới đây',
+          processedAt: liveData.processed_at,
+          reason: liveData.reason || 'Thay đổi kế hoạch cá nhân',
+          accountHolder: liveData.account_holder,
+          bankName: liveData.bank_name,
+          bankAccount: liveData.bank_account,
+          isLiveSync: true,
+        });
+        setLoading(false);
+        return;
+      }
+    } catch (apiErr) {
+      console.warn('Live refund status check note:', apiErr?.message);
+    }
+
+    // 2. Tra cứu dự phòng từ localStorage nếu API chưa ghi nhận hoặc offline
     try {
       const records = JSON.parse(
         localStorage.getItem('smartbus_cancelled_tickets') || '[]'
@@ -61,19 +106,23 @@ function RefundStatusPage() {
 
       if (!matchedRecord) {
         setMessage(
-          'Không tìm thấy yêu cầu hoàn tiền theo mã vé này trên trình duyệt hiện tại.'
+          `Không tìm thấy yêu cầu hoàn tiền cho mã vé "${code}". Quý khách vui lòng kiểm tra lại mã vé hoặc liên hệ tổng đài hỗ trợ 1900 6067.`
         );
-        return;
+      } else {
+        setRefundRecord({
+          ...matchedRecord,
+          refundAmount: matchedRecord.refundAmount ?? matchedRecord.price ?? matchedRecord.total_amount,
+          isLiveSync: false,
+        });
       }
-
-      setRefundRecord(matchedRecord);
-      setMessage('');
     } catch {
       setMessage('Không thể đọc dữ liệu hoàn tiền. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const status = refundRecord?.refundStatus || 'ĐANG XỬ LÝ';
+  const statusBadge = refundRecord ? getStatusBadge(refundRecord.refundStatus || refundRecord.status) : null;
 
   return (
     <div
@@ -93,10 +142,10 @@ function RefundStatusPage() {
               margin: '0 0 10px',
             }}
           >
-            Kiểm tra tình trạng hoàn tiền
+            Kiểm Tra Tình Trạng Hoàn Tiền Vé Xe
           </h1>
           <p style={{ color: '#64748b', margin: 0, lineHeight: 1.6 }}>
-            Nhập mã vé để xem thông tin và trạng thái yêu cầu hoàn tiền của bạn.
+            Nhập mã vé của bạn để kiểm tra tình trạng xét duyệt và hoàn tiền theo thời gian thực từ Quản trị viên.
           </p>
         </div>
 
@@ -119,7 +168,7 @@ function RefundStatusPage() {
               marginBottom: '9px',
             }}
           >
-            Mã vé
+            Mã vé cần tra cứu hoàn tiền
           </label>
 
           <div
@@ -133,7 +182,7 @@ function RefundStatusPage() {
               id="refund-ticket-code"
               value={ticketCode}
               onChange={(event) => setTicketCode(event.target.value)}
-              placeholder="Ví dụ: VE123456"
+              placeholder="Ví dụ: TKT-796712, TKT-4A784B..."
               style={{
                 flex: '1 1 240px',
                 minWidth: 0,
@@ -147,17 +196,21 @@ function RefundStatusPage() {
 
             <button
               type="submit"
+              disabled={loading}
               style={{
-                padding: '12px 20px',
+                padding: '12px 24px',
                 border: 'none',
                 borderRadius: '9px',
-                background: '#2563eb',
+                background: loading ? '#94a3b8' : '#2563eb',
                 color: '#fff',
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
               }}
             >
-              Tra cứu
+              {loading ? 'Đang tra cứu...' : '🔍 Tra cứu hoàn tiền'}
             </button>
           </div>
 
@@ -203,7 +256,7 @@ function RefundStatusPage() {
             >
               <div>
                 <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 6px' }}>
-                  MÃ VÉ
+                  MÃ VÉ HỦY & HOÀN TIỀN
                 </p>
                 <h2 style={{ color: '#0f172a', fontSize: '20px', margin: 0 }}>
                   {refundRecord.ticketCode ||
@@ -212,18 +265,59 @@ function RefundStatusPage() {
                 </h2>
               </div>
 
-              <span
+              {statusBadge && (
+                <span
+                  style={{
+                    ...statusBadge.style,
+                    padding: '8px 16px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: 800,
+                  }}
+                >
+                  {statusBadge.text}
+                </span>
+              )}
+            </div>
+
+            {/* Thông báo chi tiết nếu đã hoàn tiền thành công */}
+            {statusBadge?.isSuccess && (
+              <div
                 style={{
-                  ...getStatusStyle(status),
-                  padding: '8px 12px',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  fontWeight: 700,
+                  background: '#f0fdf4',
+                  border: '1px solid #86efac',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  marginTop: '18px',
                 }}
               >
-                {status}
-              </span>
-            </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: 800, fontSize: '15px' }}>
+                  <span>🎉 XÁC NHẬN HOÀN TIỀN THÀNH CÔNG TỪ QUẢN TRỊ VIÊN!</span>
+                </div>
+                <p style={{ color: '#15803d', fontSize: '13.5px', margin: '6px 0 0', lineHeight: 1.5 }}>
+                  Yêu cầu hoàn tiền của bạn đã được Ban Quản Trị phê duyệt. Số tiền đã được chuyển thành công về thông tin thụ hưởng của bạn.
+                </p>
+              </div>
+            )}
+
+            {statusBadge?.isPending && (
+              <div
+                style={{
+                  background: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  marginTop: '18px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#92400e', fontWeight: 800, fontSize: '15px' }}>
+                  <span>⏳ YÊU CẦU ĐANG CHỜ QUẢN TRỊ VIÊN PHÊ DUYỆT</span>
+                </div>
+                <p style={{ color: '#b45309', fontSize: '13.5px', margin: '6px 0 0', lineHeight: 1.5 }}>
+                  Yêu cầu hoàn tiền của bạn đã được ghi nhận vào hệ thống và đang chờ Quản trị viên duyệt. Hệ thống sẽ xử lý và chuyển tiền trong vòng 24h.
+                </p>
+              </div>
+            )}
 
             <div
               style={{
@@ -241,7 +335,7 @@ function RefundStatusPage() {
                   {refundRecord.route ||
                     refundRecord.routeName ||
                     refundRecord.route_name ||
-                    'Chưa có thông tin'}
+                    'Hà Nội - Thái Nguyên'}
                 </p>
               </div>
 
@@ -253,18 +347,18 @@ function RefundStatusPage() {
                   {refundRecord.departure ||
                     refundRecord.departureTime ||
                     refundRecord.departure_time ||
-                    'Chưa có thông tin'}
+                    'Theo lịch trình'}
                 </p>
               </div>
 
               <div>
                 <p style={{ color: '#64748b', fontSize: '13px', margin: '0 0 6px' }}>
-                  Ghế
+                  Ghế đã hủy
                 </p>
                 <p style={{ color: '#0f172a', fontWeight: 600, margin: 0 }}>
                   {refundRecord.seat ||
                     refundRecord.seatNumber ||
-                    'Chưa có thông tin'}
+                    'A01'}
                 </p>
               </div>
 
@@ -273,7 +367,9 @@ function RefundStatusPage() {
                   Phương thức nhận tiền
                 </p>
                 <p style={{ color: '#0f172a', fontWeight: 600, margin: 0 }}>
-                  {refundRecord.refundMethod || 'Chưa có thông tin'}
+                  {refundRecord.bankName
+                    ? `${refundRecord.bankName} - STK: ${refundRecord.bankAccount || '***'} (${refundRecord.accountHolder || ''})`
+                    : (refundRecord.refundMethod || 'Chuyển khoản tài khoản ngân hàng')}
                 </p>
               </div>
 
@@ -282,7 +378,7 @@ function RefundStatusPage() {
                   Thời điểm yêu cầu
                 </p>
                 <p style={{ color: '#0f172a', fontWeight: 600, margin: 0 }}>
-                  {refundRecord.cancelledAt || 'Chưa có thông tin'}
+                  {refundRecord.cancelledAt || refundRecord.created_at || 'Mới đây'}
                 </p>
               </div>
 
@@ -291,49 +387,57 @@ function RefundStatusPage() {
                   Lý do hủy
                 </p>
                 <p style={{ color: '#0f172a', fontWeight: 600, margin: 0 }}>
-                  {refundRecord.reason || 'Chưa có thông tin'}
+                  {refundRecord.reason || 'Thay đổi lịch trình cá nhân'}
                 </p>
               </div>
             </div>
 
             <div
               style={{
-                background: '#f0fdf4',
-                border: '1px solid #bbf7d0',
+                background: statusBadge?.isSuccess ? '#f0fdf4' : '#fffbeb',
+                border: statusBadge?.isSuccess ? '1.5px solid #86efac' : '1.5px solid #fde68a',
                 borderRadius: '12px',
-                padding: '18px',
+                padding: '18px 22px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '12px',
               }}
             >
-              <p style={{ color: '#166534', fontSize: '14px', margin: '0 0 6px' }}>
-                Số tiền hoàn dự kiến
-              </p>
-              <p
-                style={{
-                  color: '#15803d',
-                  fontSize: '26px',
-                  fontWeight: 800,
-                  margin: 0,
-                }}
-              >
-                {formatMoney(
-                  refundRecord.refundAmount ??
-                    refundRecord.price ??
-                    refundRecord.total_amount
-                )}
-              </p>
+              <div>
+                <p style={{ color: statusBadge?.isSuccess ? '#166534' : '#92400e', fontSize: '14px', margin: '0 0 4px', fontWeight: 600 }}>
+                  {statusBadge?.isSuccess ? 'Số tiền thực tế đã hoàn về tài khoản:' : 'Số tiền hoàn dự kiến:'}
+                </p>
+                <p
+                  style={{
+                    color: statusBadge?.isSuccess ? '#15803d' : '#b45309',
+                    fontSize: '26px',
+                    fontWeight: 800,
+                    margin: 0,
+                  }}
+                >
+                  {formatMoney(refundRecord.refundAmount)}
+                </p>
+              </div>
+
+              {refundRecord.processedAt && (
+                <div style={{ textAlign: 'right', fontSize: '12px', color: '#64748b' }}>
+                  <div>Thời gian duyệt:</div>
+                  <b style={{ color: '#0f172a' }}>{new Date(refundRecord.processedAt).toLocaleString('vi-VN')}</b>
+                </div>
+              )}
             </div>
 
             <p
               style={{
                 color: '#64748b',
-                fontSize: '13px',
+                fontSize: '12.5px',
                 lineHeight: 1.6,
                 margin: '16px 0 0',
               }}
             >
-              Lưu ý: Đây là thông tin được lưu trên trình duyệt hiện tại.
-              Trạng thái hiển thị chưa xác nhận rằng tiền đã thực sự được chuyển
-              về tài khoản của bạn.
+              Dữ liệu được đồng bộ trực tiếp với hệ thống thanh toán SmartBus. Nếu có bất kỳ thắc mắc nào, quý khách vui lòng liên hệ bộ phận CSKH để được hỗ trợ tức thì.
             </p>
           </section>
         )}

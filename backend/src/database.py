@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS trips (
     route_id INTEGER REFERENCES routes(id),
     driver_id INTEGER REFERENCES users(id),
     staff_id INTEGER REFERENCES users(id),
+    driver_status TEXT DEFAULT 'ASSIGNED',
     available_seats INTEGER DEFAULT 36
 );
 
@@ -453,6 +454,8 @@ def initialize_database(connection: sqlite3.Connection) -> None:
                      for row in connection.execute("PRAGMA table_info(trips)").fetchall()}
         if "staff_id" not in trip_cols:
             connection.execute("ALTER TABLE trips ADD COLUMN staff_id INTEGER REFERENCES users(id)")
+        if "driver_status" not in trip_cols:
+            connection.execute("ALTER TABLE trips ADD COLUMN driver_status TEXT DEFAULT 'ASSIGNED'")
     except Exception:
         pass
 

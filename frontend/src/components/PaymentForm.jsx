@@ -63,7 +63,7 @@ function PaymentForm({ bookingData }) {
   const discountAmount = hasDiscount ? Math.round(basePrice * 0.2) : 0;
   const priceAfterUserDiscount = basePrice - discountAmount;
   const voucherDiscountAmount = appliedVoucher
-    ? appliedVoucher.type === 'percentage'
+    ? (appliedVoucher.type === 'percentage' || appliedVoucher.type === 'percent')
       ? Math.round(priceAfterUserDiscount * appliedVoucher.value / 100)
       : Math.min(appliedVoucher.value, priceAfterUserDiscount)
     : 0;

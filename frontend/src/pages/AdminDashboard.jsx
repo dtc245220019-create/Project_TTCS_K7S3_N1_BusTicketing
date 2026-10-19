@@ -223,13 +223,11 @@ function AdminDashboard() {
     setLoadingDiscounts(true);
     try {
       const res = await getPendingDiscounts();
-      if (res && res.pending_users) {
-        setPendingDiscounts(res.pending_users);
-      } else {
-        setPendingDiscounts([]);
-      }
+      const list = Array.isArray(res) ? res : (res?.pending_users || res?.users || []);
+      setPendingDiscounts(list);
     } catch (e) {
       console.warn('Lỗi tải danh sách ưu đãi:', e);
+      setPendingDiscounts([]);
     } finally {
       setLoadingDiscounts(false);
     }
@@ -440,9 +438,21 @@ function AdminDashboard() {
     if (!window.confirm(`Bạn có chắc muốn ${actionLabel} hồ sơ ưu đãi của người dùng #${userId}?`)) return;
 
     try {
-      await approveDiscount(userId, approved, approved ? 'Đã xác thực thẻ HSSV hợp lệ' : 'Hồ sơ chưa đạt yêu cầu');
+      const res = await approveDiscount(userId, approved, approved ? 'Đã xác thực thẻ HSSV hợp lệ' : 'Hồ sơ chưa đạt yêu cầu');
       setPendingDiscounts((prev) => prev.filter((u) => u.id !== userId));
       showToast(`Đã ${actionLabel} hồ sơ ưu đãi thành công cho user #${userId}!`);
+
+      // Cập nhật ngay smartbus_user nếu là user hiện tại trong browser
+      const cur = getCurrentUser();
+      if (cur && cur.id === userId) {
+        const updated = {
+          ...cur,
+          discount_status: approved ? 'DaDuyet' : 'TuChoi',
+          discount_type: res?.discount_type || cur.discount_type || 'HSSV',
+        };
+        setCurrentUser(updated);
+      }
+
       loadAdminData();
     } catch (err) {
       showToast(`Lỗi duyệt ưu đãi: ${err.message || 'Không thể xử lý'}`, 'error');
