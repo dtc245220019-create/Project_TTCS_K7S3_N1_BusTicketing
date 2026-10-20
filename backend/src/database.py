@@ -61,6 +61,10 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (role IN ('CUSTOMER', 'STAFF', 'ADMIN', 'DRIVER', 'CONDUCTOR', 'TaiXe', 'PhuXe', 'HanhKhach', 'Admin', 'QuanTriVien')),
     discount_type TEXT DEFAULT 'Khong',
     discount_status TEXT DEFAULT 'ChoDuyet',
+    student_id TEXT DEFAULT NULL,
+    card_image TEXT DEFAULT NULL,
+    id_card_number TEXT DEFAULT NULL,
+    proof_note TEXT DEFAULT NULL,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -407,6 +411,14 @@ def initialize_database(connection: sqlite3.Connection) -> None:
                      for row in connection.execute("PRAGMA table_info(users)").fetchall()}
         if "discount_status" not in user_cols:
             connection.execute("ALTER TABLE users ADD COLUMN discount_status TEXT DEFAULT 'ChoDuyet'")
+        if "student_id" not in user_cols:
+            connection.execute("ALTER TABLE users ADD COLUMN student_id TEXT DEFAULT NULL")
+        if "card_image" not in user_cols:
+            connection.execute("ALTER TABLE users ADD COLUMN card_image TEXT DEFAULT NULL")
+        if "id_card_number" not in user_cols:
+            connection.execute("ALTER TABLE users ADD COLUMN id_card_number TEXT DEFAULT NULL")
+        if "proof_note" not in user_cols:
+            connection.execute("ALTER TABLE users ADD COLUMN proof_note TEXT DEFAULT NULL")
     except Exception:
         pass
 

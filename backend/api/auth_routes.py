@@ -102,8 +102,10 @@ class UpdateProfileRequest(BaseModel):
 class VerifyDiscountRequest(BaseModel):
     user_id: int
     discount_type: str
+    student_id: Optional[str] = None
     id_card_number: Optional[str] = None
     proof_note: Optional[str] = None
+    card_image: Optional[str] = None
 
 @router.post("/api/v1/auth/forgot-password", summary="Yêu cầu mã khôi phục mật khẩu (Quên mật khẩu)")
 def forgot_password_endpoint(payload: ForgotPasswordRequest):
@@ -240,16 +242,26 @@ def register_discount_verification(payload: VerifyDiscountRequest):
             raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản người dùng")
 
         d_type = payload.discount_type.strip()
+        st_id = payload.student_id or payload.id_card_number or ""
         connection.execute(
-            "UPDATE users SET discount_type = ?, discount_status = 'ChoDuyet' WHERE id = ?",
-            (d_type, payload.user_id),
+            """UPDATE users 
+               SET discount_type = ?, 
+                   discount_status = 'ChoDuyet',
+                   student_id = ?,
+                   id_card_number = ?,
+                   proof_note = ?,
+                   card_image = ?
+               WHERE id = ?""",
+            (d_type, st_id, payload.id_card_number or st_id, payload.proof_note or "", payload.card_image or "", payload.user_id),
         )
 
         note_str = f"Loại: {d_type}"
-        if payload.id_card_number:
-            note_str += f", Số thẻ/CCCD: {payload.id_card_number}"
+        if st_id:
+            note_str += f", Mã sinh viên/Số thẻ: {st_id}"
         if payload.proof_note:
-            note_str += f", Ghi chú minh chứng: {payload.proof_note}"
+            note_str += f", Ghi chú/Trường: {payload.proof_note}"
+        if payload.card_image:
+            note_str += ", Đã đính kèm ảnh thẻ SV"
 
         log_audit(connection, payload.user_id, "REGISTER_DISCOUNT", "USERS", payload.user_id, note_str)
 

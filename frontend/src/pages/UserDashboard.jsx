@@ -225,8 +225,11 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
 
   // State xác minh đối tượng ưu đãi (Đăng ký)
   const [discountTypeForm, setDiscountTypeForm] = useState(currentUser.discount_type !== 'Khong' ? currentUser.discount_type : 'HSSV');
-  const [idCardNumber, setIdCardNumber] = useState('');
-  const [proofNote, setProofNote] = useState('');
+  const [studentId, setStudentId] = useState(currentUser.student_id || currentUser.id_card_number || '');
+  const [idCardNumber, setIdCardNumber] = useState(currentUser.student_id || currentUser.id_card_number || '');
+  const [proofNote, setProofNote] = useState(currentUser.proof_note || '');
+  const [schoolName, setSchoolName] = useState(currentUser.proof_note || '');
+  const [cardImage, setCardImage] = useState(currentUser.card_image || '');
   const [discountSubmitting, setDiscountSubmitting] = useState(false);
   const [discountMsg, setDiscountMsg] = useState('');
   const [discountErr, setDiscountErr] = useState('');
@@ -246,6 +249,17 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
           setProfileName(merged.full_name || '');
           setProfilePhone(merged.phone || '');
           setProfileEmail(merged.email || '');
+          if (merged.student_id || merged.id_card_number) {
+            setStudentId(merged.student_id || merged.id_card_number || '');
+            setIdCardNumber(merged.student_id || merged.id_card_number || '');
+          }
+          if (merged.proof_note) {
+            setProofNote(merged.proof_note);
+            setSchoolName(merged.proof_note);
+          }
+          if (merged.card_image) {
+            setCardImage(merged.card_image);
+          }
           if (merged.discount_type && merged.discount_type !== 'Khong') {
             setDiscountTypeForm(merged.discount_type);
           }
@@ -294,30 +308,57 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
     }
   };
 
+  const handleCardImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setDiscountErr('Kích thước ảnh tối đa 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setCardImage(event.target.result);
+      setDiscountErr('');
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleRegisterDiscount = async (e) => {
     if (e) e.preventDefault();
-    if (!idCardNumber.trim()) {
-      setDiscountErr('Vui lòng nhập số thẻ HSSV hoặc số CCCD xác minh');
+    const finalCode = (studentId || idCardNumber || '').trim();
+    if (discountTypeForm === 'HSSV' && !finalCode) {
+      setDiscountErr('Vui lòng nhập Mã sinh viên / Mã học sinh để xác minh');
+      return;
+    }
+    if (!finalCode) {
+      setDiscountErr('Vui lòng nhập Mã sinh viên hoặc CCCD xác minh');
       return;
     }
     setDiscountSubmitting(true);
     setDiscountMsg('');
     setDiscountErr('');
     try {
+      const finalNote = (schoolName || proofNote || '').trim();
       await registerDiscount({
         user_id: userProfile.id || currentUser.id,
         discount_type: discountTypeForm,
-        id_card_number: idCardNumber,
-        proof_note: proofNote,
+        student_id: finalCode,
+        id_card_number: finalCode,
+        proof_note: finalNote,
+        card_image: cardImage,
       });
       const updated = {
         ...userProfile,
         discount_type: discountTypeForm,
         discount_status: 'ChoDuyet',
+        student_id: finalCode,
+        id_card_number: finalCode,
+        proof_note: finalNote,
+        card_image: cardImage,
       };
       setCurrentUser(updated);
       setUserProfile(updated);
-      setDiscountMsg('🎉 Đã gửi hồ sơ xác minh đối tượng ưu đãi thành công! Ban Quản Trị sẽ xem xét và phê duyệt trong vòng 24h.');
+      setDiscountMsg('🎉 Đã gửi hồ sơ xác minh đối tượng ưu đãi kèm ảnh thẻ sinh viên thành công! Ban Quản Trị sẽ xem xét và phê duyệt trong vòng 24h.');
     } catch (err) {
       setDiscountErr(err.message || 'Gửi hồ sơ thất bại, vui lòng thử lại.');
     } finally {
@@ -2597,42 +2638,128 @@ function UserDashboard({ defaultTab = 'upcoming' }) {
 
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
-                    Số CCCD hoặc Mã số thẻ HSSV / Thẻ ưu tiên
+                    {discountTypeForm === 'HSSV' ? 'Mã sinh viên / Mã học sinh' : 'Số CCCD / Mã thẻ ưu tiên'}
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="ví dụ: 001202012345 hoặc SV2026-889"
-                    value={idCardNumber}
-                    onChange={(e) => setIdCardNumber(e.target.value)}
+                    placeholder={discountTypeForm === 'HSSV' ? 'ví dụ: B21DCCN001 hoặc SV2026-889' : 'ví dụ: 001202012345'}
+                    value={studentId}
+                    onChange={(e) => {
+                      setStudentId(e.target.value);
+                      setIdCardNumber(e.target.value);
+                    }}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
                   />
                 </div>
 
                 <div style={{ marginBottom: '14px' }}>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '4px' }}>
-                    Đơn vị công tác / Trường học hoặc Ghi chú
+                    {discountTypeForm === 'HSSV' ? 'Trường Đại Học / Học Viện / Khoa' : 'Đơn vị công tác / Trường học hoặc Ghi chú'}
                   </label>
                   <input
                     type="text"
-                    placeholder="ví dụ: Đại học Bách Khoa, Khóa 2023-2027"
-                    value={proofNote}
-                    onChange={(e) => setProofNote(e.target.value)}
+                    placeholder={discountTypeForm === 'HSSV' ? 'ví dụ: Đại học Bách Khoa, Khóa 2023-2027' : 'Ghi chú minh chứng'}
+                    value={schoolName}
+                    onChange={(e) => {
+                      setSchoolName(e.target.value);
+                      setProofNote(e.target.value);
+                    }}
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
                   />
                 </div>
 
-                <div style={{ marginBottom: '18px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #cbd5e1' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>
-                    📎 Minh chứng đối tượng kèm theo:
+                {/* Upload Ảnh Thẻ Sinh Viên / Minh Chứng */}
+                <div style={{ marginBottom: '18px', padding: '14px', background: '#f8fafc', borderRadius: '10px', border: '1.5px dashed #cbd5e1' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#1e293b', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>📷</span>
+                    <span>{discountTypeForm === 'HSSV' ? 'Ảnh thẻ sinh viên để xác minh:' : 'Ảnh giấy tờ minh chứng kèm theo:'}</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '8px' }}>
-                    Chụp rõ 2 mặt thẻ HSSV hoặc giấy chứng nhận chính sách còn thời hạn.
+                  <div style={{ fontSize: '11.5px', color: '#64748b', marginBottom: '10px' }}>
+                    {discountTypeForm === 'HSSV' ? 'Chụp rõ nét mặt trước thẻ sinh viên hoặc ảnh thẻ có dấu trường còn hiệu lực.' : 'Chụp rõ 2 mặt giấy tờ minh chứng hoặc thẻ ưu tiên còn thời hạn.'}
                   </div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#166534', cursor: 'pointer' }}>
-                    <input type="checkbox" defaultChecked />
-                    <span>✓ Đã liên kết số định danh cá nhân với cơ sở dữ liệu xác thực</span>
-                  </label>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <label style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      fontSize: '12.5px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}>
+                      📁 Chọn ảnh thẻ từ máy
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCardImageUpload}
+                        style={{ display: 'none' }}
+                      />
+                    </label>
+
+                    {!cardImage && (
+                      <button
+                        type="button"
+                        onClick={() => setCardImage('https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=400&q=80')}
+                        style={{
+                          backgroundColor: '#eff6ff',
+                          color: '#1d4ed8',
+                          border: '1px solid #bfdbfe',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        🖼️ Dùng ảnh thẻ SV mẫu demo
+                      </button>
+                    )}
+
+                    {cardImage && (
+                      <button
+                        type="button"
+                        onClick={() => setCardImage('')}
+                        style={{
+                          backgroundColor: '#fee2e2',
+                          color: '#dc2626',
+                          border: '1px solid #fecaca',
+                          padding: '7px 12px',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ✕ Xóa ảnh
+                      </button>
+                    )}
+                  </div>
+
+                  {cardImage && (
+                    <div style={{ marginTop: '12px', padding: '10px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <img
+                        src={cardImage}
+                        alt="Ảnh thẻ sinh viên"
+                        style={{ width: '120px', height: '76px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                      />
+                      <div>
+                        <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#166534' }}>✓ Đã chọn ảnh thẻ sinh viên</div>
+                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>Ảnh đã sẵn sàng gửi tới Ban Quản Trị xét duyệt.</div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: '10px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#166534', cursor: 'pointer' }}>
+                      <input type="checkbox" defaultChecked />
+                      <span>✓ Cam kết thông tin mã sinh viên và ảnh thẻ sinh viên chính chủ</span>
+                    </label>
+                  </div>
                 </div>
 
                 <button

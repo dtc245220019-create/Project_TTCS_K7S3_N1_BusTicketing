@@ -47,7 +47,8 @@ def get_pending_discounts():
     with get_connection() as conn:
         users = conn.execute(
             """
-            SELECT id, full_name, email, phone, discount_type, discount_status 
+            SELECT id, full_name, email, phone, discount_type, discount_status,
+                   student_id, card_image, id_card_number, proof_note
             FROM users 
             WHERE discount_status = 'ChoDuyet' OR discount_type != 'Khong'
             """

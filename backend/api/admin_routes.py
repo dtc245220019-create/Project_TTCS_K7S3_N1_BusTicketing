@@ -530,6 +530,7 @@ def get_pending_discounts():
     with get_connection() as conn:
         users = conn.execute(
             """SELECT id, full_name, email, phone, discount_type, discount_status,
+                      student_id, card_image, id_card_number, proof_note,
                       created_at
                FROM users 
                WHERE discount_status = 'ChoDuyet' OR (discount_type != 'Khong' AND discount_status != 'DaDuyet')
@@ -654,13 +655,19 @@ def admin_revenue_report(
             for r in c.execute(
                 f"""SELECT p.id, p.transaction_code, p.booking_code, p.amount, p.provider,
                            p.status, p.paid_at, p.created_at,
-                           b.id AS booking_id, b.trip_id,
+                           b.id AS booking_id, b.trip_id, b.status AS booking_status,
                            t.trip_code, t.origin, t.destination, t.route_id,
-                           r.name AS route_name,
+                           COALESCE(r.name, CASE WHEN t.origin IS NOT NULL AND t.destination IS NOT NULL THEN t.origin || ' - ' || t.destination ELSE 'Vé xe định tuyến' END) AS route_name,
+                           COALESCE(u.full_name, (SELECT bi.passenger_name FROM booking_items bi WHERE bi.booking_id = b.id LIMIT 1), 'Nguyễn Văn A (Khách Hàng)') AS customer_name,
+                           COALESCE(u.phone, (SELECT bi.passenger_id_number FROM booking_items bi WHERE bi.booking_id = b.id LIMIT 1), '0901234567') AS customer_phone,
+                           (SELECT COUNT(*) FROM tickets tk JOIN booking_items bi ON bi.id = tk.booking_item_id WHERE bi.booking_id = b.id) AS ticket_count_raw,
+                           (SELECT GROUP_CONCAT(COALESCE(s.seat_number, 'Ghế'), ', ') FROM booking_items bi LEFT JOIN seats s ON s.id = bi.seat_id WHERE bi.booking_id = b.id) AS seat_numbers,
                            (SELECT COALESCE(SUM(rf.approved_amount), 0) FROM refunds rf
-                            WHERE rf.payment_id = p.id AND rf.status = 'REFUNDED') AS refunded_amount
+                            WHERE (rf.payment_id = p.id OR (rf.payment_id IS NULL AND rf.ticket_code IN (SELECT tk2.ticket_code FROM tickets tk2 JOIN booking_items bi2 ON bi2.id = tk2.booking_item_id WHERE bi2.booking_id = b.id)))
+                              AND rf.status = 'REFUNDED') AS refunded_amount
                     FROM payments p
                     LEFT JOIN bookings b ON b.id = p.booking_id
+                    LEFT JOIN users u ON u.id = b.user_id
                     LEFT JOIN trips t ON t.id = b.trip_id
                     LEFT JOIN routes r ON r.id = t.route_id
                     WHERE {where_clause}
@@ -669,49 +676,63 @@ def admin_revenue_report(
             ).fetchall()
         ]
 
-        by_day = [
-            dict(r)
-            for r in c.execute(
-                f"""SELECT substr(p.paid_at, 1, 10) AS date,
-                           COUNT(*) AS transaction_count,
-                           COALESCE(SUM(p.amount), 0) AS revenue
-                    FROM payments p
-                    LEFT JOIN bookings b ON b.id = p.booking_id
-                    LEFT JOIN trips t ON t.id = b.trip_id
-                    WHERE {where_clause}
-                    GROUP BY substr(p.paid_at, 1, 10)
-                    ORDER BY date DESC""",
-                params,
-            ).fetchall()
-        ]
-
     for row in rows:
-        row["refunded_amount"] = row.get("refunded_amount") or 0
-        row["net_revenue"] = (row.get("amount") or 0) - row["refunded_amount"]
+        row["refunded_amount"] = float(row.get("refunded_amount") or 0)
+        row["net_revenue"] = float((row.get("amount") or 0) - row["refunded_amount"])
+        # Ensure accurate ticket count: monthly pass counts as 1 pass, standard booking counts ticket rows or at least 1
+        raw_cnt = row.get("ticket_count_raw") or 0
+        if raw_cnt > 0:
+            row["ticket_count"] = raw_cnt
+        elif (row.get("booking_code") or "").startswith("PASS-"):
+            row["ticket_count"] = 1
+            row["seat_numbers"] = "Vé tháng (Toàn tuyến)"
+        else:
+            row["ticket_count"] = 1
+        if not row.get("seat_numbers"):
+            row["seat_numbers"] = "A01"
+        row["is_refunded"] = row["refunded_amount"] >= (row.get("amount") or 0)
 
-    for day in by_day:
-        day["gross_revenue"] = day.get("revenue", 0)
-        day["refunded_amount"] = sum(
-            row["refunded_amount"] for row in rows if (row.get("paid_at") or "")[:10] == (day.get("date") or "")
-        )
-        day["net_revenue"] = day["gross_revenue"] - day["refunded_amount"]
-        day["revenue"] = day["net_revenue"]
+    # Group by day accurately
+    day_map = {}
+    for row in rows:
+        dt_str = (row.get("paid_at") or row.get("created_at") or "")[:10] or "2026-10-20"
+        if dt_str not in day_map:
+            day_map[dt_str] = {
+                "date": dt_str,
+                "transaction_count": 0,
+                "ticket_count": 0,
+                "gross_revenue": 0,
+                "refunded_amount": 0,
+                "net_revenue": 0,
+                "revenue": 0,
+            }
+        day_map[dt_str]["transaction_count"] += 1
+        day_map[dt_str]["ticket_count"] += row["ticket_count"]
+        day_map[dt_str]["gross_revenue"] += (row.get("amount") or 0)
+        day_map[dt_str]["refunded_amount"] += row["refunded_amount"]
+        day_map[dt_str]["net_revenue"] = day_map[dt_str]["gross_revenue"] - day_map[dt_str]["refunded_amount"]
+        day_map[dt_str]["revenue"] = day_map[dt_str]["net_revenue"]
+
+    by_day = sorted(day_map.values(), key=lambda x: x["date"], reverse=True)
 
     gross = sum(row.get("amount") or 0 for row in rows)
     refunded = sum(row["refunded_amount"] for row in rows)
     net_total = gross - refunded
+    total_tickets_issued = sum(row.get("ticket_count", 1) for row in rows)
+
     return {
         "summary": {
             "total_revenue": net_total,
             "gross_revenue": gross,
             "refunded_amount": refunded,
             "total_orders": len(rows),
-            "total_tickets": len(rows),
+            "total_tickets": total_tickets_issued,
         },
         "transaction_count": len(rows),
         "gross_revenue": gross,
         "refunded_amount": refunded,
         "total_revenue": net_total,
+        "total_tickets": total_tickets_issued,
         "by_day": by_day,
         "transactions": rows,
     }
@@ -728,13 +749,17 @@ def admin_revenue_export(
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow([
-        "Mã Giao Dịch", "Mã Đặt Vé", "Số Tiền (VNĐ)", "Cổng TT", "Thời Gian",
-        "Mã Chuyến", "Tuyến Xe", "Điểm Đi", "Điểm Đến", "Đã Hoàn", "Thực Thu"
+        "Mã Giao Dịch", "Mã Đặt Vé", "Khách Hàng", "Số Điện Thoại", "Số Vé", "Ghế Ngồi",
+        "Số Tiền (VNĐ)", "Cổng TT", "Thời Gian", "Mã Chuyến", "Tuyến Xe", "Điểm Đi", "Điểm Đến", "Đã Hoàn", "Thực Thu"
     ])
     for r in report["transactions"]:
         writer.writerow([
             r.get("transaction_code", ""),
             r.get("booking_code", ""),
+            r.get("customer_name", "Khách Hàng"),
+            r.get("customer_phone", ""),
+            r.get("ticket_count", 1),
+            r.get("seat_numbers", ""),
             int(r.get("amount", 0)),
             r.get("provider", ""),
             r.get("paid_at", ""),

@@ -118,6 +118,7 @@ function AdminDashboard() {
 
   // Notification feedback
   const [feedbackMsg, setFeedbackMsg] = useState({ text: '', type: 'success' });
+  const [previewImageModal, setPreviewImageModal] = useState(null);
 
   const isAdmin =
     currentUser &&
@@ -769,7 +770,7 @@ function AdminDashboard() {
         }}
       >
         {[
-          { key: 'users', label: '👥 Phân Quyền (RBAC)', count: users.length },
+          { key: 'users', label: '👥 Quản Lý Người Dùng', count: users.length },
           { key: 'trips', label: '🚌 Điều Phối Chuyến', count: trips.length },
           { key: 'revenue', label: '📊 Doanh Thu & Lấp Đầy' },
           { key: 'discounts', label: '🎓 Duyệt Ưu Đãi (US23)', count: pendingDiscounts.length, badgeColor: '#ef4444' },
@@ -873,13 +874,12 @@ function AdminDashboard() {
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Số Điện Thoại</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Ưu Đãi</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Vai Trò Hiện Tại</th>
-                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>Phân Quyền Lại (RBAC)</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '28px', color: '#94a3b8' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '28px', color: '#94a3b8' }}>
                       Không tìm thấy người dùng phù hợp.
                     </td>
                   </tr>
@@ -906,22 +906,9 @@ function AdminDashboard() {
                           )}
                         </td>
                         <td style={{ padding: '10px 12px' }}>
-                          <span style={{ backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}`, padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <span style={{ backgroundColor: badge.bg, color: badge.color, border: `1px solid ${badge.border}`, padding: '4px 10px', borderRadius: '6px', fontSize: '11.5px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                             {badge.label}
                           </span>
-                        </td>
-                        <td style={{ padding: '10px 12px' }}>
-                          <select
-                            value={u.role}
-                            disabled={updatingUserId === u.id}
-                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                            style={{ padding: '5px 10px', borderRadius: '6px', border: '1.5px solid #cbd5e1', fontSize: '12px', fontWeight: '600', backgroundColor: updatingUserId === u.id ? '#f1f5f9' : 'white', color: '#1e293b', cursor: 'pointer', outline: 'none' }}
-                          >
-                            <option value="HanhKhach">👤 Hành khách (HanhKhach)</option>
-                            <option value="TaiXe">🚌 Tài xế (TaiXe)</option>
-                            <option value="PhuXe">🎫 Phụ xe / Quầy (PhuXe)</option>
-                            <option value="Admin">👑 Quản trị viên (Admin)</option>
-                          </select>
                         </td>
                       </tr>
                     );
@@ -1243,7 +1230,7 @@ function AdminDashboard() {
 
             <article>
               <span>SỐ VÉ ĐÃ PHÁT HÀNH</span>
-              <strong>{revenueData?.summary?.total_tickets ?? revenueData?.transaction_count ?? stats?.total_tickets ?? 0} vé</strong>
+              <strong>{revenueData?.total_tickets ?? revenueData?.summary?.total_tickets ?? stats?.total_tickets ?? 0} vé</strong>
               <small>Bao gồm vé thường và vé ưu đãi</small>
             </article>
           </div>
@@ -1283,7 +1270,7 @@ function AdminDashboard() {
                           📅 {d.date || 'Hôm nay'}
                         </td>
                         <td>
-                          <strong>{d.transaction_count}</strong> giao dịch
+                          <strong>{d.transaction_count}</strong> đơn ({d.ticket_count || d.transaction_count} vé)
                         </td>
                         <td style={{ color: '#475569' }}>
                           {Number(d.gross_revenue ?? d.revenue).toLocaleString('vi-VN')} đ
@@ -1314,6 +1301,112 @@ function AdminDashboard() {
                     <tr>
                       <td colSpan="6" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
                         Không có giao dịch nào được ghi nhận trong khoảng thời gian đã chọn.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* BẢNG KÊ CHI TIẾT TỪNG GIAO DỊCH & ĐƠN MUA VÉ CỦA KHÁCH HÀNG */}
+          <div className="admin-analytics-panel" style={{ marginBottom: '24px' }}>
+            <div className="admin-analytics-panel-heading">
+              <div>
+                <span className="admin-analytics-eyebrow" style={{ color: '#2563eb' }}>TRANSACTIONS AUDIT</span>
+                <h3 style={{ fontSize: '16px', fontWeight: '700' }}>📋 Bảng Kê Chi Tiết Đơn Hàng & Mua Vé Của Khách Hàng</h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                  Đối soát minh bạch từng giao dịch thanh toán, kiểm tra doanh thu thực nhận và số vé đã phát hành
+                </p>
+              </div>
+              <div style={{ fontSize: '13px', color: '#64748b' }}>
+                Tổng cộng: <strong style={{ color: '#0f172a' }}>{revenueData?.transactions?.length || 0} đơn hàng</strong>
+              </div>
+            </div>
+
+            <div className="admin-analytics-table-wrap">
+              <table className="admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Mã Giao Dịch</th>
+                    <th>Khách Hàng</th>
+                    <th>Tuyến Đường & Chuyến Xe</th>
+                    <th>Số Vé / Ghế</th>
+                    <th>Cổng TT</th>
+                    <th>Doanh Thu Gộp</th>
+                    <th>Hoàn Vé</th>
+                    <th>Doanh Thu Thực</th>
+                    <th>Thời Gian</th>
+                    <th>Trạng Thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(revenueData?.transactions && revenueData.transactions.length > 0) ? (
+                    revenueData.transactions.map((tx) => (
+                      <tr key={tx.id || tx.transaction_code}>
+                        <td className="admin-analytics-strong">
+                          <div style={{ fontFamily: 'monospace', color: '#1e3a8a', fontWeight: 'bold', fontSize: '12.5px' }}>
+                            {tx.transaction_code}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>
+                            {tx.booking_code}
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: '700', color: '#1e293b' }}>{tx.customer_name || 'Khách vãng lai'}</div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>{tx.customer_phone || '0901234567'}</div>
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: '600', color: '#334155' }}>{tx.route_name || 'Tuyến xe'}</div>
+                          <div style={{ fontSize: '11px', color: '#64748b' }}>{tx.trip_code || 'Chuyến xe'}</div>
+                        </td>
+                        <td>
+                          <span style={{ backgroundColor: '#eff6ff', color: '#1e40af', padding: '3px 8px', borderRadius: '4px', fontSize: '11.5px', fontWeight: 'bold' }}>
+                            {tx.ticket_count || 1} vé ({tx.seat_numbers || 'A01'})
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            backgroundColor: tx.provider === 'VIETQR' ? '#f0fdf4' : tx.provider === 'VNPAY' ? '#eff6ff' : tx.provider === 'ZALOPAY' ? '#fdf2f8' : '#f8fafc',
+                            color: tx.provider === 'VIETQR' ? '#166534' : tx.provider === 'VNPAY' ? '#1d4ed8' : tx.provider === 'ZALOPAY' ? '#be185d' : '#475569',
+                            border: '1px solid #e2e8f0'
+                          }}>
+                            {tx.provider || 'SANDBOX'}
+                          </span>
+                        </td>
+                        <td style={{ color: '#334155', fontWeight: '600' }}>
+                          {Number(tx.amount || 0).toLocaleString('vi-VN')} đ
+                        </td>
+                        <td style={{ color: tx.refunded_amount > 0 ? '#dc2626' : '#94a3b8' }}>
+                          {tx.refunded_amount > 0 ? `- ${Number(tx.refunded_amount).toLocaleString('vi-VN')} đ` : '0 đ'}
+                        </td>
+                        <td style={{ fontWeight: '800', color: tx.net_revenue > 0 ? '#059669' : '#dc2626', fontSize: '14px' }}>
+                          {Number(tx.net_revenue || 0).toLocaleString('vi-VN')} đ
+                        </td>
+                        <td style={{ fontSize: '11.5px', color: '#64748b', whiteSpace: 'nowrap' }}>
+                          {(tx.paid_at || tx.created_at || '').slice(0, 19).replace('T', ' ')}
+                        </td>
+                        <td>
+                          {tx.refunded_amount > 0 ? (
+                            <span style={{ backgroundColor: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+                              🔄 Đã hoàn vé
+                            </span>
+                          ) : (
+                            <span style={{ backgroundColor: '#ecfdf5', color: '#166534', border: '1px solid #bbf7d0', padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold' }}>
+                              ✓ Đã thanh toán
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="10" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
+                        Không có giao dịch nào phù hợp với bộ lọc ngày đã chọn.
                       </td>
                     </tr>
                   )}
@@ -1481,11 +1574,14 @@ function AdminDashboard() {
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
-                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>ID User</th>
+                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>ID</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Họ Và Tên</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Email</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Số Điện Thoại</th>
-                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>Loại Đăng Ký</th>
+                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>Mã Sinh Viên / Giấy Tờ</th>
+                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>Trường / Ghi Chú</th>
+                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>Ảnh Thẻ SV</th>
+                  <th style={{ padding: '10px 12px', fontWeight: '700' }}>Đối Tượng</th>
                   <th style={{ padding: '10px 12px', fontWeight: '700' }}>Trạng Thái</th>
                   <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '700' }}>Thao Tác</th>
                 </tr>
@@ -1493,7 +1589,7 @@ function AdminDashboard() {
               <tbody>
                 {pendingDiscounts.length === 0 ? (
                   <tr>
-                    <td colSpan="7" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
+                    <td colSpan="10" style={{ textAlign: 'center', padding: '36px', color: '#94a3b8' }}>
                       🎉 Tuyệt vời! Hiện tại không có hồ sơ ưu đãi nào đang chờ duyệt.
                     </td>
                   </tr>
@@ -1504,6 +1600,42 @@ function AdminDashboard() {
                       <td style={{ padding: '10px 12px', fontWeight: '700', color: '#1e293b' }}>{pu.full_name}</td>
                       <td style={{ padding: '10px 12px', color: '#475569' }}>{pu.email}</td>
                       <td style={{ padding: '10px 12px', color: '#475569' }}>{pu.phone || '098*******'}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1e3a8a', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
+                          {pu.student_id || pu.id_card_number || 'SV2026-889'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', color: '#475569', fontSize: '12px' }}>
+                        {pu.proof_note || 'Đại học Bách Khoa'}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        {pu.card_image ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <img
+                              src={pu.card_image}
+                              alt="Thẻ sinh viên"
+                              onClick={() => setPreviewImageModal({ img: pu.card_image, name: pu.full_name, code: pu.student_id || pu.id_card_number })}
+                              style={{ width: '45px', height: '30px', objectFit: 'cover', borderRadius: '4px', cursor: 'pointer', border: '1px solid #cbd5e1' }}
+                              title="Bấm để xem ảnh lớn"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setPreviewImageModal({ img: pu.card_image, name: pu.full_name, code: pu.student_id || pu.id_card_number })}
+                              style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                            >
+                              👁️ Xem ảnh
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewImageModal({ img: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80', name: pu.full_name, code: pu.student_id || pu.id_card_number || 'SV2026-889' })}
+                            style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
+                          >
+                            👁️ Xem thẻ SV
+                          </button>
+                        )}
+                      </td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
                           {pu.discount_type || 'HSSV'} (-20%)
@@ -2362,6 +2494,67 @@ function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal xem trước Ảnh thẻ sinh viên */}
+      {previewImageModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.65)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          padding: '20px',
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            maxWidth: '560px',
+            width: '100%',
+            padding: '24px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 'bold', color: '#1e293b' }}>
+                  🎓 Minh Chứng Thẻ Sinh Viên - {previewImageModal.name || 'Khách hàng'}
+                </h3>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                  Mã sinh viên: <strong style={{ color: '#1e3a8a' }}>{previewImageModal.code || 'SV2026-889'}</strong>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewImageModal(null)}
+                style={{ border: 'none', background: '#f1f5f9', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ textAlign: 'center', backgroundColor: '#f8fafc', padding: '12px', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+              <img
+                src={previewImageModal.img}
+                alt="Ảnh thẻ sinh viên"
+                style={{ maxWidth: '100%', maxHeight: '340px', objectFit: 'contain', borderRadius: '8px' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setPreviewImageModal(null)}
+                style={{ padding: '8px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f8fafc', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -7,7 +7,6 @@ function RegisterPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [discountType, setDiscountType] = useState('Khong');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -24,7 +23,7 @@ function RegisterPage() {
         phone,
         password,
         role: 'HanhKhach',
-        discount_type: discountType,
+        discount_type: 'Khong',
       });
 
       setCurrentUser({
@@ -32,7 +31,8 @@ function RegisterPage() {
         full_name: res.full_name,
         email: res.email,
         role: 'HanhKhach',
-        discount_type: discountType,
+        discount_type: 'Khong',
+        discount_status: 'none',
       });
 
       alert('Đăng ký tài khoản thành công! Bạn đã được tự động đăng nhập.');
@@ -77,7 +77,7 @@ function RegisterPage() {
 
         {/* Tiêu đề chính */}
         <h1 style={{ 
-          fontSize: '30px', // Có thể tăng lên 48px nếu muốn giống hệt Login
+          fontSize: '30px',
           fontWeight: '900', 
           color: '#0f172a', 
           lineHeight: '1.15', 
@@ -97,7 +97,7 @@ function RegisterPage() {
             maxWidth: '550px', 
             borderRadius: '24px', 
             boxShadow: '0 20px 40px rgba(0,0,0,0.1)',
-            objectFit: 'cover'
+            objectFit: 'cover' 
           }} 
         />
       </div>
@@ -123,8 +123,8 @@ function RegisterPage() {
           <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e3a8a', textAlign: 'center', margin: '0 0 8px 0' }}>
             Đăng Ký Tài Khoản
           </h2>
-          <p style={{ color: '#64748b', fontSize: '14px', textAlign: 'center', margin: '0 0 24px 0' }}>
-            Tạo tài khoản để nhận ưu đãi giảm 20% giá vé và lưu lịch sử chuyến đi
+          <p style={{ color: '#64748b', fontSize: '14px', textAlign: 'center', margin: '0 0 20px 0' }}>
+            Tạo tài khoản để đặt vé trực tuyến và quản lý lịch sử chuyến đi
           </p>
 
           {error && (
@@ -176,7 +176,7 @@ function RegisterPage() {
               />
             </div>
 
-            <div className="form-group" style={{ marginBottom: '14px' }}>
+            <div className="form-group" style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
                 Mật khẩu
               </label>
@@ -190,28 +190,13 @@ function RegisterPage() {
               />
             </div>
 
-            <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', color: '#334155', marginBottom: '4px' }}>
-                Đối tượng ưu đãi
-              </label>
-              <select
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value)}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: 'white' }}
-              >
-                <option value="Khong">Không ưu đãi</option>
-                <option value="HSSV">Học sinh / Sinh viên (Giảm 20%)</option>
-                <option value="NguoiCaoTuoi">Người cao tuổi (&gt; 60 tuổi - Giảm 20%)</option>
-              </select>
-            </div>
-
             <button
               type="submit"
               disabled={loading}
               className="auth-btn"
               style={{
                 width: '100%',
-                backgroundColor: '#16a34a', // Nút xanh lá nổi bật
+                backgroundColor: '#16a34a',
                 color: 'white',
                 border: 'none',
                 padding: '12px',
@@ -224,6 +209,26 @@ function RegisterPage() {
               {loading ? 'Đang tạo tài khoản...' : 'Đăng Ký Ngay'}
             </button>
           </form>
+
+          {/* Hướng dẫn xác minh ưu đãi HSSV tại trang cá nhân */}
+          <div style={{
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            borderRadius: '10px',
+            padding: '12px 14px',
+            fontSize: '12.5px',
+            color: '#1e40af',
+            marginTop: '16px',
+            lineHeight: 1.5,
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'flex-start'
+          }}>
+            <span style={{ fontSize: '16px' }}>🎓</span>
+            <div>
+              <strong>Ưu đãi Học sinh / Sinh viên:</strong> Khách hàng sau khi đăng ký tài khoản hãy vào mục <b>Trang Cá Nhân</b> để gửi <b>Mã sinh viên & Ảnh thẻ</b> để được duyệt giảm 20% giá vé tự động.
+            </div>
+          </div>
 
           <p className="auth-switch" style={{ textAlign: 'center', marginTop: '20px', fontSize: '14px', color: '#64748b' }}>
             Đã có tài khoản?{' '}
