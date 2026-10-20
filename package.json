@@ -1,6 +1,6 @@
 {
   "name": "project-bus-ticketing-root",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Smart Bus Ticketing System - Unified Root Launcher",
   "scripts": {

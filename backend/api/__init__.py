@@ -62,7 +62,7 @@ from faq_routes import router as faq_router
 app = FastAPI(
     title="Smart Bus Ticketing API - Unified System",
     description="Hệ thống API quản lý và đặt vé xe buýt thông minh, hỗ trợ đa kênh thanh toán và AI Chatbot.",
-    version="2.0.0",
+    version="2.2.0",
 )
 
 # CORS middleware for React / Vite frontend
