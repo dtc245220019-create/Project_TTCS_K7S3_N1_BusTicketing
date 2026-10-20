@@ -1,183 +1,222 @@
 # 🚌 HỆ THỐNG ĐẶT VÉ XE BUÝT THÔNG MINH (SMART BUS TICKETING)
 > **Đồ án Thực tập Cơ sở K7S3 — Nhóm 01**  
 > **Repository:** [Project_TTCS_K7S3_N1_BusTicketing](https://github.com/dtc245220019-create/Project_TTCS_K7S3_N1_BusTicketing.git)  
-> **Trạng thái:** Tích hợp toàn diện Sprint 1, 2 & 3. 100% vượt qua kiểm thử (**58/58 Pytest Tests Passed**), Frontend Vite Production Build thành công, cấu trúc GitFlow chuẩn hóa, phân tách riêng biệt `backend/` và `frontend/`.
+> **Phiên bản hiện tại:** `v2.2.0 - Final Golden Release` (Cập nhật ngày 20/10/2026)  
+> **Trạng thái kiểm thử:** 100% vượt qua kiểm thử tự động (**102/102 Pytest Tests Passed**), Frontend Vite Production Build thành công, cấu trúc GitFlow chuẩn hóa, phân tách riêng biệt `backend/` và `frontend/`.
 
 ---
 
-## 📌 1. Giới Thiệu Dự Án
+## 📌 1. Giới Thiệu Tổng Quan Dự Án
 
-Hệ thống **Smart Bus Ticketing** là nền tảng quản trị và bán vé xe buýt / xe khách trực tuyến toàn diện, áp dụng quy trình phát triển phần mềm Agile/Scrum qua 3 Sprint:
+Hệ thống **Smart Bus Ticketing** là giải pháp phần mềm quản trị và bán vé xe buýt / xe khách trực tuyến toàn diện, được thiết kế và triển khai nhằm số hóa toàn bộ chu trình vận hành vận tải hành khách: từ tìm kiếm chuyến, giữ chỗ thời gian thực, thanh toán đa kênh, cấp vé điện tử mã QR, đến quản lý chuyến, phân công tài xế, soát vé lên xe và báo cáo doanh thu tài chính chuyên sâu.
 
-* **Sprint 1 — Nền Tảng Cốt Lõi (Core MVP):**
-  * Tra cứu chuyến xe liên tỉnh/nội đô theo điểm đi, điểm đến, thời gian (**US01**).
-  * Sơ đồ ghế 2 tầng (Dãy A Tầng Dưới, Dãy B Tầng Trên), cơ chế tạm giữ ghế trong 10 phút với **Cronjob APScheduler** tự động giải phóng ghế hết hạn (**US02**, **US03**).
-  * Đăng ký, đăng nhập và phân quyền người dùng (**US04**).
-  * Thanh toán trực tuyến Sandbox Momo, VNPay, ZaloPay, Thẻ ngân hàng (**US05**).
-  * Xuất vé điện tử kèm mã QR Code động hiển thị đầy đủ thông tin vé (**US06**).
-  * Lịch sử đặt vé, đổi ghế, đổi chuyến và hủy vé trực tuyến (**US07**).
-  * Bản đồ tương tác Leaflet hiển thị lộ trình tuyến và trạm dừng GPS.
-
-* **Sprint 2 — Mở Rộng Cổng Thanh Toán & Nghiệp Vụ Vận Hành:**
-  * Tích hợp cổng thanh toán thực tế **VNPay** (chữ ký bảo mật HMAC-SHA512) và **ZaloPay** (HMAC-SHA256) kèm Webhook IPN & Return URL (**US17**, **US18**).
-  * Hệ thống thông báo đa kênh (**US20**): Gửi email xác nhận HTML qua SMTP Gmail, tin nhắn SMS Gateway và thông báo In-App.
-  * Phân hệ soát vé quét mã QR cho tài xế/phụ xe và ghi nhận hành khách lên xe (**US08**, **US24** - Boarding Check-in).
-  * Quản lý mã giảm giá (**Vouchers**) và phụ phí dịch vụ (**Fees**).
-  * Đăng ký và quản lý vé tháng (**Monthly Passes**).
-  * Kiến trúc CSDL linh hoạt **Dual-Engine** (SQLite & MySQL).
-
-* **Sprint 3 — AI Chatbot, Doanh Thu, Tỷ Lệ Lấp Đầy & Quản Trị Toàn Diện 4 Actors:**
-  * 🤖 **Trợ Lý Ảo Chatbot AI Thông Minh (`ChatWidget.jsx`):** Tư vấn tự động lịch trình, giá vé, khuyến mãi, chính sách đổi trả vé 24/7 với gợi ý điều hướng thông minh.
-  * 📊 **Báo Cáo Doanh Thu & Xuất CSV (Revenue & Export):** Thống kê doanh thu theo ngày, tháng, chuyến, tuyến xe, tính toán doanh thu thuần (đã trừ hoàn tiền) và xuất file CSV 1-click.
-  * 📈 **Tỷ Lệ Lấp Đầy Ghế (Occupancy Rate):** Phân tích hiệu suất khai thác chuyến xe thời gian thực (loại bỏ triệt để giá trị âm).
-  * 👑 **Bổ sung chức năng Nghiệp vụ Quản Trị Viên (Admin Operations):**
-    * Thêm mới tuyến xe vận tải liên tỉnh/nội đô.
-    * Tạo chuyến xe mới với khung giờ, đơn giá và biển số xe.
-    * Thêm mới và phân công Tài xế (`TaiXe`), Phụ xe (`PhuXe`) cho từng chuyến xe.
-    * Đồng bộ thời gian thực dữ liệu tuyến xe, chuyến xe cho toàn bộ các Role.
-  * 🎓 **Xét Duyệt Ưu Đãi HSSV (US23):** Ban quản trị xét duyệt hồ sơ giảm giá sinh viên (giảm 20%) trực tiếp trên Admin Dashboard.
-  * 🎟️ **Mã Khuyến Mãi Nâng Cao (US18):** Popup chọn voucher trực quan tại bước thanh toán (`VoucherModal.jsx`) và tính năng quản trị tạo mã ưu đãi mới (chặn ngày quá khứ).
-  * 💸 **Quy Trình Hủy Vé & Hoàn Tiền (US08 / Refunds):** Hành khách gửi yêu cầu hoàn tiền, Admin duyệt/từ chối, trang tra cứu tiến độ hoàn tiền (`RefundStatusPage.jsx`), cập nhật trạng thái `REFUNDED` tức thì.
-  * 💬 **Đánh Giá & Phản Ánh Dịch Vụ (US24 / Feedbacks):** Hành khách gửi góp ý sao và nhận xét; ban quản trị theo dõi xử lý chất lượng dịch vụ.
-  * 🛡️ **Nhật Ký Kiểm Toán (Audit Logs US17):** Ghi vết chi tiết mọi thao tác hệ thống (soát vé, duyệt ưu đãi, hoàn tiền, thanh toán).
-  * 👥 **Mô Hình Phân Quyền 4 Actors (RBAC):** Giao diện và quyền hạn tối ưu cho 4 vai trò (**Hành Khách**, **Tài Xế**, **Phụ Xe**, **Quản Trị Viên**).
+Hệ thống áp dụng mô hình phân quyền **4 Actors độc lập**:
+1. **👤 Hành Khách (Customer):** Tìm chuyến, chọn sơ đồ ghế 2 tầng, giữ chỗ 10 phút, áp mã voucher, thanh toán QR (VietQR / VNPay / ZaloPay), nhận vé điện tử, đổi/hủy vé, đăng ký thẻ vé tháng và gửi hồ sơ xác minh học sinh - sinh viên.
+2. **🚌 Tài Xế (Driver):** Theo dõi lịch trình phân công lái xe theo thời gian thực, danh sách hành khách lên xe và xác nhận hoàn thành chuyến xe.
+3. **🎫 Phụ Xe / Tiếp Viên (Conductor / Staff):** Quét mã QR soát vé tại cửa xe, xác nhận hành khách lên xe (**Boarding Check-in**), hỗ trợ bán vé nhanh cho khách vãng lai.
+4. **👑 Quản Trị Viên (Admin):** Khởi tạo tuyến đường, điều phối chuyến xe, phân công tài xế/phụ xe, xét duyệt hồ sơ ưu đãi HSSV (kèm ảnh thẻ sinh viên), phát hành voucher, duyệt yêu cầu hoàn tiền vé và theo dõi báo cáo doanh thu - tỷ lệ lấp đầy ghế minh bạch.
 
 ---
 
-## 🏗️ 2. Cấu Trúc Mã Nguồn Sau Tái Cấu Trúc (Clean Architecture)
+## 💻 2. Môi Trường Lập Trình & Công Nghệ Sử Dụng (Development Environment)
 
-Dự án đã được phân tách rõ ràng thành hai phân hệ độc lập:
+Dự án được xây dựng và tối ưu trên nền tảng công nghệ hiện đại, đảm bảo tính ổn định, tốc độ phản hồi nhanh và khả năng tương thích cao trên mọi hệ điều hành:
+
+### 2.1. Môi trường phát triển & Hệ điều hành
+* **Hệ điều hành thử nghiệm & vận hành:** Windows 10/11 64-bit (hoàn toàn tương thích và hỗ trợ cross-platform trên macOS và Linux).
+* **Môi trường dòng lệnh (CLI/Terminal):** PowerShell 7+, Windows Terminal, Git Bash.
+* **Môi trường tích hợp (IDE / Tooling):** Visual Studio Code, Google Antigravity Agentic IDE.
+
+### 2.2. Phân hệ Backend (API & Core Engine)
+* **Ngôn ngữ:** Python 3.12 (tương thích Python 3.10 trở lên).
+* **Framework:** **FastAPI** (hiệu năng cao dựa trên Starlette và Pydantic v2, hỗ trợ chuẩn OpenAPI / Swagger UI).
+* **Web Server (ASGI):** **Uvicorn** với cơ chế tự động nạp lại mã nguồn (`--reload`).
+* **Quản lý dữ liệu:** SQLite3 native tích hợp sẵn trong Python standard library, kết hợp SQLAlchemy ORM và DDL Schema tương thích MySQL.
+* **Tác vụ nền & Định kỳ (Cronjob):** **APScheduler** (tự động quét và giải phóng ghế tạm giữ sau 10 phút hết hạn).
+* **Bảo mật & Mã hóa:** `passlib` (PBKDF2 SHA-256 password hashing), `hashlib` (HMAC-SHA512 cho VNPay, HMAC-SHA256 cho ZaloPay).
+* **Thông báo đa kênh:** SMTP Gmail HTML template (Email), Mock SMS Gateway.
+* **Kiểm thử tự động (QA):** `pytest`, `httpx` (TestClient), `unittest`.
+
+### 2.3. Phân hệ Frontend (Client Interface)
+* **Ngôn ngữ & Thư viện:** **JavaScript (ES6+)**, **React 19** (Functional Components, Custom Hooks).
+* **Bộ điều hướng:** **React Router DOM v7** (định tuyến SPA mượt mà, phân tách layout thông minh).
+* **Công cụ đóng gói (Bundler):** **Vite v8.3** (Hot Module Replacement - HMR tức thì, thời gian build production dưới 2 giây).
+* **Bản đồ tương tác:** **Leaflet** & OpenStreetMap (hiển thị lộ trình xe và trạm dừng GPS trực quan).
+* **Sinh mã QR trực quan:** Dynamic QR Server Engine (hỗ trợ in vé chuẩn và quét bằng camera điện thoại).
+* **Quản lý gói:** Node.js 18.x+, `npm`.
+
+---
+
+## 👥 3. Quy Trình Làm Việc Của Đội Ngũ Phát Triển (Team Workflow)
+
+Nhóm 01 áp dụng phương pháp luận phát triển phần mềm **Agile / Scrum** kết hợp quy chuẩn quản lý mã nguồn **GitFlow** nhằm đảm bảo tiến độ, chất lượng mã nguồn và sự đồng bộ nhịp nhàng giữa các thành viên:
+
+```mermaid
+flowchart LR
+    A["Sprint Planning<br/>(Product Backlog)"] --> B["Phân Nhánh Tính Năng<br/>feature/fe-* & feature/be-*"]
+    B --> C["Pair Programming<br/>& Development"]
+    C --> D["Local Test & Pytest<br/>(102 Test Cases)"]
+    D --> E["Pull Request & Code Review<br/>(PR Template)"]
+    E --> F["Merge vào nhánh develop<br/>(Integration)"]
+    F --> G["Staging Verification<br/>& End-to-End Test"]
+    G --> H["Release đóng gói sang main<br/>(Production Ready)"]
+```
+
+### 3.1. Các giai đoạn phát triển theo Sprint
+* **Sprint 1 — Core MVP:** Xây dựng khung kiến trúc Backend/Frontend, thiết kế cơ sở dữ liệu 10 bảng, luồng đặt vé, sơ đồ ghế 2 tầng, giữ chỗ 10 phút và sinh vé điện tử QR.
+* **Sprint 2 — Mở rộng Thanh toán & Vận hành:** Tích hợp VNPay, ZaloPay, VietQR, gửi email thông báo xác nhận đặt vé, phân hệ soát vé QR cho tài xế/phụ xe và vé tháng.
+* **Sprint 3 — AI Chatbot, Doanh thu & Quản trị 4 Actors:** Tích hợp Chatbot AI hỗ trợ khách hàng, báo cáo doanh thu tài chính đa chiều, tỷ lệ lấp đầy ghế, quản lý phân công chuyến xe, hoàn tiền vé và duyệt ưu đãi sinh viên.
+
+### 3.2. Quy chuẩn Git & Phối hợp nhóm (GitFlow Workflow)
+* **Nhánh `develop`:** Nhánh tích hợp trung tâm của dự án. Tất cả tính năng mới sau khi kiểm thử nội bộ đều được hợp nhất về đây.
+* **Nhánh `main`:** Nhánh phát hành chính thức (Release). Mã nguồn trên nhánh `main` luôn ở trạng thái ổn định nhất, vượt qua 100% test suites.
+* **Nhánh tính năng (`feature/fe-*` và `feature/be-*`):**
+  * Thành viên phụ trách Frontend làm việc độc lập trên nhánh `feature/fe-*`, thao tác trong phạm vi thư mục `frontend/`.
+  * Thành viên phụ trách Backend làm việc trên nhánh `feature/be-*`, thao tác trong thư mục `backend/`.
+* **Cơ chế Code Review & Kiểm thử trước khi Merge:**
+  * Mọi Pull Request (PR) đều tuân theo mẫu biểu `.github/pull_request_template.md`.
+  * Yêu cầu bắt buộc: `npm run build` không phát sinh lỗi và toàn bộ 102 test cases backend `pytest` đều vượt qua trước khi phê duyệt merge.
+
+---
+
+## 🗄️ 4. Kiến Trúc Cơ Sở Dữ Liệu: Vị Trí, Cơ Chế & Đánh Giá Ưu / Nhược Điểm
+
+Hệ thống được trang bị kiến trúc lưu trữ **Dual-Engine** linh hoạt: mặc định sử dụng cơ chế Serverless SQLite cho môi trường phát triển và kiểm thử, đồng thời hỗ trợ chuyển mạch sang MySQL phân tán khi triển khai quy mô lớn.
+
+### 4.1. Vị trí lưu trữ dữ liệu
+* **Tệp cơ sở dữ liệu chính thức:** Đặt tại thư mục `backend/data/bus_booking.db` (đường dẫn tương đối từ gốc dự án: `data/bus_booking.db`).
+* **Tệp khởi tạo & Tự động di trú (Migration):** `backend/src/database.py` (tự động nhận diện cấu trúc, tạo mới các bảng và tự động bổ sung các cột mới như `student_id`, `card_image`, `refunded_amount` nếu chưa tồn tại).
+* **Tệp dữ liệu mẫu chuẩn hóa:** `backend/src/seed_data.py` (nạp sẵn danh sách người dùng 4 vai trò, 30+ chuyến xe liên tỉnh, sơ đồ ghế 2 tầng, lịch sử giao dịch và mã ưu đãi).
+* **Tệp kịch bản chuyển đổi MySQL:** `backend/src/schema_mysql.sql` (sẵn sàng chuyển sang MySQL thông qua cấu hình biến môi trường `DATABASE_URL=mysql+pymysql://user:pass@host/bus_booking`).
+
+### 4.2. Bảng phân tích Ưu điểm & Nhược điểm của giải pháp CSDL
+
+| Tiêu Chí | Ưu Điểm (Strengths) | Nhược Điểm & Hạn Chế (Limitations) | Giải Pháp Khắc Phục Của Nhóm |
+|:---|:---|:---|:---|
+| **Cài đặt & Triển khai** | **Zero-Configuration:** Hoạt động ngay lập tức không cần cài đặt phần mềm máy chủ CSDL (MySQL/PostgreSQL), không lo cấu hình port hay tài khoản phân quyền. | Không chạy dưới dạng một dịch vụ độc lập (Daemon process) quản lý qua mạng. | Đã xây dựng sẵn script `database.py` tự động phát hiện đường dẫn và kết nối an toàn. |
+| **Tính di động (Portability)** | **Gọn nhẹ & Toàn vẹn:** Toàn bộ hệ thống cơ sở dữ liệu nằm trọn trong 1 file `.db` duy nhất, cực kỳ dễ dàng sao lưu (backup), copy sang máy khác và chia sẻ giữa các thành viên. | Kích thước file tăng dần theo thời gian nếu lưu trữ lượng lớn ảnh base64. | Giới hạn dung lượng ảnh thẻ SV tải lên tối đa 5MB và khuyến khích lưu trữ URL ảnh CDN. |
+| **Tốc độ truy vấn (Speed)** | **In-process Querying:** Truy vấn dữ liệu trực tiếp trong bộ nhớ/tệp nội bộ, loại bỏ hoàn toàn độ trễ truyền tải qua mạng (Network Latency), cho tốc độ đọc cực nhanh. | Xung đột ghi đồng thời (Concurrency Lock) do SQLite sử dụng cơ chế khóa ở mức file (File-level locking) khi ghi. | Hệ thống sử dụng chế độ kết nối ngắn gọn (`contextmanager`), commit ngay sau khi thực thi để giải phóng khóa lập tức. |
+| **Kiểm thử tự động (QA Testing)** | **Repeatable Fixtures:** Khôi phục trạng thái dữ liệu mẫu và chạy 102 test cases trong vài giây mà không làm sai lệch dữ liệu của máy chủ thật. | Không có sẵn các tính năng nâng cao như Stored Procedure, Trigger phức tạp cấp DB. | Đưa toàn bộ quy tắc nghiệp vụ (Business Rules) lên tầng Python Core để kiểm soát chặt chẽ 100%. |
+| **Khả năng mở rộng (Scalability)** | Phù hợp tối đa cho đồ án, thử nghiệm nghiệm thu, demo sản phẩm và hệ thống vừa và nhỏ. | Không hỗ trợ mở rộng theo chiều ngang (Clustering / Multi-master Replication) cho hàng chục ngàn lượt ghi/giây. | Thiết kế schema theo chuẩn ANSI SQL 100% tương thích MySQL; chỉ cần đổi `DATABASE_URL` là chuyển sang MySQL ngay. |
+
+---
+
+## 🏗️ 5. Cấu Trúc Mã Nguồn Dự Án (Clean Architecture)
 
 ```text
 Project_TTCS_K7S3_N1_BusTicketing/
 ├── backend/                         # === PHÂN HỆ BACKEND (Python FastAPI) ===
-│   ├── main.py                      # File khởi động chính của Backend Server
-│   ├── pytest.ini                   # Cấu hình kiểm thử tự động
-│   ├── requirements.txt             # Danh sách thư viện Python
-│   ├── api/                         # Tầng Router API bóc tách theo nghiệp vụ
-│   │   ├── auth_routes.py           # Đăng ký, đăng nhập, thông tin cá nhân
-│   │   ├── trips_routes.py          # Tìm kiếm chuyến, sơ đồ ghế, giữ chỗ 10p
-│   │   ├── payments_routes.py       # Cổng thanh toán VietQR, MoMo, VNPay, ZaloPay
-│   │   ├── tickets_routes.py        # Quản lý vé điện tử, mã QR, đổi vé, hủy vé
-│   │   ├── vouchers_routes.py       # Mã giảm giá, tính toán phụ phí
-│   │   ├── monthly_pass_routes.py   # Quản lý thẻ và gia hạn vé tháng
-│   │   ├── admin_routes.py          # Dashboard admin, tuyến/chuyến, nhân sự, doanh thu
-│   │   ├── interactions_routes.py   # Chatbot AI, thông báo email/SMS, phản ánh
-│   │   └── common.py                # Hàm tiện ích chung, audit logging
-│   ├── src/                         # Mã nguồn nghiệp vụ lõi (Business Logic Core)
-│   │   ├── database.py              # Kết nối CSDL thông minh Dual-Engine (SQLite/MySQL)
-│   │   ├── notification.py          # Module gửi email SMTP Gmail và SMS
-│   │   ├── payment_gateway.py       # Xử lý sinh mã QR VietQR, MoMo, VNPay, ZaloPay
-│   │   ├── chatbot_engine.py        # Bộ máy xử lý ngôn ngữ Chatbot AI
-│   │   ├── ticket_changes.py        # Logic nghiệp vụ đổi ghế, đổi chuyến xe
-│   │   ├── boarding_api.py          # Nghiệp vụ soát vé quét mã QR cho tài xế/phụ xe
-│   │   ├── seed_data.py             # Bộ dữ liệu mẫu phong phú khởi tạo hệ thống
-│   │   ├── doanh_thu_api.py         # Tính toán báo cáo doanh thu
-│   │   ├── xuat_doanh_thu_api.py    # Xuất báo cáo tài chính ra file CSV
-│   │   └── refund_api.py            # Quản lý quy trình hoàn tiền vé US08
-│   └── tests/                       # Bộ kiểm thử tự động toàn diện (58 test cases)
-│       ├── test_admin_management.py # Test quản trị tuyến, chuyến, gán tài xế
-│       ├── test_api.py              # Test tìm kiếm chuyến và đặt vé
-│       ├── test_boarding_api.py     # Test soát vé QR và khách lên xe
-│       ├── test_database.py         # Test khởi tạo và truy vấn CSDL
-│       ├── test_monthly_pass.py     # Test chu trình vé tháng
-│       ├── test_qr_api.py           # Test mã QR bảo mật vé điện tử
-│       ├── test_rbac_and_admin_api.py # Test phân quyền 4 vai trò
-│       ├── test_sprint2_api.py      # Test thanh toán VNPay, ZaloPay, thông báo
-│       ├── test_sprint3_api.py      # Test chatbot AI, audit log, voucher
-│       └── test_ticket_changes.py   # Test đổi vé và hủy vé
+│   ├── main.py                      # Điểm khởi động chính của Backend Server (Uvicorn)
+│   ├── pytest.ini                   # Cấu hình kiểm thử tự động toàn diện
+│   ├── requirements.txt             # Danh sách thư viện Python phụ thuộc
+│   ├── data/                        # Thư mục chứa cơ sở dữ liệu SQLite
+│   │   └── bus_booking.db           # Tệp CSDL chính của hệ thống
+│   ├── api/                         # Tầng Router API nghiệp vụ độc lập
+│   │   ├── auth_routes.py           # Đăng ký, đăng nhập, hồ sơ, xác minh HSSV (mã SV & ảnh thẻ)
+│   │   ├── trips_routes.py          # Tra cứu chuyến, sơ đồ ghế 2 tầng, giữ chỗ 10p
+│   │   ├── payments_routes.py       # Xử lý thanh toán VietQR, MoMo, VNPay, ZaloPay
+│   │   ├── tickets_routes.py        # Vé điện tử, đổi ghế, đổi chuyến, hủy vé & hoàn tiền
+│   │   ├── vouchers_routes.py       # Quản lý mã ưu đãi, tính toán giảm phần trăm & phụ phí
+│   │   ├── monthly_pass_routes.py   # Mua mới và gia hạn thẻ vé tháng toàn tuyến
+│   │   ├── admin_routes.py          # Điều phối chuyến xe, đối soát doanh thu, duyệt ưu đãi
+│   │   ├── interactions_routes.py   # Trợ lý ảo Chatbot AI, thông báo Email/SMS, đánh giá
+│   │   └── common.py                # Hàm tiện ích dùng chung, ghi vết Audit Logs
+│   ├── src/                         # Nghiệp vụ lõi (Business Logic Core Engine)
+│   │   ├── database.py              # Quản lý kết nối CSDL và tự động Migration
+│   │   ├── seed_data.py             # Bộ dữ liệu mẫu khởi tạo phong phú
+│   │   ├── notification.py          # Module gửi thông báo Email HTML và SMS
+│   │   ├── payment_gateway.py       # Thuật toán tạo mã thanh toán & kiểm tra chữ ký số
+│   │   ├── chatbot_engine.py        # Động cơ xử lý ngôn ngữ tư vấn khách hàng tự động
+│   │   ├── ticket_changes.py        # Nghiệp vụ đổi vé và hủy vé trực tuyến
+│   │   ├── boarding_api.py          # Nghiệp vụ quét mã QR soát vé cho tài xế/phụ xe
+│   │   ├── doanh_thu_api.py         # Công thức tính doanh thu thuần và tỷ lệ lấp đầy
+│   │   ├── xuat_doanh_thu_api.py    # Xuất file CSV báo cáo tài chính
+│   │   └── refund_api.py            # Quy trình tiếp nhận và xử lý hoàn tiền US08
+│   └── tests/                       # 102 Test Cases kiểm thử tự động toàn diện
 │
 ├── frontend/                        # === PHÂN HỆ FRONTEND (React 19 + Vite) ===
 │   ├── package.json                 # Cấu hình gói và thư viện giao diện
 │   ├── vite.config.js               # Cấu hình máy chủ phát triển Vite
 │   └── src/
-│       ├── api/                     # Tầng API Client giao tiếp Backend
-│       │   ├── client.js            # Axios client, cấu hình baseURL và Interceptors
-│       │   ├── chatbotApi.js        # API gọi Chatbot AI
-│       │   ├── feedbackApi.js       # API gửi phản ánh đánh giá
-│       │   └── index.js             # Export tập trung các service API
-│       ├── components/              # Các thành phần giao diện tái sử dụng
+│       ├── api/                     # Tầng API Client gọi Backend
+│       │   ├── client.js            # Cấu hình baseURL và Fetch Client
+│       │   ├── adminApi.js          # API điều phối chuyến, doanh thu, duyệt ưu đãi
+│       │   ├── authApi.js           # API đăng nhập, đăng ký, xác minh mã SV & ảnh thẻ
+│       │   ├── tripsApi.js          # API tìm chuyến, khóa ghế tạm thời
+│       │   ├── paymentsApi.js       # API khởi tạo đơn hàng và thanh toán
+│       │   ├── ticketsApi.js        # API vé điện tử, đổi vé, hủy vé
+│       │   ├── vouchersApi.js       # API áp dụng và tạo voucher
+│       │   └── index.js             # Export tập trung các dịch vụ
+│       ├── components/              # Thành phần giao diện tái sử dụng
 │       │   ├── Header.jsx           # Thanh điều hướng, chuyển đổi vai trò Demo
-│       │   ├── Footer.jsx           # Chân trang kèm liên kết Gửi phản ánh
-│       │   ├── ChatWidget.jsx       # Cửa sổ chat với Trợ lý AI thông minh
-│       │   ├── SearchForm.jsx       # Form tra cứu chuyến xe kèm gợi ý
-│       │   ├── PaymentForm.jsx      # Form thanh toán kèm popup chọn Voucher
-│       │   ├── VoucherModal.jsx     # Popup chọn mã giảm giá trực quan
-│       │   ├── CreateVoucher.jsx    # Popup tạo mã ưu đãi cho Admin
-│       │   ├── RefundManagement.jsx # Quản lý và xử lý hoàn tiền vé
-│       │   ├── PrintableTicket.jsx  # Thẻ vé xe có thể in ấn trực tiếp
+│       │   ├── Footer.jsx           # Chân trang kèm thông tin liên hệ và phản ánh
+│       │   ├── ChatWidget.jsx       # Cửa sổ Trợ lý ảo AI thông minh 24/7
+│       │   ├── SearchForm.jsx       # Form tìm kiếm chuyến xe thông minh
+│       │   ├── PaymentForm.jsx      # Form thanh toán và áp mã voucher trực quan
+│       │   ├── VoucherModal.jsx     # Popup danh sách mã giảm giá
+│       │   ├── PrintableTicket.jsx  # Mẫu vé điện tử in trực tiếp kèm mã QR
 │       │   └── CountdownTimer.jsx   # Đồng hồ đếm ngược 10 phút giữ chỗ
 │       └── pages/                   # Các trang giao diện chức năng chính
 │           ├── HomePage.jsx         # Trang chủ giới thiệu dịch vụ
 │           ├── BusListPage.jsx      # Danh sách xe và sơ đồ ghế 2 tầng
-│           ├── PaymentPage.jsx      # Trang xác nhận đặt vé và thanh toán
-│           ├── PaymentResultPage.jsx# Màn hình kết quả thanh toán chi tiết
-│           ├── UserDashboard.jsx    # Quản lý vé cá nhân, đổi vé, hủy vé
+│           ├── PaymentPage.jsx      # Xác nhận đặt vé và quét mã thanh toán
+│           ├── UserDashboard.jsx    # Vé của tôi, đổi/hủy vé, xác minh mã SV & ảnh thẻ
+│           ├── AdminDashboard.jsx   # Quản trị hệ thống, duyệt ưu đãi, đối soát doanh thu
+│           ├── TicketVerification.jsx # Màn hình quét QR soát vé cho Tài xế / Phụ xe
+│           ├── MonthlyPassPage.jsx  # Đăng ký và gia hạn vé tháng
 │           ├── RefundStatusPage.jsx # Tra cứu tiến độ yêu cầu hoàn tiền
-│           ├── MonthlyPassPage.jsx  # Đăng ký và thanh toán gia hạn vé tháng
-│           ├── TicketVerification.jsx # Màn hình soát vé QR cho Tài xế / Phụ xe
-│           ├── AdminDashboard.jsx   # Bảng điều khiển toàn diện của Quản trị viên
-│           ├── FeedbackPage.jsx     # Gửi góp ý và đánh giá chất lượng
-│           ├── MapPage.jsx          # Bản đồ định vị lộ trình GPS
+│           ├── MapPage.jsx          # Bản đồ định vị GPS trạm dừng
 │           ├── LoginPage.jsx        # Đăng nhập hệ thống
-│           └── RegisterPage.jsx     # Đăng ký tài khoản (tự động gửi email)
+│           └── RegisterPage.jsx     # Đăng ký tài khoản (tối ưu, gọn gàng)
 │
-├── start_project.bat                # Script 1-Click tự động chạy cả Backend & Frontend
-├── api.py & main.py                 # File proxy tương thích ngược 100%
-├── package.json                     # NPM script điều phối từ thư mục gốc
-└── README.md                        # Tài liệu hướng dẫn sử dụng và báo cáo
+├── start_project.bat                # Script 1-Click tự động chạy toàn bộ hệ thống
+├── package.json                     # NPM launcher điều phối từ thư mục gốc
+└── README.md                        # Tài liệu hướng dẫn sử dụng và báo cáo kỹ thuật
 ```
 
 ---
 
-## 👥 3. Danh Sách Tài Khoản Demo Theo Từng Vai Trò (4 Actors)
+## 👥 6. Danh Sách Tài Khoản Demo Theo Từng Vai Trò (4 Actors)
 
-Hệ thống hỗ trợ chuyển đổi vai trò 1-click trực tiếp trên thanh điều hướng (Navbar) hoặc đăng nhập với **mật khẩu chung: `123456`**:
+Hệ thống hỗ trợ chuyển đổi vai trò 1-click trực tiếp trên thanh Header (Navbar) hoặc đăng nhập với **mật khẩu chung: `123456`**:
 
-| Vai Trò (Role) | Tên Người Dùng Demo | Email Đăng Nhập | Mật Khẩu | Nghiệp Vụ Chính Để Demo |
+| Vai Trò (Role) | Tên Người Dùng Demo | Email Đăng Nhập | Mật Khẩu | Nghiệp Vụ Trọng Tâm |
 |:---|:---|:---|:---|:---|
-| **Quản Trị Viên** *(Admin)* | Lê Quản Lý | `admin@smartbus.vn` | `123456` | Quản lý tuyến xe, tạo chuyến, phân công tài xế & phụ xe, duyệt hoàn tiền, xem tỷ lệ lấp đầy, xuất CSV doanh thu, duyệt hồ sơ HSSV. |
-| **Hành Khách (Thường)** | Nguyễn Văn A | `customer@example.com` | `123456` | Tìm chuyến, chọn ghế 2 tầng, giữ chỗ 10p, áp dụng voucher, thanh toán QR, quản lý vé sắp tới, hủy vé yêu cầu hoàn tiền. |
-| **Hành Khách (HSSV)** | Nguyễn Văn A (Ưu đãi) | `nguyenvana@gmail.com` | `123456` | Mua và gia hạn vé tháng xe buýt trực tuyến, hưởng ưu đãi giảm giá học sinh - sinh viên. |
+| **Quản Trị Viên** *(Admin)* | Lê Quản Lý | `admin@smartbus.vn` | `123456` | Quản lý tuyến/chuyến, phân công tài xế & phụ xe, xem ảnh thẻ SV và duyệt ưu đãi HSSV (US23), đối soát doanh thu chi tiết từng đơn hàng, xuất file CSV. |
+| **Hành Khách (Thường)** | Nguyễn Văn A | `customer@example.com` | `123456` | Tìm chuyến, chọn ghế 2 tầng, giữ chỗ 10p, áp dụng voucher, thanh toán VietQR/VNPay, in vé điện tử, yêu cầu hủy vé hoàn tiền trực tuyến. |
+| **Hành Khách (HSSV)** | Nguyễn Văn A (Ưu đãi) | `nguyenvana@gmail.com` | `123456` | Gửi mã sinh viên và ảnh thẻ sinh viên để nhận ưu đãi giảm 20% giá vé xe khách và thẻ vé tháng. |
 | **Tài Xế** *(Driver)* | Trần Văn Tài | `taixe.nguyen@smartbus.vn` | `123456` | Xem lịch trình phân công lái xe, danh sách hành khách lên xe của chuyến xe mình phụ trách. |
-| **Phụ Xe / Soát Vé** *(Staff)* | Trần Thị B | `nhanvien@smartbus.vn` | `123456` | Quét mã QR soát vé khách lên xe tại cửa xe, xác nhận lên xe (**Boarding**). |
+| **Phụ Xe / Soát Vé** *(Staff)* | Trần Thị B | `nhanvien@smartbus.vn` | `123456` | Quét mã QR soát vé khách lên xe tại cửa xe, xác nhận lên xe (**Boarding Check-in**). |
 
 ---
 
-## 🚀 4. Hướng Dẫn Khởi Chạy Hệ Thống Demo
-
-### Yêu Cầu Cài Đặt Ban Đầu:
-* **Python:** 3.10 trở lên (khuyên dùng Python 3.11 hoặc 3.12).
-* **Node.js:** 18.x trở lên kèm `npm`.
-* **Hệ điều hành:** Windows 10/11, macOS hoặc Linux.
-
----
+## 🚀 7. Hướng Dẫn Khởi Chạy Hệ Thống
 
 ### Cách 1: Khởi Chạy 1-Click Bằng File Batch (Khuyên Dùng Cho Windows)
-Chỉ cần nhấp đúp vào file `start_project.bat` tại thư mục gốc, hoặc chạy từ Terminal:
+Nhấp đúp chuột vào file `start_project.bat` tại thư mục gốc dự án, hoặc mở PowerShell chạy:
 
 ```powershell
 .\start_project.bat
 ```
 
 > **Script sẽ tự động:**
-> 1. Kiểm tra thư viện và nạp dữ liệu mẫu khởi tạo.
+> 1. Kiểm tra môi trường Python và Node.js.
 > 2. Khởi chạy Backend FastAPI Server tại cổng `8000`.
 > 3. Khởi chạy Frontend React Vite Dev Server tại cổng `5173`.
-> 4. Tự động bật trình duyệt web truy cập ngay **http://localhost:5173**.
+> 4. Tự động mở trình duyệt truy cập ngay **http://localhost:5173**.
 
 ---
 
 ### Cách 2: Khởi Chạy Thủ Công Từng Phân Hệ
 
 #### Bước 1: Khởi động Backend (FastAPI Server)
-Mở cửa sổ PowerShell/Terminal thứ nhất tại thư mục gốc dự án:
+Mở cửa sổ Terminal/PowerShell thứ nhất tại thư mục gốc:
 
 ```powershell
-# 1. Cài đặt các thư viện Python cần thiết
+# Cài đặt thư viện Python (chỉ chạy lần đầu)
 pip install -r requirements.txt
 
-# 2. Khởi chạy Backend Server (hỗ trợ tự động reload khi code thay đổi)
+# Khởi chạy Backend Server
 python backend/main.py
 ```
 * **Địa chỉ Backend API:** [http://127.0.0.1:8000](http://127.0.0.1:8000)
@@ -185,10 +224,9 @@ python backend/main.py
 * **Tài liệu Redoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
 
 #### Bước 2: Khởi động Frontend (React 19 + Vite)
-Mở cửa sổ PowerShell/Terminal thứ hai tại thư mục gốc:
+Mở cửa sổ Terminal/PowerShell thứ hai tại thư mục gốc:
 
 ```powershell
-# Di chuyển vào thư mục frontend và khởi chạy
 cd frontend
 npm install
 npm run dev
@@ -197,148 +235,78 @@ npm run dev
 
 ---
 
-### Cách 3: Khởi Chạy Qua NPM Script Tại Thư Mục Gốc
+## 🎬 8. Kịch Bản Trình Diễn Demo Các Tính Năng Mới Cập Nhật
 
+### 🎭 Kịch Bản 1: Đăng Ký Tài Khoản & Xác Minh Sinh Viên Bằng Ảnh Thẻ
+1. **Đăng ký tài khoản mới:**
+   - Bấm **"Đăng ký"** tại trang chủ hoặc truy cập `/register`.
+   - Form đăng ký được tinh giản gọn gàng: chỉ gồm Họ tên, Email, Số điện thoại, Mật khẩu (đã lược bỏ ô chọn đối tượng ưu đãi bên ngoài theo yêu cầu).
+   - Nhập thông tin và bấm **"Đăng Ký Ngay"** ➔ Hệ thống tự động tạo tài khoản thường và tự động đăng nhập.
+2. **Xác minh sinh viên trên Trang cá nhân:**
+   - Vào mục **"Trang cá nhân"** (`/dashboard?tab=profile`).
+   - Tại card **"🎓 Xác Minh Đối Tượng Ưu Đãi"**:
+     - Nhập **Mã sinh viên / Mã học sinh** (ví dụ: `B21DCCN001` hoặc `SV2026-889`).
+     - Nhập **Trường Đại Học / Học Viện** (ví dụ: `Đại học Bách Khoa`).
+     - Bấm **"📁 Chọn ảnh thẻ từ máy"** hoặc bấm **"🖼️ Dùng ảnh thẻ SV mẫu demo"** để đính kèm ảnh thẻ sinh viên. Ảnh xem trước hiển thị sắc nét.
+     - Bấm **"📤 Gửi Hồ Sơ Xác Minh Ưu Đãi"** ➔ Hệ thống ghi nhận trạng thái **"⏳ Chờ duyệt"**.
+
+---
+
+### 👑 Kịch Bản 2: Quản Trị Viên Duyệt Ưu Đãi & Đối Soát Doanh Thu Khớp Đơn Vé
+1. **Xét duyệt hồ sơ sinh viên kèm ảnh thẻ (US23):**
+   - Đăng nhập quyền **Admin**, chuyển đến tab **"🎓 Duyệt Ưu Đãi (US23)"**.
+   - Bảng danh sách hiển thị đầy đủ: ID, Họ tên, Email, Số điện thoại, **Mã Sinh Viên**, **Trường học** và cột **Ảnh Thẻ SV**.
+   - Bấm **"👁️ Xem ảnh"** ➔ Modal phóng to ảnh thẻ sinh viên xuất hiện rõ ràng để kiểm tra tính hợp lệ.
+   - Bấm **"✓ Duyệt"** ➔ Tài khoản người dùng được nâng cấp lên diện HSSV và tự động được giảm 20% khi mua vé.
+2. **Quản lý danh sách người dùng:**
+   - Tại tab **"👥 Quản Lý Người Dùng"**, bảng hiển thị thông tin cân đối, gọn gàng (đã bỏ cột Phân quyền lại RBAC theo đúng yêu cầu).
+3. **Báo cáo Doanh thu & Bảng kê đối soát giao dịch chi tiết:**
+   - Chuyển sang tab **"📊 Doanh Thu & Lấp Đầy"**.
+   - Thẻ KPI hiển thị số liệu chuẩn xác:
+     - **TỔNG DOANH THU THỰC NHẬN (NET):** Tổng tiền sau khi trừ hoàn vé.
+     - **DOANH THU GỘP (GROSS):** Tổng tiền thanh toán thành công.
+     - **TỔNG SỐ ĐƠN ĐẶT:** Số lượng đơn hàng giao dịch.
+     - **SỐ VÉ ĐÃ PHÁT HÀNH:** Đếm chính xác số lượng vé thực tế được cấp (kể cả đơn mua nhiều vé).
+   - Bảng theo ngày hiển thị rõ: `X đơn (Y vé)`.
+   - **Bảng kê chi tiết đơn hàng:** Hiển thị minh bạch từng giao dịch của khách hàng (Mã GD, Mã đơn, Tên & SĐT khách, Tuyến xe, Số vé & ghế ngồi, Cổng thanh toán, Tiền gốc, Hoàn tiền, Thực thu, Thời gian và Trạng thái).
+   - Bấm **"📥 Xuất File CSV"** để tải file đối soát doanh thu tài chính đầy đủ thông tin khách hàng và số ghế.
+
+---
+
+## 🧪 9. Kiểm Thử Chất Lượng (Quality Assurance & Testing)
+
+### 1. Kiểm thử Backend Tự Động (102/102 Tests Passed - 100% OK)
 ```powershell
-# Cài đặt toàn bộ thư viện Frontend từ root
-npm run install:frontend
-
-# Khởi chạy máy chủ phát triển Frontend
-npm run dev
-
-# Đóng gói sản phẩm biên dịch production (Build < 700ms)
-npm run build
+python -m pytest
 ```
-
----
-
-## 🎬 5. Kịch Bản Chi Tiết Các Bước Trình Diễn Demo
-
-Sau khi mở trình duyệt tại **[http://localhost:5173](http://localhost:5173)**, bạn hãy thực hiện theo kịch bản mẫu sau để kiểm tra đầy đủ các tính năng:
-
-### 🎭 Kịch Bản 1: Role Hành Khách (Customer Flow)
-1. **Tìm kiếm chuyến xe:**
-   - Tại Trang Chủ, chọn Điểm đi: `TP. Hồ Chí Minh`, Điểm đến: `Đà Lạt` (hoặc `Hà Nội` ➔ `Thái Nguyên`).
-   - Bấm **"Tìm Chuyến Xe"** ➔ Màn hình hiển thị danh sách các chuyến xe với thông tin giờ xuất bến, biển số xe, loại xe và giá vé.
-2. **Chọn ghế & Tạm giữ chỗ 10 phút:**
-   - Bấm **"Chọn Ghế"** trên một chuyến xe bất kỳ.
-   - Sơ đồ ghế 2 tầng hiển thị trực quan: Tầng Dưới (Dãy A: A01, A02...) và Tầng Trên (Dãy B: B01, B02...).
-   - Nhấp chọn ghế ➔ Đồng hồ đếm ngược **10:00** bắt đầu kích hoạt; hệ thống khóa ghế trên server chống xung đột giữ chỗ.
-3. **Áp dụng Voucher giảm giá:**
-   - Tại trang thanh toán, bấm vào nút **"Chọn Mã Giảm Giá"** ➔ Popup `VoucherModal` xuất hiện liệt kê các mã ưu đãi hợp lệ.
-   - Chọn mã giảm giá (ví dụ: `GIAM20K`, `HSSV20`) ➔ Tiền vé được trừ trực tiếp và hiển thị rõ ràng.
-4. **Thanh toán trực tuyến:**
-   - Chọn phương thức thanh toán: **VietQR / MoMo / VNPay**.
-   - Bấm **"Xác Nhận Thanh Toán"** ➔ Mã QR thanh toán kèm số tài khoản hiển thị. Sau khi hoàn tất, hệ thống cấp vé điện tử thành công.
-5. **Kiểm tra vé cá nhân ("Vé Của Tôi"):**
-   - Vào mục **Vé Của Tôi** (`/dashboard`).
-   - Vé vừa đặt hiển thị ngay lập tức trong tab **"Vé Sắp Khởi Hành"** (không bị nhầm lẫn thời gian với các vé quá khứ).
-   - Bấm **"In Vé / Xem Thẻ Vé"** để xem vé điện tử mã QR sắc nét.
-6. **Thử nghiệm Hủy vé & Yêu cầu hoàn tiền (US08):**
-   - Bấm **"Yêu Cầu Hủy Vé"** trên vé vừa đặt.
-   - Nhập lý do hủy, chọn Ngân hàng, nhập Số tài khoản và Tên chủ tài khoản nhận tiền hoàn.
-   - Bấm gửi ➔ Hệ thống tiếp nhận yêu cầu và cấp mã tra cứu hoàn tiền.
-7. **Trợ lý ảo Chatbot AI:**
-   - Nhấp vào biểu tượng Chatbot AI ở góc dưới cùng bên phải màn hình.
-   - Thử nhắn tin: *"Cho tôi biết giá vé đi Đà Lạt?"*, *"Chính sách hoàn hủy vé như thế nào?"*. Chatbot AI sẽ trả lời thông minh và gợi ý link xem chuyến.
-8. **Đăng ký / Gia hạn Vé tháng:**
-   - Truy cập tab **"Vé Tháng"** (`/monthly-pass`).
-   - Chọn tuyến xe thường xuyên đi lại, nhập thông tin cá nhân và thanh toán gia hạn vé tháng online.
-
----
-
-### 👑 Kịch Bản 2: Role Quản Trị Viên (Admin Flow)
-Đăng nhập tài khoản `admin@smartbus.vn` (mật khẩu `123456`) hoặc chọn vai trò **Admin** trên thanh Header:
-
-1. **Bảng số liệu tổng quan (Dashboard Overview):**
-   - Xem các thẻ thống kê tổng doanh thu, tổng số vé đã bán, tổng số chuyến xe và tổng số người dùng.
-   - Xem bảng phân bổ vai trò và tỷ lệ lấp đầy ghế (**Occupancy Rate**) thời gian thực (giá trị phần trăm chuẩn xác từ 0% đến 100%, không bị âm).
-2. **Thêm Tuyến xe mới:**
-   - Chọn tab **"Quản Lý Tuyến & Chuyến Xe"**.
-   - Bấm nút **"+ Thêm Tuyến Xe Mới"**.
-   - Nhập Điểm đi (VD: `Hà Nội`), Điểm đến (VD: `Hạ Long`), Cự ly (VD: `160 km`), Giá vé cơ bản (VD: `180,000 VNĐ`).
-   - Bấm **"Khởi Tạo Tuyến Xe"** ➔ Tuyến xe mới lập tức xuất hiện và có thể dùng cho toàn bộ hệ thống.
-3. **Thêm Chuyến xe mới:**
-   - Bấm nút **"+ Thêm Chuyến Xe Mới"**.
-   - Chọn tuyến xe vừa tạo, nhập giờ khởi hành, chọn xe buýt và đơn giá riêng của chuyến.
-   - Chọn gán trực tiếp **Tài xế** và **Phụ xe** vận hành chuyến đi.
-   - Bấm **"Khởi Tạo Chuyến Xe"** ➔ Chuyến xe mới sẽ xuất hiện trên trang tìm kiếm của khách hàng và lịch trình của tài xế ngay lập tức.
-4. **Phân công lại Nhân sự cho Chuyến xe:**
-   - Tại danh sách chuyến xe của Admin, bấm nút **"Gán Lại Nhân Sự"** trên một chuyến bất kỳ để đổi tài xế hoặc phụ xe.
-5. **Duyệt yêu cầu Hoàn tiền vé (Refund Approval):**
-   - Chọn tab **"Quản Lý Hoàn Tiền"**.
-   - Danh sách các yêu cầu hoàn tiền đang chờ (`PENDING`) hiển thị đầy đủ thông tin: Mã vé, Lý do hủy, Số tiền hoàn, Ngân hàng, Số tài khoản.
-   - Bấm **"✓ Xác Nhận Hoàn Tiền"** ➔ Trạng thái chuyển ngay sang **`REFUNDED` (Đã hoàn tiền)** và cập nhật vào lịch sử tài chính, không còn bị treo ở PENDING.
-6. **Thêm Mã Giảm Giá mới (Vouchers):**
-   - Bấm nút **"+ Tạo Mã Ưu Đãi Mới"**.
-   - Hệ thống có cơ chế kiểm tra ngày hết hạn: **chặn không cho phép tạo mã ưu đãi trong quá khứ**.
-7. **Báo cáo Tài chính & Xuất File CSV:**
-   - Chọn tab **"Báo Cáo Doanh Thu"**.
-   - Xem biểu đồ doanh thu theo ngày, doanh thu theo tuyến xe.
-   - Bấm nút **"Xuất File CSV Doanh Thu"** ➔ Trình duyệt tự động tải file `doanh_thu_smartbus_*.csv` chứa bảng kê chi tiết để báo cáo kế toán.
-8. **Duyệt hồ sơ Ưu đãi HSSV (US23):**
-   - Xem danh sách học sinh - sinh viên gửi thẻ sinh viên xác nhận ưu đãi và bấm duyệt 1-click.
-9. **Nhật ký Kiểm toán (Audit Logs US17):**
-   - Tra cứu vết toàn bộ các hành động trong phiên làm việc: ai đã soát vé, ai đã duyệt hoàn tiền, mã giao dịch nào đã được xử lý.
-
----
-
-### 🚍 Kịch Bản 3: Role Tài Xế (Driver Flow)
-1. Đăng nhập tài khoản `taixe.nguyen@smartbus.vn` (mật khẩu `123456`) hoặc chọn vai trò **Tài Xế**.
-2. Mở mục **"Lịch Trình Của Tôi"**:
-   - Hiển thị danh sách các chuyến xe được Admin phân công cho tài xế Trần Văn Tài.
-   - Xem thông tin biển số xe, giờ xuất bến, tuyến đường phụ trách.
-   - Xem danh sách hành khách đã đặt vé trên chuyến xe của mình.
-
----
-
-### 🎫 Kịch Bản 4: Role Phụ Xe / Soát Vé (Staff Flow)
-1. Đăng nhập tài khoản `nhanvien@smartbus.vn` (mật khẩu `123456`) hoặc chọn vai trò **Phụ Xe**.
-2. Truy cập màn hình **"Soát Vé"** (`/verify-ticket`):
-   - Mở camera quét mã QR trên vé điện tử của hành khách, hoặc nhập trực tiếp mã vé (VD: `TKT-HCM-001`, `TKT-TN-001`).
-   - Bấm **"Kiểm Tra Vé"** ➔ Hệ thống hiển thị trạng thái vé: **HỢP LỆ**, tên hành khách, số ghế và chuyến đi.
-   - Bấm **"Xác Nhận Lên Xe (Boarding)"** ➔ Trạng thái vé chuyển thành `USED` (Đã soát vé) và lưu vết vào Nhật ký soát vé.
-
----
-
-## 🧪 6. Hướng Dẫn Chạy Kiểm Thử Tự Động (Quality Assurance)
-
-### 1. Kiểm thử Backend (58/58 Tests Passed)
-Chạy toàn bộ bộ kiểm thử tự động của dự án bằng lệnh:
-
-```powershell
-python -m pytest -q
-```
-* **Kết quả:** `58 passed in < 10s (100% OK)` bao phủ đầy đủ tất cả các phân hệ: Đặt vé, Giữ ghế, Thanh toán, Đổi vé, Hoàn tiền, Vé tháng, Chatbot AI, Quản trị Admin, Doanh thu và Phân quyền.
+* **Kết quả:** `102 passed in ~11s (100% SUCCESS)`.
+* Bao phủ 13 bộ test suites kiểm tra toàn bộ: Đặt vé, Giữ ghế 10p, Cổng thanh toán (VietQR, VNPay, ZaloPay), Đổi/hủy vé, Hoàn tiền US08, Vé tháng US16, Chatbot AI, Quản lý chuyến, Báo cáo doanh thu và Phân quyền người dùng.
 
 ### 2. Kiểm thử Biên Dịch Frontend (Vite Production Build)
 ```powershell
-cd frontend
 npm run build
 ```
-* **Kết quả:** `✓ built in < 700ms`, toàn bộ 61 module được tối ưu hóa gzip hoàn hảo, 0 lỗi biên dịch.
+* **Kết quả:** `✓ built in < 2.0s`, tối ưu hóa tài nguyên hoàn hảo, 0 lỗi biên dịch.
 
 ---
 
-## 🛠️ 7. Quy Trình Phối Hợp Mã Nguồn (GitFlow Workflow)
+## 📜 10. Nhật Ký Phiên Bản (Changelog - Release v2.2.0)
 
-Dự án áp dụng quy chuẩn GitFlow chặt chẽ để đảm bảo không xảy ra xung đột mã nguồn:
-
-1. **Nhánh `develop`:** Nhánh hoạt động và tích hợp chính của toàn bộ dự án. Tất cả các chức năng mới sau khi kiểm thử đạt 100% đều được hợp nhất vào nhánh này.
-2. **Nhánh `main`:** Nhánh phát hành chính thức (Release), được bảo vệ và đóng gói từ `develop`.
-3. **Nhánh tính năng (`feature/fe-*` và `feature/be-*`):**
-   - Đội ngũ Frontend làm việc trên các nhánh `feature/fe-*` (chỉ thao tác trong thư mục `frontend/`).
-   - Đội ngũ Backend làm việc trên các nhánh `feature/be-*` (chỉ thao tác trong thư mục `backend/`).
-   - Tất cả Pull Request đều hướng vào nhánh `develop`, có tiêu đề và mô tả rõ ràng theo mẫu `.github/pull_request_template.md`.
+* **Phiên bản v2.2.0 (20/10/2026) — Final Golden Release:**
+  * ✨ **Xác minh sinh viên:** Đổi trường xác minh thành Mã sinh viên và tích hợp chức năng tải ảnh thẻ sinh viên (kèm preview xem trước và modal phóng to cho Admin).
+  * 🎨 **Tối ưu form đăng ký:** Loại bỏ ô chọn đối tượng ưu đãi bên ngoài, hướng dẫn khách hàng đăng ký xong xác minh trong trang cá nhân.
+  * 🛡️ **Tinh giản Admin:** Loại bỏ cột "Phân quyền lại (RBAC)" không hợp lý, cân đối lại giao diện quản lý người dùng.
+  * 📊 **Chuẩn hóa Báo cáo Doanh thu:** Sửa lỗi đếm số vé phát hành (khớp đúng số vé của từng đơn), sửa logic đối soát hoàn tiền và bổ sung bảng kê chi tiết từng giao dịch của khách hàng.
+  * 📖 **Tài liệu:** Bổ sung chi tiết môi trường lập trình, quy trình Agile của team và phân tích ưu/nhược điểm CSDL.
 
 ---
 
-## 📞 8. Thông Tin Liên Hệ & Hỗ Trợ
+## 📞 11. Thông Tin Nhóm Phát Triển & Liên Hệ
 
 * **Đồ án:** Thực tập Cơ sở K7S3 — Nhóm 01 (Hệ thống Smart Bus Ticketing)
-* **Leader & Đại diện kỹ thuật:** Lê Gia Bảo
+* **Trưởng nhóm & Kỹ thuật:** Lê Gia Bảo
 * **Email:** `hotro@smartbus.vn` | `dtc245220019@ictu.edu.vn`
-* **Hotline hỗ trợ kỹ thuật:** `1900 6868`
+* **Hotline kỹ thuật:** `1900 6868`
 
 ---
 © 2026 Smart BusTicketing — Unified Ecosystem. Bản quyền thuộc về Nhóm 01.
