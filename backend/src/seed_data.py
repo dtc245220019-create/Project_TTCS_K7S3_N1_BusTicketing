@@ -487,8 +487,17 @@ def seed_rich_demo_data(connection: sqlite3.Connection) -> None:
         )
 
     # 16. Cập nhật discount_status cho người dùng chờ duyệt (US23)
-    connection.execute("UPDATE users SET discount_status = 'ChoDuyet' WHERE id IN (1, 3)")
+    connection.execute("""
+        UPDATE users 
+        SET discount_type = 'Khong', 
+            discount_status = 'ChoDuyet',
+            student_id = 'SV-BK-2026',
+            proof_note = 'Đại học Bách Khoa TP.HCM - Khoa CNTT',
+            card_image = 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80'
+        WHERE id = 1
+    """)
     connection.execute("UPDATE users SET discount_status = 'DaDuyet' WHERE id = 10")
+    connection.execute("UPDATE users SET discount_status = 'None', student_id = NULL, card_image = NULL WHERE id NOT IN (1, 10)")
 
     # 17. Demo FAQs & Hệ thống Hướng dẫn vận hành 4 Role (SmartBus Knowledge Base)
     demo_faqs = [

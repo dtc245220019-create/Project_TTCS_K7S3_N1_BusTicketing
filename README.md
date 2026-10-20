@@ -1,7 +1,7 @@
 # 🚌 HỆ THỐNG ĐẶT VÉ XE BUÝT THÔNG MINH (SMART BUS TICKETING)
 > **Đồ án Thực tập Cơ sở K7S3 — Nhóm 01**  
 > **Repository:** [Project_TTCS_K7S3_N1_BusTicketing](https://github.com/dtc245220019-create/Project_TTCS_K7S3_N1_BusTicketing.git)  
-> **Phiên bản hiện tại:** `v2.2.0 - Final Golden Release` (Cập nhật ngày 20/10/2026)  
+> **Phiên bản hiện tại:** `v2.2.1 - Hotfix & Conductor Synchronization Release` (Cập nhật ngày 20/10/2026)  
 > **Trạng thái kiểm thử:** 100% vượt qua kiểm thử tự động (**102/102 Pytest Tests Passed**), Frontend Vite Production Build thành công, cấu trúc GitFlow chuẩn hóa, phân tách riêng biệt `backend/` và `frontend/`.
 
 ---
@@ -290,7 +290,18 @@ npm run build
 
 ---
 
-## 📜 10. Nhật Ký Phiên Bản (Changelog - Release v2.2.0)
+## 📜 10. Nhật Ký Phiên Bản (Changelog)
+
+* **Phiên bản v2.2.1 (20/10/2026) — Hotfix & Conductor Synchronization Release:**
+  * 🛡️ **Khắc phục lỗi tự động đẩy duyệt ưu đãi HSSV:**
+    * Sửa logic kiểm tra yêu cầu ưu đãi trong Backend API (`get_pending_discounts`): Chỉ hiển thị các tài khoản thực sự đã nộp hồ sơ (có Mã sinh viên hoặc Ảnh thẻ sinh viên và trạng thái `ChoDuyet`).
+    * Sửa giá trị mặc định của `discount_status` thành `None` (thay vì tự gán `ChoDuyet`), bảo đảm khách hàng mới đăng ký hoặc chưa gửi duyệt sẽ không bị tự động đẩy lên trang quản trị viên.
+    * Xóa bỏ các chuỗi dữ liệu giả định hardcode (`SV2026-889`, `Đại học Bách Khoa`) trên giao diện Admin; chỉ hiển thị dữ liệu xác thực thực tế do người dùng cung cấp.
+  * 🎫 **Đồng bộ hóa & Hoàn thiện Nghiệp vụ Role Phụ Xe (`PhuXe`):**
+    * Mở rộng quyền cho Phụ xe và Admin kiểm soát danh sách hành khách của tất cả các chuyến xe đang vận hành trong hệ thống thay vì bị giới hạn 0 chuyến xe.
+    * Đồng bộ hóa dữ liệu hành khách theo thời gian thực: Hợp nhất tức thì các vé mới được khách hàng đặt trực tuyến (qua API và phiên Client).
+    * Bổ sung nút **"🔄 Làm Mới Vé"** và thanh tìm kiếm nhanh theo Tên hành khách, Số điện thoại, Số ghế và Mã vé.
+    * Nâng cấp thao tác duyệt khách lên xe (**"🚪 Duyệt Cho Lên Xe"**), tự động chuyển đổi trạng thái vé sang `USED` (Đã lên xe) và ghi nhật ký soát vé bảo mật.
 
 * **Phiên bản v2.2.0 (20/10/2026) — Final Golden Release:**
   * ✨ **Xác minh sinh viên:** Đổi trường xác minh thành Mã sinh viên và tích hợp chức năng tải ảnh thẻ sinh viên (kèm preview xem trước và modal phóng to cho Admin).

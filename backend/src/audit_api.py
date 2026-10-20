@@ -50,7 +50,13 @@ def get_pending_discounts():
             SELECT id, full_name, email, phone, discount_type, discount_status,
                    student_id, card_image, id_card_number, proof_note
             FROM users 
-            WHERE discount_status = 'ChoDuyet' OR discount_type != 'Khong'
+            WHERE discount_status = 'ChoDuyet' 
+              AND (
+                  (student_id IS NOT NULL AND TRIM(student_id) != '') 
+                  OR (card_image IS NOT NULL AND TRIM(card_image) != '') 
+                  OR (discount_type != 'Khong' AND discount_type IS NOT NULL AND discount_type != 'None')
+              )
+              AND role NOT IN ('ADMIN', 'Admin', 'QuanTriVien', 'PhuXe', 'TaiXe', 'DRIVER', 'CONDUCTOR', 'STAFF')
             """
         ).fetchall()
         return [dict(u) for u in users]

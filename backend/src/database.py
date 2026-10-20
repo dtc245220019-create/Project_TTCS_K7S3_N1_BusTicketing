@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT DEFAULT 'pbkdf2:sha256:123456',
     role TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (role IN ('CUSTOMER', 'STAFF', 'ADMIN', 'DRIVER', 'CONDUCTOR', 'TaiXe', 'PhuXe', 'HanhKhach', 'Admin', 'QuanTriVien')),
     discount_type TEXT DEFAULT 'Khong',
-    discount_status TEXT DEFAULT 'ChoDuyet',
+    discount_status TEXT DEFAULT 'None',
     student_id TEXT DEFAULT NULL,
     card_image TEXT DEFAULT NULL,
     id_card_number TEXT DEFAULT NULL,
@@ -410,7 +410,7 @@ def initialize_database(connection: sqlite3.Connection) -> None:
         user_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1]
                      for row in connection.execute("PRAGMA table_info(users)").fetchall()}
         if "discount_status" not in user_cols:
-            connection.execute("ALTER TABLE users ADD COLUMN discount_status TEXT DEFAULT 'ChoDuyet'")
+            connection.execute("ALTER TABLE users ADD COLUMN discount_status TEXT DEFAULT 'None'")
         if "student_id" not in user_cols:
             connection.execute("ALTER TABLE users ADD COLUMN student_id TEXT DEFAULT NULL")
         if "card_image" not in user_cols:
@@ -490,7 +490,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False, default="pbkdf2:sha256:123456")
     role = Column(String(30), default="CUSTOMER")  # CUSTOMER, STAFF, ADMIN, DRIVER, CONDUCTOR
     discount_type = Column(String(30), default="Khong")  # HSSV, NguoiCaoTuoi, Khong
-    discount_status = Column(String(30), default="ChoDuyet")
+    discount_status = Column(String(30), default="None")
     created_at = Column(DateTime, default=datetime.now)
 
     bookings = relationship("Booking", back_populates="user")

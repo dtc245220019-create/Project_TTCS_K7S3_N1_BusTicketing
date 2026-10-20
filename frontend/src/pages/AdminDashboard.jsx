@@ -1602,11 +1602,11 @@ function AdminDashboard() {
                       <td style={{ padding: '10px 12px', color: '#475569' }}>{pu.phone || '098*******'}</td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1e3a8a', backgroundColor: '#eff6ff', padding: '2px 6px', borderRadius: '4px' }}>
-                          {pu.student_id || pu.id_card_number || 'SV2026-889'}
+                          {pu.student_id || pu.id_card_number || 'Chưa cập nhật'}
                         </span>
                       </td>
                       <td style={{ padding: '10px 12px', color: '#475569', fontSize: '12px' }}>
-                        {pu.proof_note || 'Đại học Bách Khoa'}
+                        {pu.proof_note || 'Chưa có ghi chú'}
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         {pu.card_image ? (
@@ -1614,31 +1614,27 @@ function AdminDashboard() {
                             <img
                               src={pu.card_image}
                               alt="Thẻ sinh viên"
-                              onClick={() => setPreviewImageModal({ img: pu.card_image, name: pu.full_name, code: pu.student_id || pu.id_card_number })}
+                              onClick={() => setPreviewImageModal({ img: pu.card_image, name: pu.full_name, code: pu.student_id || pu.id_card_number || 'SV' })}
                               style={{ width: '45px', height: '30px', objectFit: 'cover', borderRadius: '4px', cursor: 'pointer', border: '1px solid #cbd5e1' }}
                               title="Bấm để xem ảnh lớn"
                             />
                             <button
                               type="button"
-                              onClick={() => setPreviewImageModal({ img: pu.card_image, name: pu.full_name, code: pu.student_id || pu.id_card_number })}
+                              onClick={() => setPreviewImageModal({ img: pu.card_image, name: pu.full_name, code: pu.student_id || pu.id_card_number || 'SV' })}
                               style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
                             >
                               👁️ Xem ảnh
                             </button>
                           </div>
                         ) : (
-                          <button
-                            type="button"
-                            onClick={() => setPreviewImageModal({ img: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80', name: pu.full_name, code: pu.student_id || pu.id_card_number || 'SV2026-889' })}
-                            style={{ border: 'none', background: 'none', color: '#2563eb', fontSize: '11px', cursor: 'pointer', textDecoration: 'underline' }}
-                          >
-                            👁️ Xem thẻ SV
-                          </button>
+                          <span style={{ color: '#94a3b8', fontSize: '11px', fontStyle: 'italic' }}>
+                            Chưa đính kèm ảnh
+                          </span>
                         )}
                       </td>
                       <td style={{ padding: '10px 12px' }}>
                         <span style={{ backgroundColor: '#eff6ff', color: '#1d4ed8', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold' }}>
-                          {pu.discount_type || 'HSSV'} (-20%)
+                          {pu.discount_type === 'HSSV' ? 'Sinh viên (-20%)' : pu.discount_type === 'NguoiCaoTuoi' ? 'Người cao tuổi (-15%)' : pu.discount_type === 'ThuongBinh' ? 'Thương binh (-30%)' : (pu.discount_type || 'Sinh viên (-20%)')}
                         </span>
                       </td>
                       <td style={{ padding: '10px 12px' }}>

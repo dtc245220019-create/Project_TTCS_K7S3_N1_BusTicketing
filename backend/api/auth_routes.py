@@ -24,8 +24,8 @@ def register_user(payload: RegisterRequest):
             raise HTTPException(status_code=400, detail="Email hoặc số điện thoại đã được đăng ký")
 
         cursor = connection.execute(
-            """INSERT INTO users (full_name, email, phone, password_hash, role, discount_type)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO users (full_name, email, phone, password_hash, role, discount_type, discount_status)
+               VALUES (?, ?, ?, ?, ?, ?, 'None')""",
             (
                 payload.full_name.strip(),
                 payload.email.strip().lower(),
@@ -229,7 +229,7 @@ def update_profile_endpoint(payload: UpdateProfileRequest):
                 "phone": updated_user["phone"],
                 "role": updated_user["role"],
                 "discount_type": updated_user["discount_type"],
-                "discount_status": updated_user["discount_status"] if "discount_status" in updated_user.keys() else "ChoDuyet",
+                "discount_status": updated_user["discount_status"] if ("discount_status" in updated_user.keys() and updated_user["discount_status"]) else "None",
             },
         }
 
@@ -309,7 +309,7 @@ def login_user(payload: LoginRequest):
                 "phone": user["phone"],
                 "role": user["role"],
                 "discount_type": user["discount_type"],
-                "discount_status": user["discount_status"] if "discount_status" in user.keys() else "ChoDuyet",
+                "discount_status": user["discount_status"] if ("discount_status" in user.keys() and user["discount_status"]) else "None",
             },
             "message": "Đăng nhập thành công!",
         }

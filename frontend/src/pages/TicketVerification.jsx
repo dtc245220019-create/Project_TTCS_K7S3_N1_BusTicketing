@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
   getCurrentUser,
@@ -23,6 +23,8 @@ function TicketVerification() {
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [_manifestLoading, setManifestLoading] = useState(false);
   const [boardFeedback, setBoardFeedback] = useState('');
+  const [ticketRefreshTrigger, setTicketRefreshTrigger] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Check authorization
   const isAuthorized =
@@ -50,14 +52,15 @@ function TicketVerification() {
   const loadManifestTrips = async () => {
     setManifestLoading(true);
     try {
-      const data = await getDriverTrips(currentUser?.id);
-      const tripsList = data.trips || data || [];
+      const u = getCurrentUser() || currentUser;
+      const data = await getDriverTrips(u?.id);
+      const tripsList = Array.isArray(data) ? data : (data?.trips || []);
       setDriverTrips(tripsList);
-      if (tripsList.length > 0 && !selectedTripId) {
-        setSelectedTripId(tripsList[0].id);
+      if (tripsList.length > 0) {
+        setSelectedTripId((prev) => (prev && tripsList.some((t) => t.id === prev) ? prev : tripsList[0].id));
       }
     } catch (err) {
-      console.warn('Lỗi tải danh sách chuyến của tài xế:', err);
+      console.warn('Lỗi tải danh sách chuyến của tài xế / phụ xe:', err);
     } finally {
       setManifestLoading(false);
     }
@@ -192,24 +195,43 @@ function TicketVerification() {
 
   const handleBoardPassenger = async (ticketId, passengerName) => {
     try {
-      await boardPassenger(ticketId, currentUser?.email || 'taixe.nguyen@smartbus.vn');
-      setBoardFeedback(`✅ Đã xác nhận hành khách ${passengerName} (Vé #${ticketId}) lên xe thành công!`);
-      // Update manifest locally
+      await boardPassenger(ticketId, currentUser?.email || 'nhanvien@smartbus.vn');
+      setBoardFeedback(`✅ Đã duyệt hành khách ${passengerName} (Mã vé: ${ticketId}) lên xe thành công!`);
+
+      // Cập nhật trạng thái vé trong localStorage smartbus_purchased_tickets
+      try {
+        const localList = JSON.parse(localStorage.getItem('smartbus_purchased_tickets') || '[]');
+        const updated = localList.map((t) => {
+          const matchId = String(t.ticket_code || t.id || '').toUpperCase();
+          if (matchId === String(ticketId).toUpperCase()) {
+            return { ...t, status: 'USED', boarded: true };
+          }
+          return t;
+        });
+        localStorage.setItem('smartbus_purchased_tickets', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Lỗi cập nhật local tickets:', e);
+      }
+
+      // Cập nhật danh sách manifest trong state
       setDriverTrips((prev) =>
         prev.map((trip) => {
           if (trip.id === selectedTripId && trip.passengers) {
             return {
               ...trip,
-              passengers: trip.passengers.map((p) =>
-                p.ticket_id === ticketId || p.ticket_code === ticketId
-                  ? { ...p, status: 'USED', boarded: true }
-                  : p
-              ),
+              passengers: trip.passengers.map((p) => {
+                const pCode = String(p.ticket_code || p.ticket_id || '').toUpperCase();
+                if (pCode === String(ticketId).toUpperCase() || p.ticket_id === ticketId || p.ticket_code === ticketId) {
+                  return { ...p, status: 'USED', ticket_status: 'USED', boarded: true };
+                }
+                return p;
+              }),
             };
           }
           return trip;
         })
       );
+      setTicketRefreshTrigger((v) => v + 1);
       loadLogs();
       setTimeout(() => setBoardFeedback(''), 4000);
     } catch (err) {
@@ -338,8 +360,91 @@ function TicketVerification() {
   }
 
   const selectedTrip = driverTrips.find((t) => t.id === selectedTripId) || driverTrips[0];
-  const manifestPassengers = selectedTrip?.passengers || [];
-  const boardedCount = manifestPassengers.filter((p) => p.status === 'USED' || p.status === 'BOARDED' || p.boarded).length;
+
+  // Hợp nhất dữ liệu hành khách theo thời gian thực từ Backend API và LocalStorage (vé vừa đặt online)
+  const manifestPassengers = useMemo(() => {
+    if (!selectedTrip) return [];
+
+    const apiPassengers = selectedTrip.passengers || [];
+    let localPurchased = [];
+    try {
+      localPurchased = JSON.parse(localStorage.getItem('smartbus_purchased_tickets') || '[]');
+    } catch {
+      localPurchased = [];
+    }
+
+    // Lọc các vé local khớp với chuyến xe được chọn (theo ID chuyến hoặc điểm đi - điểm đến)
+    const matchingLocal = localPurchased.filter((lt) => {
+      if (lt.trip_id && Number(lt.trip_id) === Number(selectedTrip.id)) return true;
+      if (lt.departure_city && lt.arrival_city && selectedTrip.origin && selectedTrip.destination) {
+        return (
+          lt.departure_city.toLowerCase().trim() === selectedTrip.origin.toLowerCase().trim() &&
+          lt.arrival_city.toLowerCase().trim() === selectedTrip.destination.toLowerCase().trim()
+        );
+      }
+      return false;
+    });
+
+    const mergedMap = new Map();
+
+    // 1. Thêm danh sách từ Backend API
+    apiPassengers.forEach((p) => {
+      const code = (p.ticket_code || `ID-${p.ticket_id}`).toUpperCase();
+      mergedMap.set(code, {
+        ticket_id: p.ticket_id || code,
+        ticket_code: p.ticket_code || code,
+        seat_number: p.seat_number || 'A01',
+        passenger_name: p.passenger_name || p.customer_name || 'Hành khách',
+        customer_name: p.passenger_name || p.customer_name || 'Hành khách',
+        phone: p.phone || p.passenger_phone || p.customer_phone || '0901234567',
+        passenger_phone: p.phone || p.passenger_phone || p.customer_phone || '0901234567',
+        customer_phone: p.phone || p.passenger_phone || p.customer_phone || '0901234567',
+        ticket_status: p.ticket_status || p.status || 'PAID',
+        boarded: p.ticket_status === 'USED' || p.status === 'USED' || p.boarded === true,
+      });
+    });
+
+    // 2. Thêm hoặc cập nhật vé từ LocalStorage (vé vừa mua ở Client)
+    matchingLocal.forEach((lt, idx) => {
+      const code = (lt.ticket_code || lt.id || `TKT-LOCAL-${idx}`).toUpperCase();
+      if (mergedMap.has(code)) {
+        const item = mergedMap.get(code);
+        if (lt.status === 'USED' || lt.boarded) {
+          item.boarded = true;
+          item.ticket_status = 'USED';
+        }
+      } else {
+        const isUsed = lt.status === 'USED' || lt.boarded === true;
+        mergedMap.set(code, {
+          ticket_id: lt.id || code,
+          ticket_code: lt.ticket_code || code,
+          seat_number: lt.seatNumber || lt.seat_number || `A0${idx + 1}`,
+          passenger_name: lt.passenger_name || 'Hành khách',
+          customer_name: lt.passenger_name || 'Hành khách',
+          phone: lt.passenger_phone || lt.phone || '0901234567',
+          passenger_phone: lt.passenger_phone || lt.phone || '0901234567',
+          customer_phone: lt.passenger_phone || lt.phone || '0901234567',
+          ticket_status: isUsed ? 'USED' : 'PAID',
+          boarded: isUsed,
+        });
+      }
+    });
+
+    let list = Array.from(mergedMap.values());
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      list = list.filter(
+        (p) =>
+          p.passenger_name?.toLowerCase().includes(term) ||
+          p.phone?.toLowerCase().includes(term) ||
+          p.ticket_code?.toLowerCase().includes(term) ||
+          p.seat_number?.toLowerCase().includes(term)
+      );
+    }
+    return list;
+  }, [selectedTrip, ticketRefreshTrigger, searchTerm]);
+
+  const boardedCount = manifestPassengers.filter((p) => p.ticket_status === 'USED' || p.boarded).length;
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '28px 20px', minHeight: '80vh' }}>
@@ -721,28 +826,71 @@ function TicketVerification() {
               </p>
             </div>
 
-            {/* Trip selector */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Chọn Chuyến:</span>
-              <select
-                value={selectedTripId || ''}
-                onChange={(e) => setSelectedTripId(Number(e.target.value))}
+            {/* Trip selector & Actions */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="text"
+                placeholder="🔍 Tìm tên, SĐT, số ghế..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
                   padding: '8px 12px',
                   borderRadius: '8px',
                   border: '1.5px solid #cbd5e1',
                   fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#1e293b',
+                  minWidth: '200px',
                   outline: 'none',
                 }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#475569' }}>Chuyến:</span>
+                <select
+                  value={selectedTripId || ''}
+                  onChange={(e) => setSelectedTripId(Number(e.target.value))}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #cbd5e1',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#1e293b',
+                    outline: 'none',
+                    maxWidth: '320px',
+                  }}
+                >
+                  {driverTrips.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      #{t.id}: {t.origin} ➔ {t.destination} ({t.departure_time?.slice(11, 16) || t.departure_at?.slice(11, 16) || '08:00'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  loadManifestTrips();
+                  setTicketRefreshTrigger((v) => v + 1);
+                  setBoardFeedback('🔄 Đã cập nhật và đồng bộ danh sách khách đặt vé mới nhất!');
+                  setTimeout(() => setBoardFeedback(''), 3000);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 14px',
+                  backgroundColor: '#0284c7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)',
+                }}
+                title="Đồng bộ danh sách vé mới đặt từ khách hàng"
               >
-                {driverTrips.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    Chuyến #{t.id}: {t.origin} ➔ {t.destination} ({t.departure_time?.slice(11, 16) || t.departure_at?.slice(11, 16) || '08:00'}) - Xe {t.license_plate || '51B-888.99'}
-                  </option>
-                ))}
-              </select>
+                🔄 Làm Mới Vé
+              </button>
             </div>
           </div>
 
@@ -837,35 +985,38 @@ function TicketVerification() {
                           {p.ticket_code || `TKT-${p.ticket_id || idx + 100}`}
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: '600', color: '#1e293b' }}>
-                          {p.customer_name || p.passenger_name || 'Khách hàng'}
+                          {p.passenger_name || p.customer_name || 'Khách hàng'}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#64748b' }}>
-                          {p.customer_phone || p.passenger_phone || '090*******'}
+                        <td style={{ padding: '12px 14px', color: '#475569', fontWeight: '500' }}>
+                          {p.phone || p.passenger_phone || p.customer_phone || '0901234567'}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <span
                             style={{
                               fontSize: '12px',
                               fontWeight: 'bold',
-                              padding: '3px 8px',
+                              padding: '4px 10px',
                               borderRadius: '6px',
                               backgroundColor: isBoarded ? '#dcfce7' : '#fef3c7',
                               color: isBoarded ? '#166534' : '#92400e',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
                             }}
                           >
-                            {isBoarded ? '✅ Đã Lên Xe' : '⏳ Chờ Lên Xe (Đã Trả Tiền)'}
+                            {isBoarded ? '✅ Đã Lên Xe' : '⏳ Chờ Duyệt Lên Xe'}
                           </span>
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           {isBoarded ? (
-                            <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 'bold' }}>
-                              ✓ Đã check-in
+                            <span style={{ fontSize: '12px', color: '#16a34a', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              ✓ Đã lên xe
                             </span>
                           ) : (
                             <button
-                              onClick={() => handleBoardPassenger(p.ticket_code || p.ticket_id, p.customer_name || p.passenger_name)}
+                              onClick={() => handleBoardPassenger(p.ticket_code || p.ticket_id, p.passenger_name || p.customer_name)}
                               style={{
-                                backgroundColor: '#2563eb',
+                                backgroundColor: '#16a34a',
                                 color: 'white',
                                 border: 'none',
                                 padding: '6px 14px',
@@ -873,9 +1024,11 @@ function TicketVerification() {
                                 fontSize: '12px',
                                 fontWeight: 'bold',
                                 cursor: 'pointer',
+                                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)',
                               }}
+                              title="Duyệt cho hành khách bước lên xe"
                             >
-                              🚪 Cho Lên Xe
+                              🚪 Duyệt Cho Lên Xe
                             </button>
                           )}
                         </td>
